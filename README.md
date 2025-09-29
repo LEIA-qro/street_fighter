@@ -222,6 +222,10 @@ With the virtual environment active, install the required packages:
 
 ```bash
 pip install gym==0.21.0 gym-retro==0.8.0
+pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 torchaudio==2.1.2+cu121 --extra-index-url https://download.pytorch.org/whl/cu121
+pip install stable-baselines3==1.7.0
+pip install optuna
+pip install "shimmy>=2.0"
 ```
 
 
