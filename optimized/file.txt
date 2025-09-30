@@ -1,2 +1,12 @@
 
 Pelon el que lo lea c:
+
+Best Hyperparameters found with 200000 timesteps, 16 eval episodes, 100 n_trials and a reward defined as reward = (self.w_enemy_damage * delta_enemy) + (self.w_self_damage * delta_self) + (self.w_score * delta_score) + match_result with self.w_enemy_damage = 1.5
+self.w_self_damage = -1.0
+self.w_score = 0.001
+self.w_repeat_action = -0.01
+self.w_match_won = 50
+
+were found at n_eval = 93 with a mean reward of 420.780 (31% higher than the average mean reward). Note, optimal learning rate might be too low for finite training, usage of 1e-7 or even 1e-6 for more aggressive tuning is an option.
+
+{'n_steps': 2304, 'gamma': 0.8996202835938458, 'learning_rate': 3.396716512805323e-08, 'clip_range': 0.1999067885598749, 'gae_lambda': 0.8494338004460419}
