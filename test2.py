@@ -143,7 +143,7 @@ class StreetFighter(Env):
 # Test to see everything working
 
 
-for game in range(1):
+for game in range(5):
     # Reset game to starting state
     try:
         env = StreetFighter()

@@ -178,10 +178,10 @@ def optimize_agent(trial):
     # Create training algorithm
     # model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)  # We unpack the model parameters obtained from the tuner and pass them to the PPO model
     model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)
-    model.learn(total_timesteps=30000) #300000  # We train the model. Longer timesteps means a better model, but also a longer training time. 100k is good, 30k is quick but inaccurate
+    model.learn(total_timesteps=300000) #300000  # We train the model. Longer timesteps means a better model, but also a longer training time. 100k is good, 30k is quick but inaccurate
     
     # Evaluate model
-    mean_reward = evaluate_policy(model, env, n_eval_episodes=5) #10  # We unpack the results obtained from evaluate policy. We will evaluate the model on 5 different games (more == better)
+    mean_reward = evaluate_policy(model, env, n_eval_episodes=16) #10  # We unpack the results obtained from evaluate policy. We will evaluate the model on 5 different games (more == better)
     env.close()
 
     SAVE_PATH = os.path.join(OPT_DIR, 'trial_{}_best_model'.format(trial.number))
@@ -203,7 +203,7 @@ def optimize_agent(trial):
 # Tuning
 
 study = optuna.create_study(direction='maximize')  # We create the experiment / study that seeks to maximize the mean reward
-study.optimize(optimize_agent, n_trials=1, n_jobs=1)  # We optimize the study based on the agent created, and how many sets we will set. 10 is good for testing, 100+ is recommended for a good model
+study.optimize(optimize_agent, n_trials=50, n_jobs=1)  # We optimize the study based on the agent created, and how many sets we will set. 10 is good for testing, 100+ is recommended for a good model
 # n_trials=20
 
 

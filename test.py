@@ -41,7 +41,7 @@ for game in range(1):
         obs, reward, done, info = env.step(env.action_space.sample())
 
         # We slow down the renders so they are watchable
-        time.sleep(0)
+        time.sleep(0.01)
 
         # We print the reward
         print(reward)
