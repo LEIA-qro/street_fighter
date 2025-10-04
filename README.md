@@ -114,11 +114,7 @@ From your project folder run:
 **Warning**
 > PowerShell may block script execution by default.  
 > If you see an error about `ExecutionPolicy`, either switch to **CMD** (below)  
-> or run PowerShell as administrator (this might be more flexible, but for simplicity use CMD) and set:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+> or run PowerShell as administrator (this might be more flexible, but for simplicity use CMD):
 
 <br>
 
@@ -162,20 +158,20 @@ import sys
 print("Python running from:", sys.executable)
 ```
 
-Expected when correct:
+Expected output:
 
 ```
 C:\Users\User\Desktop\Coding\street_fighter\venv\Scripts\python.exe
 ```
 
-If it shows a path under `AppData\Local\Programs\Python\...`  
-you are using the global Python and not the venv.
+> If it shows a path under `AppData\Local\Programs\Python\...`  
+> you are using the global Python and not the venv.
 
 
 <br>
 
-### Common `pip` / compatibility notes (Windows + Python 3.8)
-- Newer releases of `pip` (25.x) may use typing features that are only compatible with Python >= 3.9. If `pip` inside the venv throws errors like `TypeError: 'ABCMeta' object is not subscriptable`, then the venv's pip is broken.
+#### Common `pip` / compatibility notes (Windows + Python 3.8)
+> Newer releases of `pip` (25.x) may use typing features that are only compatible with Python >= 3.9. If `pip` inside the venv throws errors like `TypeError: 'ABCMeta' object is not subscriptable`, then the venv's pip is broken.
 
 <br>
 <details>
@@ -184,7 +180,7 @@ you are using the global Python and not the venv.
   
   <br>
   
-  1. Remove the broken venv:
+  1. Remove the broken venv either manually or with:
 
   ```cmd
   rmdir /s /q venv
