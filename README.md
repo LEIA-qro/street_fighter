@@ -1,24 +1,5 @@
 # Reinforcement Learning – Street Fighter
 
-<details>
-  <summary>Cosas por cambiar del readme</summary>
-    - instalar jupyther
-    - en \roms ejecutar:   python -m retro.import
-    - ejecutar test.py en el venv:  python test.py
-    <br>
-    Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to copy
-    H<sub>2</sub>O and x<sup>2</sup>
-    <details>
-      <summary>Click to expand</summary>
-        This content is hidden by default!
-        ```python
-        print("Hidden code example")
-        ```
-    </details>
-</details>
-
-
-
 [![Python](https://img.shields.io/badge/python-3.8.10-blue.svg)](https://www.python.org/)
 
 _Windows Setup guide (English)_
@@ -187,6 +168,8 @@ If there is an issue with `pip`, make sure to regenetate it, stable version that
 ## Dependencies
 <br>
 
+### Packages
+
 With the virtual environment active, install the required packages:
 
 ```bash
@@ -207,6 +190,15 @@ pip install "shimmy>=2.0"
 pip install -r requirements.txt
 ```
 
+<br>
+
+### ROMS
+
+After ypu have succesfully installed the packages. In **cmd** or in **PowerShell** run the following line: 
+
+```bash
+cd roms && python -m retro.import .
+```
 
 <br>
 
@@ -220,3 +212,13 @@ Run:
 ```bash
 python test.py
 ```
+
+
+<!--
+Cosas por Cambiar en el ReadME
+  - instalar jupyther ??????
+  - en \roms ejecutar:   python -m retro.import COMPLETADO
+  - ejecutar test.py en el venv:  python test.py COMPLETADO
+    
+-->
+
