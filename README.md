@@ -170,10 +170,16 @@ C:\Users\User\Desktop\Coding\street_fighter\venv\Scripts\python.exe
 
 <br>
 
-#### Common `pip` / compatibility notes (Windows + Python 3.8)
-> Newer releases of `pip` (25.x) may use typing features that are only compatible with Python >= 3.9. If `pip` inside the venv throws errors like `TypeError: 'ABCMeta' object is not subscriptable`, then the venv's pip is broken.
+<details>
+  
+  <summary>
+    Common pip / compatibility notes (Windows + Python 3.8)
+  </summary>
+  
+  > Newer releases of `pip` (25.x) may use typing features that are only compatible with Python >= 3.9. If `pip` inside the venv throws errors like `TypeError: 'ABCMeta' object is not subscriptable`, then the venv's pip is broken.
 
 If there is an issue with `pip`, make sure to regenetate it, stable version that works in this project is `pip 21.1.1`.
+</details>
 
 <br>
 
