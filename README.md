@@ -138,7 +138,7 @@ To **deactivate** the venv simply type:
 deactivate
 ```
 
----
+<br>
 
 ### 3. Verify interpreter
 
@@ -173,42 +173,9 @@ C:\Users\User\Desktop\Coding\street_fighter\venv\Scripts\python.exe
 #### Common `pip` / compatibility notes (Windows + Python 3.8)
 > Newer releases of `pip` (25.x) may use typing features that are only compatible with Python >= 3.9. If `pip` inside the venv throws errors like `TypeError: 'ABCMeta' object is not subscriptable`, then the venv's pip is broken.
 
-<br>
-<details>
-  <summary>Regenerating VENV</summary>
-
-  
-  <br>
-  
-  1. Remove the broken venv either manually or with:
-
-  ```cmd
-  rmdir /s /q venv
-  ```
-  <br>
-  
-  2. Recreate it with Python 3.8:
-  
-  ```cmd
-  py -3.8 -m venv venv
-  ```
-  <br>
-  
-  3. Activate and verify `pip`:
-  
-  ```cmd
-  venv\Scripts\activate
-  pip --version
-  ```
-  
-  You should see a `pip` version in the `23.x` series.
-  
-  ---
-</details>
-
+If there is an issue with `pip`, make sure to regenetate it, stable version that works in this project is `pip 21.1.1`.
 
 <br>
-
 
 ---
 ## Dependencies
@@ -218,6 +185,7 @@ With the virtual environment active, install the required packages:
 
 ```bash
 pip install gym==0.21.0 gym-retro==0.8.0
+pip install opencv-python matplotlib
 pip install torch==2.1.2+cu121 torchvision==0.16.2+cu121 torchaudio==2.1.2+cu121 --extra-index-url https://download.pytorch.org/whl/cu121
 pip install stable-baselines3==1.7.0
 pip install optuna
@@ -227,14 +195,7 @@ pip install "shimmy>=2.0"
 
 <br>
 
-(Optional) create a `requirements.txt` once your dependencies are installed:
-
-```bash
-pip freeze > requirements.txt
-```
-<br>
-
-To install from `requirements.txt` on another machine:
+(Optional) To install from `requirements.txt`:
 
 ```bash
 pip install -r requirements.txt
