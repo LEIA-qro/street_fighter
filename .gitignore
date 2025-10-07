@@ -4,3 +4,5 @@ logs/
 opt/
 train/
 states/
+__pycache__/
+*.pyc
