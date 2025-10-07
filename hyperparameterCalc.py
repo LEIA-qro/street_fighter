@@ -166,34 +166,32 @@ def optimize_ppo(trial):  # i.e. objective
 
 def optimize_agent(trial):
     # A try - except section can prevent the model from breaking mid-training
-
-    model_params = optimize_ppo(trial)  # Variable where we store the parameters from the previous function
-
-    # Create environment
-    env = StreetFighter()
-    env = Monitor(env, LOG_DIR)  # We specify the location where monitor values will be exported to
-    env = DummyVecEnv([lambda: env])  # We wrap the environment on a DummyVec
-    env = VecFrameStack(env, 4, channels_order='last')  # We will stack 4 different frames
-
-    # Create training algorithm
-    # model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)  # We unpack the model parameters obtained from the tuner and pass them to the PPO model
-    model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)
-    model.learn(total_timesteps=300000) #300000  # We train the model. Longer timesteps means a better model, but also a longer training time. 100k is good, 30k is quick but inaccurate
-    
-    # Evaluate model
-    mean_reward = evaluate_policy(model, env, n_eval_episodes=16) #10  # We unpack the results obtained from evaluate policy. We will evaluate the model on 5 different games (more == better)
-    env.close()
-
-    SAVE_PATH = os.path.join(OPT_DIR, 'trial_{}_best_model'.format(trial.number))
-    model.save(SAVE_PATH)  # We save all models to get the best one
-
-    # We have to give optuna a value it expects, so if its a tuple we return only an int
-    if isinstance(mean_reward, (tuple, list)):
-        mean_reward = mean_reward[0]
-
-    return mean_reward 
     try:
-        pass
+        model_params = optimize_ppo(trial)  # Variable where we store the parameters from the previous function
+
+        # Create environment
+        env = StreetFighter()
+        env = Monitor(env, LOG_DIR)  # We specify the location where monitor values will be exported to
+        env = DummyVecEnv([lambda: env])  # We wrap the environment on a DummyVec
+        env = VecFrameStack(env, 4, channels_order='last')  # We will stack 4 different frames
+
+        # Create training algorithm
+        # model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)  # We unpack the model parameters obtained from the tuner and pass them to the PPO model
+        model = PPO('CnnPolicy', env, tensorboard_log=LOG_DIR, verbose=0, **model_params)
+        model.learn(total_timesteps=300000) #300000  # We train the model. Longer timesteps means a better model, but also a longer training time. 100k is good, 30k is quick but inaccurate
+
+        # Evaluate model
+        mean_reward = evaluate_policy(model, env, n_eval_episodes=16) #10  # We unpack the results obtained from evaluate policy. We will evaluate the model on 5 different games (more == better)
+        env.close()
+
+        SAVE_PATH = os.path.join(OPT_DIR, 'trial_{}_best_model'.format(trial.number))
+        model.save(SAVE_PATH)  # We save all models to get the best one
+
+        # We have to give optuna a value it expects, so if its a tuple we return only an int
+        if isinstance(mean_reward, (tuple, list)):
+            mean_reward = mean_reward[0]
+
+        return mean_reward
 
     except Exception as e:
         return -1000  # Model did not work, we resume training
