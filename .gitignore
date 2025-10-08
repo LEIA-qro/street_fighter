@@ -1,2 +1,7 @@
 /venv
 venv/
+/__pycache__/
+*.pyc
+logs/
+opt/
+train/
