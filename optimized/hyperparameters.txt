@@ -1,6 +1,4 @@
 
-Pelon el que lo lea c:
-
 Best Hyperparameters found with 200000 timesteps, 16 eval episodes, 100 n_trials and a reward defined as reward = (self.w_enemy_damage * delta_enemy) + (self.w_self_damage * delta_self) + (self.w_score * delta_score) + match_result 
 with:
 self.w_enemy_damage = 1.5
