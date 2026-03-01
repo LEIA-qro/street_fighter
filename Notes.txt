@@ -1,0 +1,9 @@
+Notes
+
+
+Things to do:
+probar timer por ram loc o por calculo: frame =+ 1
+
+pryectil x coord no binario indicator
+
+implement frame skip
