@@ -21,7 +21,7 @@ def random_test_telemetry():
             config.ROM_PATH, 
             f"--socket_ip={config.HOST}", 
             f"--socket_port={config.PORT}",
-            f"--lua={config.LUA_SCRIPT_PATH}"
+            f"--lua={config.ENV_CLIENT_LUA_SCRIPT_PATH}"
         ])
 
         # 3. Block and wait for BizHawk's internal engine to connect
@@ -85,6 +85,11 @@ def random_test_telemetry():
                         
                 except ConnectionResetError:
                     print("BizHawk closed the connection.")
+                    print("Resetting configurations to default")
+                    subprocess.Popen([
+                        config.BIZHAWK_PATH, 
+                        f"--lua={config.RESET_CONFIG_LUA_SCRIPT_PATH}"
+                    ])
                     break
 
 if __name__ == "__main__":

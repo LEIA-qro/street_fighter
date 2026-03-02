@@ -85,7 +85,18 @@ while true do
     response = string.gsub(response, "\n", "")
 
     -- Check for special RESET command from Python
-    if string.sub(response, 1, 5) == "RESET" then
+    if response == "EXIT" then
+        console.log("Received EXIT command. Restoring defaults and shutting down...")
+        client.setwindowsize(2)        
+        -- client.invisibleemulation(false) 
+        emu.displayvsync(false)        
+        emu.limitframerate(true)       
+        client.displaymessages(true)   
+        client.SetSoundOn(true)        
+        client.exit()                  -- Safely terminates the BizHawk application
+        break
+        
+    elseif string.sub(response, 1, 5) == "RESET" then
         local state_file_path = string.sub(response, 7) -- Extract the state name after "RESET "
         console.log("Received RESET command. Loading New Random State... ")
         savestate.load(state_file_path)
@@ -127,3 +138,4 @@ while true do
     -- 4. Advance exactly one frame
     step_count = step_count + 1
 end
+

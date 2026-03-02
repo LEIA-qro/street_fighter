@@ -11,7 +11,10 @@ LUA_DIR = os.path.join(PROJECT_ROOT, "lua")
 # Executables & Files
 BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
-LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "env_client.lua")
+ENV_CLIENT_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "env_client.lua")
+
+# Reset Config Lua Script Path (if needed in the future)
+RESET_CONFIG_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "reset_config.lua")
 
 # Network
 HOST = '127.0.0.1'
