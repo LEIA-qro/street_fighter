@@ -45,6 +45,10 @@ class StreetFighterEnv(BizHawkBaseEnv):
         # 3. Calculate Reward
         damage_dealt = max(0, self.prev_p2_hp - current_p2_hp)
         damage_taken = max(0, self.prev_p1_hp - current_p1_hp)
+        # Clamp phantom damage spikes from memory glitches
+        if damage_dealt > 70: damage_dealt = 0
+        if damage_taken > 70: damage_taken = 0
+        
         reward = float(damage_dealt - damage_taken)
         
         self.prev_p1_hp = current_p1_hp
@@ -78,7 +82,7 @@ class StreetFighterEnv(BizHawkBaseEnv):
         parts = data.split(" ", 1)
         if len(parts) == 2:
             ram_values = [int(x) for x in parts[1].split(',')]
-            ram_values[0] = 0 if ram_values[0] >= 65535 else ram_values[0]
-            ram_values[1] = 0 if ram_values[1] >= 65535 else ram_values[1]
+            ram_values[0] = 0 if ram_values[0] > 200 else ram_values[0]
+            ram_values[1] = 0 if ram_values[1] > 200 else ram_values[1]
             return np.array(ram_values, dtype=np.int32)
         return np.zeros(config.ACTION_DIM, dtype=np.int32)
