@@ -21,7 +21,7 @@ def random_test_telemetry():
             config.ROM_PATH, 
             f"--socket_ip={config.HOST}", 
             f"--socket_port={config.PORT}",
-            f"--lua={config.ENV_CLIENT_LUA_SCRIPT_PATH}"
+            f"--lua={config.TRAINING_ENV_CLIENT_LUA_PATH}"
         ])
 
         # 3. Block and wait for BizHawk's internal engine to connect

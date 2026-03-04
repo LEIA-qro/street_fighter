@@ -11,7 +11,8 @@ LUA_DIR = os.path.join(PROJECT_ROOT, "lua")
 # Executables & Files
 BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
-ENV_CLIENT_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "env_client.lua")
+TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "training_env_client.lua")
+MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "match_test_env_client.lua")
 
 # Reset Config Lua Script Path (if needed in the future)
 RESET_CONFIG_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "reset_config.lua")
@@ -20,6 +21,8 @@ RESET_CONFIG_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "reset_config.lua")
 HOST = '127.0.0.1'
 PORT = 9999
 ACTION_DIM = 10
+N_ENVS = 16 # Number of parallel BizHawk instances for Optuna trials
+N_HYPERPARAMETER_TRIALS = 20 # Number of Optuna Trials to run during hyperparameter optimization
 
 # Available Savestates for Randomization
 AVAILABLE_STATES = [
@@ -41,4 +44,15 @@ AVAILABLE_STATES = [
     "SAGAT_BLANKA_R1_HARD.State",
     "VEGA_KEN_R1_HARD.State",
     "ZANGIEF_RYU_R1_HARD.State"
+]
+
+RYU_ONLY_STATES = [
+    "RYU_BLANKA_R1_HARD.State",
+    "RYU_CHUNLI_R1_HARD.State",
+    "RYU_DHALSIM_R1_HARD.State",
+    "RYU_EHONDA_R1_HARD.State",
+    "RYU_GUILE_R1_HARD.State",
+    "RYU_KEN_R1_HARD.State",
+    "RYU_RYU_R1_HARD.State",
+    "RYU_RYU_R1_PEACEFUL.State"
 ]

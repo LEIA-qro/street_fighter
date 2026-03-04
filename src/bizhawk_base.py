@@ -6,7 +6,7 @@ import time
 class BizHawkBaseEnv(gym.Env):
     """Universal Base Environment for BizHawk socket communication."""
     
-    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, reset_lua_path=None):
+    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, reset_lua_path=None, trainable=True):
         super().__init__()
         self.bizhawk_path = bizhawk_path
         self.rom_path = rom_path
@@ -14,6 +14,7 @@ class BizHawkBaseEnv(gym.Env):
         self.host = host
         self.port = port
         self.reset_lua_path = reset_lua_path
+        self.trainable = trainable
         
         self.server_socket = None
         self.conn = None
@@ -30,14 +31,29 @@ class BizHawkBaseEnv(gym.Env):
         print(f"Python ML Server actively listening on {self.host}:{self.port}...")
         
         print("Launching BizHawk as a subprocess...")
-        self.emulator_process = subprocess.Popen([
+
+        # Base arguments
+        launch_args = [
             self.bizhawk_path, 
             self.rom_path, 
             f"--socket_ip={self.host}", 
-            f"--socket_port={self.port}",
-            f"--lua={self.lua_path}"
-        ])
+            f"--socket_port={self.port}"
+        ]
+
+        # Only auto-inject the Lua script if we are training
+        if self.trainable and self.lua_path:
+            print(f"Auto-loading training Lua script: {self.lua_path}")
+            launch_args.append(f"--lua={self.lua_path}")
+            
+        self.emulator_process = subprocess.Popen(launch_args)
         
+        if not self.trainable:
+            print("\n[INTERACTIVE MODE] BizHawk launched.")
+            print("1. Navigate the game menus manually.")
+            print("2. When the match is ready, open the BizHawk Lua Console.")
+            print(f"3. Run the script: {self.lua_path}")
+            print("Waiting for your Lua connection...")
+            
         self.conn, addr = self.server_socket.accept()
         print(f"Connection established with BizHawk at {addr}")
             
