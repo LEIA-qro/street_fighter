@@ -19,6 +19,9 @@ class BizHawkBaseEnv(gym.Env):
         self.server_socket = None
         self.conn = None
         self.emulator_process = None # Track the subprocess
+
+        # NEW: The TCP Holding Tank
+        self.stream_buffer = ""
         
         self._start_emulator_bridge()
 
@@ -55,6 +58,13 @@ class BizHawkBaseEnv(gym.Env):
             print("Waiting for your Lua connection...")
             
         self.conn, addr = self.server_socket.accept()
+        
+        # CONDITIONAL TIMEOUT: Strict failsafe for training, Infinite patience for testing
+        if self.trainable:
+            self.conn.settimeout(30.0) 
+        else:
+            self.conn.settimeout(None) # Wait forever while human navigates menus
+            
         print(f"Connection established with BizHawk at {addr}")
             
 
@@ -67,11 +77,26 @@ class BizHawkBaseEnv(gym.Env):
             pass # Socket is already dead
 
     def receive_payload(self) -> str:
-        """Blocks and waits for the next payload from Lua."""
+        """Blocks and waits for a complete, mathematically perfect payload."""
         try:
-            return self.conn.recv(1024).decode('utf-8')
+            # 1. Keep receiving bytes until we see a newline
+            while '\n' not in self.stream_buffer:
+                chunk = self.conn.recv(4096).decode('utf-8')
+                if not chunk:
+                    return ""
+                self.stream_buffer += chunk
+            
+            # 2. Slice the buffer precisely at the first newline.
+            line, self.stream_buffer = self.stream_buffer.split('\n', 1)
+            
+            return line
+            
+        except socket.timeout:
+            print("\n[FAILSAFE] Python timed out waiting for BizHawk. Forcing crash...")
+            raise RuntimeError("BizHawk Socket Timeout")
+            
         except (ConnectionResetError, ConnectionAbortedError):
-            return ""
+            return ""  
 
     def close(self):
         """Clean teardown of network and subprocess."""
