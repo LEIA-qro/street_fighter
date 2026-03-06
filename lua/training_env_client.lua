@@ -77,8 +77,27 @@ while true do
     
     -- 3. Strict Spinlock: Wait for Python's response before advancing
     local response = ""
+    local wait_start_time = os.time() -- Record the exact time we started waiting
+    local TIMEOUT_LIMIT = 30 -- Maximum seconds to wait before assuming Python is dead
     while response == "" or response == nil do
         response = comm.socketServerResponse()
+        
+        -- THE DEAD MAN'S SWITCH
+        -- If current time minus start time exceeds our limit, trigger the failsafe
+        if os.difftime(os.time(), wait_start_time) > TIMEOUT_LIMIT then
+            console.log("CRITICAL ERROR: No response from Python for " .. TIMEOUT_LIMIT .. " seconds.")
+            console.log("Triggering Dead Man's Switch. Shutting down emulator...")
+            
+            -- Restore safe defaults before crashing
+            client.setwindowsize(2)        
+            emu.displayvsync(false)        
+            emu.limitframerate(true)       
+            client.displaymessages(true)   
+            client.SetSoundOn(true)        
+            
+            client.exit() -- Force close BizHawk
+            return        -- Kill the Lua script
+        end
     end
 
     -- Remove the newline character for clean processing
