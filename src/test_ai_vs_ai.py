@@ -8,7 +8,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import config
 from env_sf2 import StreetFighterEnv
 
-MODEL_DIR = os.path.join(config.PROJECT_ROOT, "models", "using_model")
+directories = config.get_directory()
 
 # 1. The Mock Environment (Prevents Shadow Emulators)
 class MockEnv(gym.Env):
@@ -21,16 +21,7 @@ class MockEnv(gym.Env):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.int32)
 
 def test_ai_vs_ai():
-    print("Initializing AI vs AI Evaluation Mode...")
-
-    # ---------------------------------------------------------
-    # ACTION REQUIRED: Check your file names
-    # ---------------------------------------------------------
-    LATEST_ZIP_FILE_P1 = "sf2_grandmaster_model_1850000_steps.zip" 
-    LATEST_PKL_FILE_P1 = "sf2_grandmaster_vecnormalize_1850000_steps.pkl"    
-    
-    LATEST_ZIP_FILE_P2 = "sf2_grandmaster_model_1150000_steps.zip" 
-    LATEST_PKL_FILE_P2 = "sf2_grandmaster_vecnormalize_1150000_steps.pkl"    
+    print("Initializing AI vs AI Evaluation Mode...") 
 
     # 2. Boot ONE Master Environment (Handles the socket connection)
     print("Booting Master Socket...")
@@ -39,18 +30,18 @@ def test_ai_vs_ai():
     # 3. Reconstruct Normalization Math safely using MockEnv
     dummy_env = DummyVecEnv([lambda: MockEnv()])
     
-    vec_norm_p1 = VecNormalize.load(os.path.join(MODEL_DIR, LATEST_PKL_FILE_P1), dummy_env)
+    vec_norm_p1 = VecNormalize.load(os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P1), dummy_env)
     vec_norm_p1.training = False
     vec_norm_p1.norm_reward = False
 
-    vec_norm_p2 = VecNormalize.load(os.path.join(MODEL_DIR, LATEST_PKL_FILE_P2), dummy_env)
+    vec_norm_p2 = VecNormalize.load(os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P2), dummy_env)
     vec_norm_p2.training = False
     vec_norm_p2.norm_reward = False
 
     # 4. Load the Brains
     print("Loading Neural Networks...")
-    model_p1 = PPO.load(os.path.join(MODEL_DIR, LATEST_ZIP_FILE_P1), env=vec_norm_p1, device="cuda")
-    model_p2 = PPO.load(os.path.join(MODEL_DIR, LATEST_ZIP_FILE_P2), env=vec_norm_p2, device="cuda")
+    model_p1 = PPO.load(os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P1), env=vec_norm_p1, device="cuda")
+    model_p2 = PPO.load(os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P2), env=vec_norm_p2, device="cuda")
 
     print("\nFIGHT! (AI vs AI mode is running in the background)")
 

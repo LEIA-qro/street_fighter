@@ -5,81 +5,87 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import BaseCallback
 
 import config
 from env_sf2 import StreetFighterEnv
 
-LOG_DIR = os.path.join(config.PROJECT_ROOT, "logs")
-MODEL_DIR = os.path.join(config.PROJECT_ROOT, "models", "production")
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(MODEL_DIR, exist_ok=True)
+directories = config.get_directory()
 
+class SaveOnStepCallback(BaseCallback):
+    """Callback to save the model and normalization math every N steps."""
+    def __init__(self, save_freq, save_path, verbose=1):
+        super().__init__(verbose)
+        self.save_freq = save_freq
+        self.save_path = save_path
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.save_freq == 0:
+            model_path = os.path.join(self.save_path, config.MODEL_NAME + f"_{self.num_timesteps}_steps")
+            vec_path = os.path.join(self.save_path, config.MODEL_NAME + f"_vecnormalize_{self.num_timesteps}_steps.pkl")
+            
+            self.model.save(model_path)
+            self.training_env.save(vec_path)
+            if self.verbose > 0:
+                print(f"\n[CHECKPOINT] Saved model at {self.num_timesteps} steps!")
+        return True
+    
 def make_env(rank):
     def _init():
         env = StreetFighterEnv(rank=rank)
-        env = Monitor(env)
+        env = Monitor(env)  # <--- This is the accountant that tracks the score!
         return env
     return _init
 
 def train_production():
-    print("Initializing 16-Core Production Environment...")
+    print("Initializing Phase 9: Grandmaster Production Training...")
     
-    # 1. Launch 16 parallel emulators
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
-    
-    # 2. Apply Normalization
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0)
-    
-    # 3. Setup aggressive checkpointing (Save every 500k steps)
-    checkpoint_callback = CheckpointCallback(
-        save_freq=max(1, 500_000 // n_envs), 
-        save_path=MODEL_DIR,
-        name_prefix="ppo_sf2_prod"
-    )
-    
-    # 4. Initialize PPO with Optuna's WINNING Hyperparameters
-    # *** REPLACE THESE VALUES WITH YOUR OPTUNA RESULTS ***
-    print("Building Grandmaster Neural Network...")
+
+    # Instantiate the Brain with Trial 9 Math
     model = PPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=0.000112125, # Optuna's exact LR
-        n_steps=2048,              # Optuna's exact n_steps
-        batch_size=64,             # Optuna's exact batch_size
-        ent_coef=0.067344,         # Optuna's exact entropy
-        clip_range=0.208978,       # Optuna's exact clip range
-        n_epochs=10,
+        learning_rate=config.LR,
+        n_steps=config.N_STEPS,
+        batch_size=config.BATCH_SIZE,
+        ent_coef=config.ENT_COEF,
+        clip_range=config.CLIP_RANGE,
+        n_epochs=5,
         gamma=0.99,
-        tensorboard_log=LOG_DIR,
+        target_kl=0.03,  # The Emergency Brake to prevent KL explosions
         verbose=1,
+        tensorboard_log=directories["logs"],
         device="cuda"
     )
+
+    checkpoint_callback = SaveOnStepCallback(save_freq=config.SAVE_FREQ_STEPS // n_envs, save_path=directories["production"])
     
     # 5. The Grandmaster Training Loop (10 Million Steps)
     # With 16 cores, this will process exponentially faster than before.
-    TOTAL_TIMESTEPS = 10_000_000 
     
     try:
         model.learn(
-            total_timesteps=TOTAL_TIMESTEPS, 
+            total_timesteps=config.STARTING_TOTAL_TIMESTEPS, 
             callback=checkpoint_callback,
-            tb_log_name="PPO_Production_Run_1"
+            tb_log_name=config.MODEL_NAME
         )
         
         # Save Final Production Model
-        model.save(os.path.join(MODEL_DIR, "sf2_grandmaster_final"))
-        env.save(os.path.join(MODEL_DIR, "vec_normalize_grandmaster.pkl"))
+        model.save(os.path.join(directories["production"], config.MODEL_NAME + "_FINAL"))
+        env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_FINAL.pkl"))
         print("\nProduction Training Complete!")
         
     except KeyboardInterrupt:
         print("\nTraining forcefully interrupted. Executing emergency save...")
-        model.save(os.path.join(MODEL_DIR, "sf2_grandmaster_EMERGENCY"))
-        env.save(os.path.join(MODEL_DIR, "vec_normalize_EMERGENCY.pkl"))
+        model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
+        env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
         
     finally:
         # Nuclear Failsafe Cleanup
-        print("Executing Nuclear Cleanup...")
+        print("Executing Failsafe: Purging zombie BizHawk instances...")
         subprocess.run(["taskkill", "/F", "/IM", "EmuHawk.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(3)
 
