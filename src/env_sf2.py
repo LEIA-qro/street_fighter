@@ -109,7 +109,7 @@ class StreetFighterEnv(BizHawkBaseEnv):
         
         # Random Domain Selection
         # Phase selection
-        chosen_state_file = random.choice(config.RYU_ONLY_STATES_PHASE_1)
+        chosen_state_file = random.choice(config.TRAINING_STATES)
         full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
         
         # Send Reset via Parent Method

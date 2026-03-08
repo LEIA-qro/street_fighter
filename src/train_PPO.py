@@ -13,11 +13,7 @@ import config
 from env_sf2 import StreetFighterEnv
 
 # Define directories for weights and logs
-LOG_DIR = os.path.join(config.PROJECT_ROOT, "logs")
-MODEL_DIR = os.path.join(config.PROJECT_ROOT, "models")
-
-os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(MODEL_DIR, exist_ok=True)
+directories = config.get_directory()
 
 def train_baseline():
     print("Initializing Street Fighter Environment...")
@@ -25,7 +21,7 @@ def train_baseline():
     # 1. Instantiate and Wrap the Environment
     # The Monitor wrapper records episode statistics (rewards/lengths) for TensorBoard
     raw_env = StreetFighterEnv()
-    monitored_env = Monitor(raw_env, LOG_DIR)
+    monitored_env = Monitor(raw_env, directories["logs"])
 
     # 2. Vectorize the Environment (Required for VecNormalize)
     # Even though we only have 1 environment right now, we wrap it in a DummyVecEnv
@@ -44,9 +40,9 @@ def train_baseline():
     # 2. Setup Checkpoint Callback
     # Saves a .zip file of the neural network weights every 10,000 Agent Steps
     checkpoint_callback = CheckpointCallback(
-        save_freq=10000,
-        save_path=MODEL_DIR,
-        name_prefix="ppo_sf2_baseline"
+        save_freq=config.SAVE_FREQ_STEPS,
+        save_path=directories["MODEL_DIR"],
+        name_prefix=config.MODEL_NAME
     )
     
     # 3. Initialize the Neural Network (PPO)
@@ -61,7 +57,7 @@ def train_baseline():
         gamma=0.99,           
         ent_coef=0.05,          # EXPLORATION TAX: Forces the agent to keep pressing different buttons
         clip_range=0.1,         # SEATBELT: Forcibly prevents the KL Divergence from explodingtensorboard_log=LOG_DIR,
-        tensorboard_log=LOG_DIR,
+        tensorboard_log=directories["logs"],
         verbose=1,
         device="cuda"         # Explicitly targets your RTX 5070 Ti
     )
@@ -69,22 +65,22 @@ def train_baseline():
     # 4. Execute the Training Loop
     # 100,000 steps with k=4 frame skip is ~1.8 hours of in-game time (assuming 60fps).
     # This is a good baseline to verify if the agent learns basic blocking and striking.
-    TOTAL_TIMESTEPS = 300000 
+    TOTAL_TIMESTEPS = config.STARTING_TOTAL_TIMESTEPS 
     print(f"Starting training loop for {TOTAL_TIMESTEPS} timesteps...")
     
     try:
         model.learn(
             total_timesteps=TOTAL_TIMESTEPS, 
             callback=checkpoint_callback,
-            tb_log_name="PPO_Normalized_Hyperparameters_Run"
+            tb_log_name=config.MODEL_NAME
         )
         
         # 5. Save the final model state
         # Save the final model AND the normalization statistics
-        final_model_path = os.path.join(MODEL_DIR, "ppo_sf2_final_normalized_Hyperparameters")
+        final_model_path = os.path.join(directories["MODEL_DIR"], f"{config.MODEL_NAME}_final")
         model.save(final_model_path)
 
-        stats_path = os.path.join(MODEL_DIR, "vec_normalize_Hyperparameters.pkl")
+        stats_path = os.path.join(directories["MODEL_DIR"], f"{config.MODEL_NAME}_vec.pkl")
         env.save(stats_path)
 
         print(f"\nTraining complete! Final model saved to {final_model_path}.zip")
@@ -92,9 +88,9 @@ def train_baseline():
     except KeyboardInterrupt:
         # Graceful interruption: Save the model if you manually kill the script
         print("\nTraining forcefully interrupted by user. Executing emergency save...")
-        emergency_path = os.path.join(MODEL_DIR, "ppo_sf2_EMERGENCY_SAVE")
+        emergency_path = os.path.join(directories["MODEL_DIR"], f"{config.MODEL_NAME}_EMERGENCY_SAVE")
         model.save(emergency_path)
-        env.save(os.path.join(MODEL_DIR, "vec_normalize_Hyperparameters_EMERGENCY.pkl"))
+        env.save(os.path.join(directories["MODEL_DIR"], f"{config.MODEL_NAME}_vec_EMERGENCY.pkl"))
         print(f"Emergency weights and stats saved to {emergency_path}.zip")
         
     finally:

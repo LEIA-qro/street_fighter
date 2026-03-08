@@ -40,7 +40,7 @@ def objective(trial):
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
     # We must ensure batch_size is a factor of n_steps * n_envs to prevent PyTorch crashes
-    if n_steps * 16 % batch_size != 0:
+    if n_steps * config.N_ENVS % batch_size != 0:
         raise optuna.TrialPruned()
 
     print(f"\n--- Starting Trial {trial.number} ---")
