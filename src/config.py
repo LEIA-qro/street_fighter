@@ -46,19 +46,19 @@ HOST = '127.0.0.1'
 PORT = 9999
 
 # Model & Training Config
-MODEL_NAME = "PPO_sf2_ryu_specialist_7_2"
-TRAINING_ZIP_FILE = "models/production/PPO_sf2_ryu_specialist_7_1_CRASH_SAVE.zip"
-TRAINING_PKL_FILE = "models/production/PPO_sf2_ryu_specialist_7_1_vecnormalize_CRASH_SAVE.pkl"
+MODEL_NAME = "PPO_OHE_sf2_ryu_specialist_2_5"
+TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_model_26051060_steps.zip"
+TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_vecnormalize_26051060_steps.pkl"
 
 ACTION_DIM = 10
 NUM_FRAMES = 4
-OBS_DIM = 10 
+OBS_DIM = 10 # Old obs  
 
 N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
 N_HYPERPARAMETER_TRIALS = 50 # Number of Optuna Trials to run during hyperparameter optimization
 STARTING_TOTAL_TIMESTEPS = 3000000
 RESUME_PRODUCTION_TIMESTEPS = 10_000_000 
-SAVE_FREQ_STEPS = 100_000
+SAVE_FREQ_STEPS = 200_000
 
 # --- HYPERPARAMETERS FROM OPTUNA TRIAL ---
 LR = 5.6948095644433695e-05
@@ -71,8 +71,8 @@ BATCH_SIZE = 1024
 TESTING_ZIP_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_CRASH_SAVE.zip"
 TESTING_PKL_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_vecnormalize_CRASH_SAVE.pkl"
 
-TESTING_ZIP_FILE_P2 = "models/production/PPO_sf2_ryu_specialist_3_2_CRASH_SAVE.zip"
-TESTING_PKL_FILE_P2 = "models/production/PPO_sf2_ryu_specialist_3_2_vecnormalize_CRASH_SAVE.pkl"
+TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_CRASH_SAVE.zip"
+TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_vecnormalize_CRASH_SAVE.pkl"
 
 # Available Savestates for Randomization
 AVAILABLE_STATES = [
@@ -112,6 +112,7 @@ RYU_ONLY_STATES_PHASE_1 = [
 ]
 
 RYU_ONLY_STATES_PHASE_2 = [
+    # New Challengers Blanka, ChunLi, Dhalsim, Ken
     "RYU_CHUNLI_R1_lvl1.State",
     "RYU_DHALSIM_R1_lvl1.State",
     "RYU_BLANKA_R1_lvl2.State",
@@ -121,24 +122,35 @@ RYU_ONLY_STATES_PHASE_2 = [
 ]
 
 RYU_ONLY_STATES_PHASE_3 = [
+    # Legacy Roaster Blanka, ChunLi, Dhalsim, Ken
     "RYU_BLANKA_R1_lvl5.State",
     "RYU_CHUNLI_R1_lvl5.State",
     "RYU_DHALSIM_R1_lvl4.State",
     "RYU_KEN_R1_lvl4.State",
+    # New Challengers Ryu, Zangief
     "RYU_RYU_R1_lvl5.State",
     "RYU_ZANGIEF_R1_lvl4.State"
+
 ]
 
 RYU_ONLY_STATES_PHASE_4 = [
+    # The legacy Matchups Blanka, ChunLi, Dhalsim, Ken, Ryu, Zangief
+    "RYU_BLANKA_R1_lvl7.State",
+    "RYU_CHUNLI_R1_lvl6.State",
     "RYU_DHALSIM_R1_lvl7.State",
-    "RYU_EHONDA_R1_lvl6.State",
-    "RYU_GUILE_R1_lvl6.State",
     "RYU_KEN_R1_lvl7.State",
     "RYU_RYU_R1_lvl6.State",
-    "RYU_RYU_R1_lvl7.State"
+    "RYU_RYU_R1_lvl7.State",
+    "RYU_ZANGIEF_R1_lvl6.State",
+    # The new Challengers Balrog, E.Honda, Guile 
+    "RYU_BALROG_R1_lvl7.State",
+    "RYU_EHONDA_R1_lvl6.State",
+    "RYU_GUILE_R1_lvl6.State"
 ]
 
 RYU_ONLY_STATES_PHASE_5 = [
+    # The legacy Matchups Balrog, Blanka, ChunLi, Dhalsim, E.Honda, Guile, Ken, Ryu, Zangief
+    "RYU_BALROG_R1_HARD.State",
     "RYU_BLANKA_R1_HARD.State",
     "RYU_CHUNLI_R1_HARD.State",
     "RYU_DHALSIM_R1_HARD.State",
@@ -146,4 +158,11 @@ RYU_ONLY_STATES_PHASE_5 = [
     "RYU_GUILE_R1_HARD.State",
     "RYU_KEN_R1_HARD.State",
     "RYU_RYU_R1_HARD.State"
+    "RYU_ZANGIEF_R1_HARD.State",
+    # The New Challengers
+    "RYU_SAGAT_R1_HARD.State",
+    "RYU_VEGA_R1_HARD.State",
+    "RYU_MBISON_R1_HARD.State"
 ]
+
+TRAINING_STATES = RYU_ONLY_STATES_PHASE_3
