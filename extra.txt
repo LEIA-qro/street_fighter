@@ -2,8 +2,21 @@ tensorboard --logdir=logs\
 
 client.invisibleemulation(false)
 
+
+# Before OHE
 Trial 4 finished with value: 25.1 and parameters: {'learning_rate': 0.00015250752552422399, 'ent_coef': 0.020041731434032307, 'clip_range': 0.1511545175035542, 'n_steps': 1024, 'batch_size': 64}. Best is trial 4 with value: 25.1.
 
 Trial 0 finished with value: 26.2 and parameters: {'learning_rate': 0.00011034286251094867, 'ent_coef': 0.08305784188309505, 'clip_range': 0.11400379265310284, 'n_steps': 2048, 'batch_size': 64}. Best is trial 0 with value: 26.2.
 
+
 Trial 9 finished with value: 38.8 and parameters: {'learning_rate': 5.6948095644433695e-05, 'ent_coef': 0.03530287430683962, 'clip_range': 0.19964140088107324, 'n_steps': 4096, 'batch_size': 256}. Best is trial 9 with value: 38.8.
+
+# After OHE
+Trial 1 finished with value: 116.71100000000001 and parameters: {'learning_rate': 6.514947130006004e-05, 'ent_coef': 0.06701907778969503, 'clip_range': 0.1496566125298953, 'n_steps': 4096, 'batch_size': 2048}. Best is trial 1 with value: 116.71100000000001.
+
+Trial 2 finished with value: 125.997 and parameters: {'learning_rate': 9.86244486271802e-05, 'ent_coef': 0.09187284783021865, 'clip_range': 0.18525864383076907, 'n_steps': 8192, 'batch_size': 512}. Best is trial 2 with value: 125.997.
+
+
+
+
+hyper heuristic ppo
