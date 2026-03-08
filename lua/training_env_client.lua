@@ -21,6 +21,9 @@ local port = comm.socketServerGetPort()
 if port == nil then
     console.log("ERROR: Socket server not started. Run via Python script.")
     return
+elseif port == "9999" or port == 9999 then
+    client.setwindowsize(2)
+    client.invisibleemulation(false)
 end
 
 console.log("Listening on port: " .. port)
@@ -69,9 +72,16 @@ while true do
     prev_p1_proj_x = raw_p1_proj_x
     prev_p2_proj_x = raw_p2_proj_x
 
+    -- Using read_u8 because Character IDs are standard 8-bit integers
+    local p1_char_id = mainmemory.read_u8(0x81DA)
+    local p2_char_id = mainmemory.read_u8(0x845A)
+
     -- 3. Format Payload (Now 10 dimensions) & Send
-    local payload = string.format("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
-        p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, p1_action_id, p2_action_id, active_p1_proj_x, active_p2_proj_x)
+    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
+        p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
+        p1_action_id, p2_action_id, 
+        active_p1_proj_x, active_p2_proj_x,
+        p1_char_id, p2_char_id)
     
     comm.socketServerSend(payload)
     
@@ -79,6 +89,7 @@ while true do
     local response = ""
     local wait_start_time = os.time() -- Record the exact time we started waiting
     local TIMEOUT_LIMIT = 30 -- Maximum seconds to wait before assuming Python is dead
+    
     while response == "" or response == nil do
         response = comm.socketServerResponse()
         
