@@ -16,7 +16,7 @@ Trial 1 finished with value: 116.71100000000001 and parameters: {'learning_rate'
 
 Trial 2 finished with value: 125.997 and parameters: {'learning_rate': 9.86244486271802e-05, 'ent_coef': 0.09187284783021865, 'clip_range': 0.18525864383076907, 'n_steps': 8192, 'batch_size': 512}. Best is trial 2 with value: 125.997.
 
+# After Neural Netwprk enhancement
+Trial 4 finished with value: 176.8186 and parameters: {'learning_rate': 0.00011271924125868896, 'ent_coef': 0.03859662190384094, 'clip_range': 0.21211448956995405, 'n_steps': 4096, 'batch_size': 2048}. Best is trial 4 with value: 176.8186.
 
-
-
-hyper heuristic ppo
+Trial 19 finished with value: 177.2972 and parameters: {'learning_rate': 0.00014963345069997716, 'ent_coef': 0.058045038937880364, 'clip_range': 0.25225074436550204, 'n_steps': 2048, 'batch_size': 512}. Best is trial 19 with value: 177.2972..
