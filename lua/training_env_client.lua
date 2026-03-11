@@ -15,13 +15,14 @@ client.SetSoundOn(false)        -- Disables audio processing, which can be a sig
 
 -- Hardcode the states directory so Lua knows where to look
 local STATES_DIR = "C:\\Users\\Diego Perea\\Documents\\Code\\street_fighter\\states\\"
+local activate_visualization = true
 
 -- 1. Check if the server was initialized properly via the command line
 local port = comm.socketServerGetPort()
 if port == nil then
     console.log("ERROR: Socket server not started. Run via Python script.")
     return
-elseif port == "9999" or port == 9999 then
+elseif port == "9999" or port == 9999 and activate_visualization then
     client.setwindowsize(2)
     client.invisibleemulation(false)
 end
