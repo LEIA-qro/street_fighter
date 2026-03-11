@@ -1,10 +1,11 @@
 import os
-import subprocess
+import multiprocessing
+import gc
+import torch
 import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
-# from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.callbacks import BaseCallback
 
 import config
@@ -39,8 +40,6 @@ def make_env(rank):
 
 def train_production():
     print("Initializing Phase 1: Grandmaster Production Training...")
-    
-    config.RYU_ONLY_STATES = config.RYU_ONLY_STATES_PHASE_1
 
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
@@ -50,14 +49,15 @@ def train_production():
     model = PPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=9.86e-05,   # From Optuna
-        n_steps=8192,             # From Optuna
-        batch_size=512,           # From Optuna
-        ent_coef=0.0918,          # From Optuna
-        clip_range=0.185,         # From Optuna
+        learning_rate=0.00014963345069997716,   # From Trial 19
+        n_steps=2048,                           # From Trial 19
+        batch_size=512,                         # From Trial 19
+        ent_coef=0.058045038937880364,          # From Trial 19
+        clip_range=0.25225074436550204,         # From Trial 19
         n_epochs=10,              
         gamma=0.99,
         target_kl=0.03,
+        policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
         verbose=1,
         tensorboard_log=directories["logs"],
         device="cuda"
@@ -85,10 +85,36 @@ def train_production():
         model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
         env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
         
+    except Exception as e:
+        print(f"\n[CRITICAL ERROR] Training crashed: {e}")
+        model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
+        env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
+        
     finally:
-        # Nuclear Failsafe Cleanup
-        print("Executing Failsafe: Purging zombie BizHawk instances...")
-        subprocess.run(["taskkill", "/F", "/IM", "EmuHawk.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("Executing Failsafe: Purging zombie instances and VRAM...")
+        # 1. Kill Emulators
+        os.system("taskkill /F /IM EmuHawk.exe >nul 2>&1")
+        time.sleep(2)
+        
+        # 2. The Thread Sniper
+        active_children = multiprocessing.active_children()
+        if active_children:
+            for child in active_children:
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+        
+        # 3. The VRAM Purge
+        try:
+            del model
+            del env
+        except UnboundLocalError:
+            pass
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         time.sleep(3)
 
 if __name__ == "__main__":

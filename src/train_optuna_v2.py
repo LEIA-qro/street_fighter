@@ -1,11 +1,15 @@
 import os
+import multiprocessing
 import optuna
-import subprocess 
+import gc
+import torch
+# import subprocess 
 import time       
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.evaluation import evaluate_policy
+# from stable_baselines3.common.evaluation import evaluate_policy
+
 
 import config
 # THE V2 IMPORT
@@ -33,9 +37,6 @@ def objective(trial):
 
     print(f"\n--- Starting Trial {trial.number} ---")
 
-    # FORCE PHASE 2 (Sparring Partners)
-    # config.RYU_ONLY_STATES = config.RYU_ONLY_STATES_PHASE_2
-
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0)
@@ -50,7 +51,9 @@ def objective(trial):
         clip_range=clip_range,
         n_epochs=10,
         gamma=0.99,
-        target_kl=0.03, # THE KL FAILSAFE
+        target_kl=0.03, 
+        # THE FIX: Removed the [] from around the dict()
+        policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])), # THE MASSIVE BRAIN
         verbose=0, 
         tensorboard_log=directories["logs"],
         device="cuda"
@@ -58,42 +61,70 @@ def objective(trial):
 
     try:
         model.learn(
-            total_timesteps=175000,
+            total_timesteps=150000,
             tb_log_name=f"{config.MODEL_NAME}_Optuna_V2_Trial_{trial.number}"
         )
         
-        print("Evaluating V2 agent...")
-        mean_reward, _ = evaluate_policy(model, model.get_env(), n_eval_episodes=10)
+        # --- THE FIX: EXTRACT INTERNAL MEMORY INSTEAD OF EVALUATING ---
+        print("Extracting trial performance...")
+        ep_info_buffer = model.ep_info_buffer
+        
+        if len(ep_info_buffer) > 0:
+            # Calculate the average reward of the last 100 completed matches
+            mean_reward = sum([ep_info["r"] for ep_info in ep_info_buffer]) / len(ep_info_buffer)
+        else:
+            # If the agent stood completely still and didn't finish a single match in 150k steps, 
+            # it is a totally broken hyperparameter set. Punish it severely.
+            mean_reward = -9999.0 
+            
         print(f"Trial {trial.number} finished with Mean Reward: {mean_reward}")
+
+        # --- MOVED SAVING LOGIC INSIDE THE TRY BLOCK ---
+        best_path = os.path.join(directories["optuna"], "best_reward_v2.txt")
+        best_reward = -float('inf')
+       
+        if os.path.exists(best_path):
+            with open(best_path, "r") as f:
+                best_reward = float(f.read().strip()) 
+
+        if mean_reward > best_reward:
+            print(f"!!! NEW BEST V2 MODEL FOUND !!! (Reward: {mean_reward})")
+            model.save(os.path.join(directories["optuna"], "best_ppo_sf2_v2"))
+            env.save(os.path.join(directories["optuna"], "best_vec_normalize_v2.pkl"))
+            with open(best_path, "w") as f:
+                f.write(str(mean_reward))
+        # -----------------------------------------------
 
     except Exception as e:
         print(f"\n[WARNING] Trial {trial.number} crashed: {e}")
         raise optuna.exceptions.TrialPruned()
 
     finally:
+        print("Executing Failsafe: Purging zombie instances and VRAM...")
+        # 1. Kill Emulators
+        os.system("taskkill /F /IM EmuHawk.exe >nul 2>&1")
+        time.sleep(2)
+        
+        # 2. The Thread Sniper
+        active_children = multiprocessing.active_children()
+        if active_children:
+            for child in active_children:
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+        
+        # 3. The VRAM Purge
         try:
-            env.close()
-        except Exception:
+            del model
+            del env
+        except UnboundLocalError:
             pass
-
-        print("Executing Failsafe: Purging zombie BizHawk instances...")
-        subprocess.run(["taskkill", "/F", "/IM", "EmuHawk.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         time.sleep(3)
-
-    # YOUR SAVING LOGIC PRESERVED
-    best_path = os.path.join(directories["optuna"], "best_reward_v2.txt")
-    best_reward = -float('inf')
-   
-    if os.path.exists(best_path):
-        with open(best_path, "r") as f:
-            best_reward = float(f.read().strip()) 
-
-    if mean_reward > best_reward:
-        print(f"!!! NEW BEST V2 MODEL FOUND !!! (Reward: {mean_reward})")
-        model.save(os.path.join(directories["optuna"], "best_ppo_sf2_v2"))
-        env.save(os.path.join(directories["optuna"], "best_vec_normalize_v2.pkl"))
-        with open(best_path, "w") as f:
-            f.write(str(mean_reward))
 
     return mean_reward
 
