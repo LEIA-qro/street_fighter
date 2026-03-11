@@ -1,6 +1,9 @@
 import os
 import subprocess
 import time
+import multiprocessing
+import gc
+import torch
 from typing import Callable 
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
@@ -62,50 +65,45 @@ def make_env(rank):
         return env
     return _init
 
-def resume_training():
+def resume_training(model_path, vec_path):
+    
     print(f"Initializing {config.N_ENVS}-Core Resume Environment...")
-
-    # LOAD PATHS FOR RESUMPTION
-    model_load_path = os.path.join(directories["project_root"], config.TRAINING_ZIP_FILE)
-    vec_load_path = os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
     
     # 1. Boot Parallel Emulators
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
     
     # 2. Load the VecNormalize Math
-    print(f"Loading normalization stats from {config.TRAINING_PKL_FILE}...")
-    env = VecNormalize.load(vec_load_path, env)
+    print(f"Loading normalization stats from {vec_path}...")
+    env = VecNormalize.load(vec_path, env)
     
     # CRITICAL: Ensure the environment continues to update its normalization math
     env.training = True
     env.norm_reward = True
-    
-    # Use the Optuna Golden Learning Rate
-    LR_BASE = 9.86e-05
 
     # 3. Load the Brain (PPO)
-    print(f"Loading neural network weights from {config.TRAINING_ZIP_FILE}...")
+    print(f"Loading neural network weights from {model_path}...")
     model = PPO.load(
-        model_load_path, 
+        model_path, 
         env=env, 
         device="cuda", 
         tensorboard_log=directories["logs"],
         custom_objects={
-            "learning_rate": 9.86e-05,  # Locked in
-            "clip_range": 0.185         # Locked in
+            "learning_rate": 0.00014963345069997716,   # Restored from Trial 19
+            "clip_range": 0.25225074436550204,         # Restored from Trial 19
+            "ent_coef": 0.058045038937880364
         }
     )
 
-    # 5. Restore Optuna's Golden Architecture Constraints
-    model.target_kl = 0.03   
-    model.n_epochs = 10      # Restored from Optuna 
-    model.batch_size = 512   # Restored from Optuna
+    # 5. Restore Golden Architecture Constraints
+    model.target_kl = 0.03   # THE FIX: Restored to standard 0.03 
+    model.n_epochs = 10      
+    model.batch_size = 512
 
     
     # 4. Setup our impenetrable Failsafe Callback (Saves every 100k GLOBAL steps)
     sync_callback = SyncCheckpointCallback(
-        save_freq_steps=config.SAVE_FREQ_STEPS, 
+        save_freq_steps=config.SAVE_FREQ_STEPS // n_envs, 
         save_path=directories["production"],
         name_prefix=config.MODEL_NAME
     )
@@ -123,21 +121,73 @@ def resume_training():
         model.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_FINAL"))
         env.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_FINAL.pkl"))
         print("\nProduction Training Complete!")
+        return True # Signals the Supervisor that we finished successfully
         
     except KeyboardInterrupt:
         print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
         model.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_EMERGENCY"))
         env.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_EMERGENCY.pkl"))
+        return True # Signals the Supervisor to stop
         
     except Exception as e:
         print(f"\n[CRITICAL ERROR] Training crashed: {e}")
         model.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE"))
         env.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl"))
+        return False
+
         
     finally:
         print("Executing Nuclear Cleanup...")
-        subprocess.run(["taskkill", "/F", "/IM", "EmuHawk.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        time.sleep(3)
+        
+        # 1. OS-LEVEL FIRE AND FORGET
+        os.system("taskkill /F /IM EmuHawk.exe >nul 2>&1")
+        time.sleep(2)
+        
+        # 2. THE UPGRADED THREAD SNIPER
+        active_children = multiprocessing.active_children()
+        if active_children:
+            print(f"Force-killing {len(active_children)} zombie Python worker processes...")
+            for child in active_children:
+                try:
+                    child.kill()  
+                except Exception:
+                    pass
+                    
+        # 3. THE VRAM/RAM PURGE (NEW)
+        print("Purging GPU and System Memory...")
+        try:
+            # Forcefully delete the massive objects from Python's local memory
+            del model
+            del env
+        except UnboundLocalError:
+            pass # Ignores the error if the script crashed before they were created
+            
+        # Command Python to empty the RAM trash can
+        gc.collect() 
+        # Command PyTorch to completely flush the GPU VRAM
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache() 
+
+        # Give Windows 5 seconds to finalize the memory flush
+        time.sleep(5)
 
 if __name__ == "__main__":
-    resume_training()
+    current_model_path = os.path.join(directories["project_root"], config.TRAINING_ZIP_FILE)
+    current_vec_path = os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
+
+    restart_count = 0
+    
+    while True:
+        success = resume_training(current_model_path, current_vec_path)
+        
+        if success:
+            print("Training session ended cleanly.")
+            break # Exit the loop
+            
+        else:
+            restart_count += 1
+            print(f"\n--- INITIATING AUTO-RESTART #{restart_count} ---")
+            # Override the load paths to point to the newly generated crash files
+            current_model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
+            current_vec_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
+            # The loop goes back to the top and safely restarts!
