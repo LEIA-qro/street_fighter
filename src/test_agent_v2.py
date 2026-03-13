@@ -16,7 +16,7 @@ def test_agent():
     vec_load_path = os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P2)
 
     # 1. Boot a single emulator window
-    env = StreetFighterEnvV2(lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH , trainable = False, rank=0, player=2) # Player 1 controls the agent, Player 2 is the dummy opponent
+    env = StreetFighterEnvV2(lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH , trainable = False, rank=-1, player=2) # Player 1 controls the agent, Player 2 is the dummy opponent
     # env.lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH  # Switch to the match test Lua script
     # env.trainable = False  # Disable randomization and resets for testing
     env = DummyVecEnv([lambda: env])
