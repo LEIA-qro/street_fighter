@@ -1,3 +1,4 @@
+# edited train_productio_v2.py
 import os
 import multiprocessing
 import gc
@@ -10,6 +11,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 import config
 from env_sf2_v2 import StreetFighterEnvV2
+from selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
 
@@ -43,7 +45,8 @@ def train_production():
 
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
-    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+    # USE THE NEW SELECTIVE NORMALIZER
+    env = SelectiveVecNormalize(env, n_continuous_dims=10, n_frames=4)
 
     # Instantiate the Brain with Trial 9 Math
     model = PPO(
@@ -89,7 +92,7 @@ def train_production():
         print(f"\n[CRITICAL ERROR] Training crashed: {e}")
         model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
         env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
-        
+
     finally:
         print("Executing Failsafe: Purging zombie instances and VRAM...")
         # 1. Kill Emulators
