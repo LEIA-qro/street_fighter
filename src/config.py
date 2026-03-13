@@ -46,9 +46,9 @@ HOST = '127.0.0.1'
 PORT = 9999
 
 # Model & Training Config
-MODEL_NAME = "PPO_OHE_sf2_ryu_specialist_2_5"
-TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_model_26051060_steps.zip"
-TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_vecnormalize_26051060_steps.pkl"
+MODEL_NAME = "PPO_OHE_sf2_ryu_specialist_4_6"
+TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_model_9618370_steps.zip"
+TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_vecnormalize_9618370_steps.pkl"
 
 ACTION_DIM = 10
 NUM_FRAMES = 4
@@ -71,8 +71,8 @@ BATCH_SIZE = 1024
 TESTING_ZIP_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_CRASH_SAVE.zip"
 TESTING_PKL_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_vecnormalize_CRASH_SAVE.pkl"
 
-TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_CRASH_SAVE.zip"
-TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_2_4_vecnormalize_CRASH_SAVE.pkl"
+TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_model_19775040_steps.zip"
+TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_vecnormalize_19775040_steps.pkl"
 
 # Available Savestates for Randomization
 AVAILABLE_STATES = [
@@ -157,7 +157,7 @@ RYU_ONLY_STATES_PHASE_5 = [
     "RYU_EHONDA_R1_HARD.State",
     "RYU_GUILE_R1_HARD.State",
     "RYU_KEN_R1_HARD.State",
-    "RYU_RYU_R1_HARD.State"
+    "RYU_RYU_R1_HARD.State",
     "RYU_ZANGIEF_R1_HARD.State",
     # The New Challengers
     "RYU_SAGAT_R1_HARD.State",
