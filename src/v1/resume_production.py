@@ -8,7 +8,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
 
 import config
-from env_sf2 import StreetFighterEnv
+from v1.env_sf2 import StreetFighterEnv
 
 directories = config.get_directory()
 

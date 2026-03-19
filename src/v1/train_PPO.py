@@ -10,7 +10,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 # Import your custom environment and configs
 import config
-from env_sf2 import StreetFighterEnv
+from v1.env_sf2 import StreetFighterEnv
 
 # Define directories for weights and logs
 directories = config.get_directory()

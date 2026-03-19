@@ -10,7 +10,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.evaluation import evaluate_policy
 
 import config
-from env_sf2 import StreetFighterEnv
+from v1.env_sf2 import StreetFighterEnv
 
 directories = config.get_directory()
 
