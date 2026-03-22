@@ -17,17 +17,20 @@ class SelectiveVecNormalize(VecEnvWrapper):
         n_frames:          Number of stacked frames (default 4).
         clip:              Symmetric clip range after normalization (default 10.0).
     """
-    def __init__(self, venv, n_continuous_dims=10, n_frames=4, clip=10.0):
+    def __init__(self, venv, n_continuous_dims=10, n_frames=4, clip=10.0, training=True):
         super().__init__(venv)
         self.n_cont = n_continuous_dims
         self.n_frames = n_frames
         self.total_dim_per_frame = venv.observation_space.shape[0] // n_frames # e.g. 2216 // 4 = 554
         self.clip = clip
+        self._training = training  # Rename internal flag
         self.running_mean = np.zeros(n_continuous_dims, dtype=np.float64)
         self.running_var  = np.ones(n_continuous_dims, dtype=np.float64)
         self.count = 1e-4 # Small seed to avoid div-by-zero on first update
 
     def _update_stats(self, obs: np.ndarray):
+        if not self._training:   # Guard: skip updates when frozen
+            return
         # Extract only the continuous slices from all stacked frames
         cont_data = []
         for i in range(self.n_frames):
@@ -80,6 +83,12 @@ class SelectiveVecNormalize(VecEnvWrapper):
             pickle.dump(stats, f)
         print(f"[SelectiveVecNormalize] Stats saved → {path}")
 
+    def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
+        """Explicitly delegate env_method calls down to the vectorized environment."""
+        return self.venv.env_method(
+            method_name, *method_args, indices=indices, **method_kwargs
+        )
+
     @classmethod
     def load(cls, path: str, venv):
         with open(path, "rb") as f:
@@ -102,11 +111,11 @@ class SelectiveVecNormalize(VecEnvWrapper):
     # is a no-op kept for drop-in compatibility with resume script patterns.)
     @property
     def training(self):
-        return True
+        return self._training
  
     @training.setter
     def training(self, value):
-        pass  # Always updating; flag accepted silently for API compatibility
+        self._training = value   # Now actually respected
  
     # norm_reward parity — reward normalization not implemented here;
     # accepted silently to avoid AttributeError in resume scripts.

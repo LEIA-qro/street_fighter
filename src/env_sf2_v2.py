@@ -54,13 +54,20 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32) # was int32
     
         # ------------------------------------
-        
+        self.active_training_states = config.TRAINING_STATES
+
         self.prev_my_hp    = 176
         self.prev_enemy_hp = 176
         self.prev_p1_x     = 0
         self.prev_p2_x     = 0
         self.frames        = deque(maxlen=config.NUM_FRAMES)
 
+        self.corrupt_payload_count = 0
+
+    def set_training_states(self, new_states):
+        """Receives broadcast from the Main Process and updates local memory."""
+        self.active_training_states = new_states
+    
     def _get_obs(self): return np.concatenate(self.frames)
 
     def _one_hot(self, val, num_classes):
@@ -99,7 +106,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         # Footsie Spacing Reward (Distance is typically observation[2] and [3])
         # P1_X is usually at index 2, P2_X at index 3 in your cont_obs
         rel_dist = abs(observation[2] - observation[3])
-        dist_reward = 0.05 if 70 <= rel_dist <= 150 else 0.0
+        dist_reward = 0.08 if 70 <= rel_dist <= 150 else 0.0
 
         # reward = float(damage_dealt)
         # THE GRANDMASTER REWARD FUNCTION
@@ -108,12 +115,12 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         # -0.01 for Time Passed  (Urgency / Anti-Turtle)
         # THE COMBO-ENGINE REWARD LOGIC
         if damage_dealt > 0:
-            # Hit landed: Reward Damage + 1.5 Flat Bonus for Hit Count (combo incentive)
-            reward = float(damage_dealt) + 1.5 - (0.35 * float(damage_taken)) + dist_reward
+            # Hit landed: Reward Damage + 2 Flat Bonus for Hit Count (combo incentive)
+            reward = float(damage_dealt) + 2 - (0.35 * float(damage_taken)) + dist_reward
             
         else:
             # Empty frame: Apply pain penalty and exact -0.01 bleed
-            reward = -(0.35 * float(damage_taken)) - 0.02 + dist_reward
+            reward = -(0.35 * float(damage_taken)) - 0.1 + dist_reward
 
         if current_enemy_hp <= 0: reward += 50.0
         elif current_my_hp <= 0: reward -= 50.0
@@ -122,14 +129,19 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         
         terminated = bool(current_my_hp <= 0 or current_enemy_hp <= 0) if self.trainable else False
         
-        return self._get_obs(), reward, terminated, False, {}
+        # Emit win/loss outcome in info so Monitor records it
+        info = {}
+        if terminated:
+            info["win"] = 1 if current_enemy_hp <= 0 and current_my_hp > 0 else 0
+
+        return self._get_obs(), reward, terminated, False, info
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
         # Random Domain Selection
         # Phase selection
-        chosen_state_file = random.choice(config.TRAINING_STATES)
+        chosen_state_file = random.choice(self.active_training_states)
         full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
         
         # Send Reset via Parent Method
@@ -196,4 +208,8 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             except ValueError: pass
 
         # Failsafe: Return 554 zeros if the string is corrupted
-        return np.zeros(TOTAL_OBS_DIM, dtype=np.float32)
+        self.corrupt_payload_count += 1
+        if self.corrupt_payload_count % 100 == 0:
+            print(f"[WARNING] {self.corrupt_payload_count} corrupt payloads received. Check socket integrity.")
+        # Return last known good observation instead of zeros:
+        return self.frames[-1][:TOTAL_OBS_DIM] if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM, dtype=np.float32)

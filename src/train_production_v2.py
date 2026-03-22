@@ -1,9 +1,5 @@
 # edited train_productio_v2.py
-import os
-import multiprocessing
-import gc
-import torch
-import time
+import os, multiprocessing, gc, torch, time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
@@ -12,52 +8,37 @@ from stable_baselines3.common.callbacks import BaseCallback
 import config
 from env_sf2_v2 import StreetFighterEnvV2
 from selective_norm import SelectiveVecNormalize
+from curriculum_callback import CurriculumCallback
 
 directories = config.get_directory()
-
-class SaveOnStepCallback(BaseCallback):
-    """Callback to save the model and normalization math every N steps."""
-    def __init__(self, save_freq, save_path, verbose=1):
-        super().__init__(verbose)
-        self.save_freq = save_freq
-        self.save_path = save_path
-
-    def _on_step(self) -> bool:
-        if self.n_calls % self.save_freq == 0:
-            model_path = os.path.join(self.save_path, config.MODEL_NAME + f"_{self.num_timesteps}_steps")
-            vec_path = os.path.join(self.save_path, config.MODEL_NAME + f"_vecnormalize_{self.num_timesteps}_steps.pkl")
-            
-            self.model.save(model_path)
-            self.training_env.save(vec_path)
-            if self.verbose > 0:
-                print(f"\n[CHECKPOINT] Saved model at {self.num_timesteps} steps!")
-        return True
     
 def make_env(rank):
     def _init():
         env = StreetFighterEnvV2(rank=rank)
-        env = Monitor(env)  # <--- This is the accountant that tracks the score!
-        return env
+        return Monitor(env)
     return _init
 
 def train_production():
-    print("Initializing Phase 1: Grandmaster Production Training...")
+    print("[Training] Initializing Curriculum Production Training...")
+
+    # Phase 0 starts here — config.TRAINING_STATES must equal CURRICULUM_PHASES[0]
+    config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
 
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
     # USE THE NEW SELECTIVE NORMALIZER
     env = SelectiveVecNormalize(env, n_continuous_dims=10, n_frames=4)
 
-    # Instantiate the Brain with Trial 9 Math
+    phase0 = config.PHASE_HYPERPARAMS[0]
     model = PPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=0.00014963345069997716,   # From Trial 19
-        n_steps=2048,                           # From Trial 19
-        batch_size=512,                         # From Trial 19
-        ent_coef=0.058045038937880364,          # From Trial 19
-        clip_range=0.25225074436550204,         # From Trial 19
-        n_epochs=10,              
+        learning_rate=phase0["lr"],
+        n_steps=config.N_STEPS,
+        batch_size=config.BATCH_SIZE,
+        ent_coef=phase0["ent_coef"],
+        clip_range=phase0["clip"],
+        n_epochs=10,
         gamma=0.99,
         target_kl=0.03,
         policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
@@ -66,15 +47,14 @@ def train_production():
         device="cuda"
     )
 
-    checkpoint_callback = SaveOnStepCallback(save_freq=config.SAVE_FREQ_STEPS // n_envs, save_path=directories["production"])
+    callback = CurriculumCallback(save_path=directories["production"], verbose=1)
     
-    # 5. The Grandmaster Training Loop (10 Million Steps)
-    # With 16 cores, this will process exponentially faster than before.
-    
+    print("[Training] Press Ctrl + C to stop the training. ")
+
     try:
         model.learn(
             total_timesteps=config.STARTING_TOTAL_TIMESTEPS, 
-            callback=checkpoint_callback,
+            callback=callback,
             tb_log_name=config.MODEL_NAME
         )
         

@@ -5,6 +5,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import config
 from env_sf2_v2 import StreetFighterEnvV2
+from selective_norm import SelectiveVecNormalize
 from bizhawk_base import BizHawkBaseEnv
 
 directories = config.get_directory()
@@ -23,7 +24,7 @@ def test_agent():
     
     # 2. Load the Normalization Math safely
     print(f"Loading normalization stats from {config.TESTING_PKL_FILE_P2}...")
-    env = VecNormalize.load(vec_load_path, env)
+    env = SelectiveVecNormalize.load(vec_load_path, env)
     
     # CRITICAL: Lock the normalization math. Do NOT let it update during testing!
     env.training = False

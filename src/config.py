@@ -46,7 +46,7 @@ HOST = '127.0.0.1'
 PORT = 9999
 
 # Model & Training Config
-MODEL_NAME = "PPO_OHE_sf2_ryu_specialist_4_6"
+MODEL_NAME = "PPO_NOv2_sf2_ryu_specialist_0_0"
 TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_model_9618370_steps.zip"
 TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_vecnormalize_9618370_steps.pkl"
 
@@ -56,9 +56,9 @@ OBS_DIM = 10 # Old obs
 
 N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
 N_HYPERPARAMETER_TRIALS = 50 # Number of Optuna Trials to run during hyperparameter optimization
-STARTING_TOTAL_TIMESTEPS = 3000000
+STARTING_TOTAL_TIMESTEPS = 3_000_000
 RESUME_PRODUCTION_TIMESTEPS = 10_000_000 
-SAVE_FREQ_STEPS = 200_000
+SAVE_FREQ_STEPS = 1_000_000
 
 # --- HYPERPARAMETERS FROM OPTUNA TRIAL ---
 LR = 5.6948095644433695e-05
@@ -165,4 +165,45 @@ RYU_ONLY_STATES_PHASE_5 = [
     "RYU_MBISON_R1_HARD.State"
 ]
 
-TRAINING_STATES = RYU_ONLY_STATES_PHASE_3
+TRAINING_STATES = RYU_ONLY_STATES_PHASE_2
+
+# config.py — add these at the bottom
+
+# config.py — Remove Phase 1 entirely:
+CURRICULUM_PHASES = [
+    RYU_ONLY_STATES_PHASE_2,   # Now Phase 0 — easy but live opponents, diverse states
+    RYU_ONLY_STATES_PHASE_3,   # Phase 1
+    RYU_ONLY_STATES_PHASE_4,   # Phase 2
+    RYU_ONLY_STATES_PHASE_5,   # Phase 3 — full difficulty
+]
+
+# Curriculum advancement gate
+WIN_RATE_THRESHOLD = 0.70   # Must win 70% of episodes to advance
+WIN_RATE_WINDOW    = 500    # Rolling window of episodes to measure
+
+# Phase hyperparameter decay — applied relative to Optuna results
+# Set these after your first Optuna run finishes
+OPTUNA_PHASE1_LR         = LR          # Placeholder — update after first Optuna
+OPTUNA_PHASE1_ENT_COEF   = ENT_COEF
+OPTUNA_PHASE1_CLIP_RANGE = CLIP_RANGE
+
+# Transfer Optuna results (Phase 3→4) — update after second Optuna run
+TRANSFER_LR         = 2e-5    # Placeholder
+TRANSFER_ENT_COEF   = 0.015
+TRANSFER_CLIP_RANGE = 0.15
+
+
+
+# Update PHASE_HYPERPARAMS to re-index:
+PHASE_HYPERPARAMS = {
+    # NOTE: n_steps and batch_size are FIXED after model creation.
+    # SB3's rollout buffer is sized at init. Changing them mid-training
+    # requires rebuilding the model. Set them once in train_production_v2.py.
+    0: {"lr": OPTUNA_PHASE1_LR,          "ent_coef": OPTUNA_PHASE1_ENT_COEF,          "clip": OPTUNA_PHASE1_CLIP_RANGE},
+    1: {"lr": OPTUNA_PHASE1_LR * 0.85,   "ent_coef": OPTUNA_PHASE1_ENT_COEF * 0.80,  "clip": OPTUNA_PHASE1_CLIP_RANGE},
+    2: {"lr": TRANSFER_LR,               "ent_coef": TRANSFER_ENT_COEF,               "clip": TRANSFER_CLIP_RANGE},
+    3: {"lr": TRANSFER_LR * 0.75,        "ent_coef": TRANSFER_ENT_COEF * 0.70,        "clip": TRANSFER_CLIP_RANGE},
+}
+
+# Also update train_production_v2.py:
+# config.TRAINING_STATES = config.CURRICULUM_PHASES[0]  # Now starts at Phase 2 states

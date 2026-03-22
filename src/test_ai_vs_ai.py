@@ -6,7 +6,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import config
-from env_sf2 import StreetFighterEnv
+from v1.env_sf2 import StreetFighterEnv
 
 directories = config.get_directory()
 

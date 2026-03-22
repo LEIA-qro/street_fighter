@@ -12,8 +12,8 @@ from stable_baselines3.common.monitor import Monitor
 
 
 import config
-# THE V2 IMPORT
 from env_sf2_v2 import StreetFighterEnvV2 
+from selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
 
@@ -39,7 +39,7 @@ def objective(trial):
 
     n_envs = config.N_ENVS
     env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
-    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+    env = SelectiveVecNormalize(env, n_continuous_dims=10, n_frames=4)
 
     model = PPO(
         policy="MlpPolicy",
