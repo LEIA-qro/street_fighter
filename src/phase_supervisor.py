@@ -22,15 +22,6 @@ def _save_optuna_memory():
     with open(OPTUNA_MEMORY_FILE, "w") as f:
         json.dump(config.PHASE_HYPERPARAMS, f, indent=4)
 
-def _load_optuna_memory():
-    if os.path.exists(OPTUNA_MEMORY_FILE):
-        with open(OPTUNA_MEMORY_FILE, "r") as f:
-            saved_params = json.load(f)
-            # JSON keys are strings, convert back to ints
-            for k, v in saved_params.items():
-                config.PHASE_HYPERPARAMS[int(k)] = v
-        print(f"[Supervisor] Restored persistent Optuna parameters from disk.")
-
 def _get_phase_checkpoint_paths(phase_idx: int) -> tuple[str, str]:
     """Returns (model_path, vec_path) for a given phase entry checkpoint."""
     tag        = f"phase{phase_idx + 1}_entry"
@@ -38,31 +29,44 @@ def _get_phase_checkpoint_paths(phase_idx: int) -> tuple[str, str]:
     vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnorm_{tag}.pkl")
     return model_path, vec_path
 
-def run_supervised_curriculum(initial_model_path: str, initial_vec_path: str,
-                               optuna_trials_per_phase: int = 20):
-    """
-    Full automated loop. Reuses resume_training() and run_study() entirely.
+# phase_supervisor.py
 
-    Flow per iteration:
-      1. Train with PhaseStoppingCallback until a phase transition fires
-      2. run_study() tunes hyperparams for the next phase on the transition checkpoint
-      3. Inject best params into config.PHASE_HYPERPARAMS
-      4. Loop — resume_training() reads the updated config automatically
-    """
+MAX_CONSECUTIVE_CRASHES = 3
+_REQUIRED_HYPERPARAM_KEYS = {"lr", "ent_coef", "clip"}
+
+def _load_optuna_memory():
+    if os.path.exists(OPTUNA_MEMORY_FILE):
+        with open(OPTUNA_MEMORY_FILE, "r") as f:
+            saved_params = json.load(f)
+        
+        for k, v in saved_params.items():
+            phase_idx = int(k)
+            # --- Schema validation before mutation ---
+            if not isinstance(v, dict):
+                print(f"[Supervisor] WARNING: Malformed entry for phase {phase_idx}, skipping.")
+                continue
+            missing_keys = _REQUIRED_HYPERPARAM_KEYS - set(v.keys())
+            if missing_keys:
+                print(f"[Supervisor] WARNING: Phase {phase_idx} missing keys {missing_keys}, skipping.")
+                continue
+            config.PHASE_HYPERPARAMS[phase_idx] = v
+        
+        print(f"[Supervisor] Restored persistent Optuna parameters from disk.")
+
+
+def run_supervised_curriculum(initial_model_path: str, initial_vec_path: str,
+                               optuna_trials_per_phase: int = config.N_HYPERPARAMETER_TRIALS):  # FIX: use config
     _load_optuna_memory()
 
     model_path = initial_model_path
     vec_path   = initial_vec_path
+    consecutive_crashes = 0  # THE GUARD
 
     while True:
-        print(f"\n{'='*60}")
-        print(f"[Supervisor] Resuming training...")
-        print(f"{'='*60}")
-
         result = resume_training(
             model_path=model_path,
             vec_path=vec_path,
-            callback_class=PhaseStoppingCallback,  # Stops on phase transition
+            callback_class=PhaseStoppingCallback,
         )
 
         if result["reason"] == "interrupted":
@@ -70,10 +74,21 @@ def run_supervised_curriculum(initial_model_path: str, initial_vec_path: str,
             break
 
         if result["reason"] == "crash":
-            print("[Supervisor] Crash detected — restarting from crash save.")
+            consecutive_crashes += 1
+            print(f"[Supervisor] Crash #{consecutive_crashes} detected.")
+            
+            # --- THE GUARD: hard stop after N consecutive crashes ---
+            if consecutive_crashes >= MAX_CONSECUTIVE_CRASHES:
+                print(f"[Supervisor] FATAL: {consecutive_crashes} consecutive crashes. "
+                      f"Halting supervisor. Manual intervention required.")
+                break
+            
             model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
             vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
             continue
+
+        # Any successful result resets the crash counter
+        consecutive_crashes = 0
 
         if result["reason"] == "completed":
             print("[Supervisor] Full curriculum complete.")
