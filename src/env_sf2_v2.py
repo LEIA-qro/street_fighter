@@ -4,15 +4,17 @@ import random
 import numpy as np
 from gymnasium import spaces
 from collections import deque
+
 import config
 from bizhawk_base import BizHawkBaseEnv
 
-CONTINUOUS_DIM = 10  # HP(2), X(2), Y(2), Proj_X(2), Vel_X(2) ← was 8
-ACT_CATEGORIES = 256
+CONTINUOUS_DIM = config.OBS_DIM  # HP(2), X(2), Y(2), Proj_X(2), Vel_X(2) ← was 8
+ACT_CATEGORIES = 256 # 
 CHAR_CATEGORIES = 16
 ONE_HOT_ACT_DIM = ACT_CATEGORIES * 2
 ONE_HOT_CHAR_DIM = CHAR_CATEGORIES * 2
 TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32 = 554
+
 
 class StreetFighterEnvV2(BizHawkBaseEnv):
     """Street Fighter II RL Environment with One-Hot Encoded Action IDs."""
@@ -26,7 +28,6 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             lua_path=lua_path,
             host=config.HOST,
             port=assigned_port,
-            reset_lua_path=config.RESET_CONFIG_LUA_SCRIPT_PATH,
             trainable=trainable
         )
         
@@ -54,7 +55,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32) # was int32
     
         # ------------------------------------
-        self.active_training_states = config.TRAINING_STATES
+        self.active_training_states = config.CURRICULUM_PHASES[0]
 
         self.prev_my_hp    = 176
         self.prev_enemy_hp = 176
@@ -103,12 +104,11 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         if damage_dealt > damage_clamp: damage_dealt = 0
         if damage_taken > damage_clamp: damage_taken = 0
 
-        # Footsie Spacing Reward (Distance is typically observation[2] and [3])
+        # Footsie Spacing Reward 
         # P1_X is usually at index 2, P2_X at index 3 in your cont_obs
         rel_dist = abs(observation[2] - observation[3])
-        dist_reward = 0.08 if 70 <= rel_dist <= 150 else 0.0
+        dist_reward = 0.005 if 70 <= rel_dist <= 150 else 0.0
 
-        # reward = float(damage_dealt)
         # THE GRANDMASTER REWARD FUNCTION
         # +1.0x for Damage Dealt (Aggression)
         # -0.25x for Damage Taken (Self-Preservation / Blocking)
@@ -120,7 +120,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             
         else:
             # Empty frame: Apply pain penalty and exact -0.01 bleed
-            reward = -(0.35 * float(damage_taken)) - 0.1 + dist_reward
+            reward = -(0.35 * float(damage_taken)) - 0.015 + dist_reward
 
         if current_enemy_hp <= 0: reward += 50.0
         elif current_my_hp <= 0: reward -= 50.0
@@ -145,7 +145,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
         
         # Send Reset via Parent Method
-        if self.reset_lua_path and self.trainable:
+        if self.trainable:
             self.send_command(f"RESET {full_state_path}\n")
         
         # Wait for resulting state

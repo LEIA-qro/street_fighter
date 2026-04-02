@@ -6,14 +6,13 @@ import time
 class BizHawkBaseEnv(gym.Env):
     """Universal Base Environment for BizHawk socket communication."""
     
-    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, reset_lua_path=None, trainable=True):
+    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, trainable=True):
         super().__init__()
         self.bizhawk_path = bizhawk_path
         self.rom_path = rom_path
         self.lua_path = lua_path
         self.host = host
         self.port = port
-        self.reset_lua_path = reset_lua_path
         self.trainable = trainable
         
         self.server_socket = None
