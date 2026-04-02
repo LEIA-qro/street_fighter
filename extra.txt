@@ -24,3 +24,17 @@ Trial 19 finished with value: 177.2972 and parameters: {'learning_rate': 0.00014
 
 // Phase 2
 Trial 16 finished with value: 126.9374 and parameters: {'learning_rate': 3.8691815392845406e-05, 'ent_coef': 0.021233610543775434, 'clip_range': 0.13691059892976204, 'n_steps': 8192, 'batch_size': 2048}. Best is trial 16 with value: 126.9374.
+
+
+
+# After New manual Curriculumn Optimization
+============================================================
+  BEST TRIAL: #21
+  BEST MEAN REWARD: 146.4465
+  BEST HYPERPARAMETERS:
+    learning_rate: 2.1083173532291324e-05
+    ent_coef: 0.0991481575312593
+    clip_range: 0.26030337888734206
+    n_steps: 2048
+    batch_size: 1024
+============================================================
