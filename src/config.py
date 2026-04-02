@@ -63,7 +63,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_model_19
 TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_vecnormalize_19775040_steps.pkl"
 
 # Model Training Config
-MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_0_0"
+MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_1_0"
 TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_model_9618370_steps.zip"
 TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_vecnormalize_9618370_steps.pkl"
 
@@ -89,15 +89,15 @@ Change this every optuna study
 '''
 
 # --- HYPERPARAMETERS FROM OPTUNA TRIAL ---
-LR = 5.6948095644433695e-05
-ENT_COEF = 0.03530287430683962
-CLIP_RANGE = 0.19964140088107324
-N_STEPS = 4096 # Once set DO NOT CHANGE
+LR = 2.1083173532291324e-05
+ENT_COEF = 0.015356816943688252
+CLIP_RANGE = 0.26030337888734206
+N_STEPS = 2048 # Once set DO NOT CHANGE
 BATCH_SIZE = 1024 # Once set DO NOT CHANGE
 
 # Curriculum advancement gate
-WIN_RATE_THRESHOLD = 0.75   # Must win 75% of episodes to advance
-WIN_RATE_WINDOW    = 500    # Rolling window of episodes to measure ------------------ No entiendo al 100 que hace 
+WIN_RATE_THRESHOLD = 0.80   # Must win 80% of episodes to advance
+WIN_RATE_WINDOW    = 250    # Rolling window of episodes to measure
 
 # Phase hyperparameter decay — applied relative to Optuna results
 # Set these after your first Optuna run finishes
