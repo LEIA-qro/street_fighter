@@ -123,7 +123,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             reward = -(0.35 * float(damage_taken)) - 0.015 + dist_reward
 
         if current_enemy_hp <= 0: reward += 50.0
-        elif current_my_hp <= 0: reward -= 50.0
+        if current_my_hp <= 0: reward -= 50.0 # To avoid a tie
 
         self.prev_my_hp, self.prev_enemy_hp = current_my_hp, current_enemy_hp
         
@@ -152,7 +152,10 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         data = self.receive_payload()
         observation = self._parse_payload(data, is_reset=True)
         
-        self.prev_my_hp, self.prev_enemy_hp = observation[0], observation[1]
+        self.prev_my_hp    = float(observation[0]) if observation[0] > 0 else 176.0
+        self.prev_enemy_hp = float(observation[1]) if observation[1] > 0 else 176.0
+        self.prev_p1_x = int(observation[2])
+        self.prev_p2_x = int(observation[3])
 
         self.frames.clear()
         for _ in range(config.NUM_FRAMES): self.frames.append(observation)
