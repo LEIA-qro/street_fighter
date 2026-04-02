@@ -6,7 +6,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import SubprocVecEnv
 # from stable_baselines3.common.monitor import Monitor
 # from stable_baselines3.common.callbacks import BaseCallback
 
@@ -25,15 +25,17 @@ def train_production_PPO():
     # Phase 0 starts here — config.TRAINING_STATES must equal CURRICULUM_PHASES[0]
     config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
 
-    n_envs = 1 # config.N_ENVS
+    n_envs = config.N_ENVS
     phase = config.PHASE_HYPERPARAMS[0]
+    env = None
+    model = None
     
 
     try:
         env = SubprocVecEnv([SFv2_make_env(i) for i in range(n_envs)])
         # USE THE NEW SELECTIVE NORMALIZER
         env = SelectiveVecNormalize(env, n_continuous_dims=10, n_frames=4)
-        
+
         model = PPO(
         policy="MlpPolicy",
         env=env,
@@ -72,17 +74,20 @@ def train_production_PPO():
         print("\nProduction Training Complete!")
         
     except KeyboardInterrupt:
-        print("\nTraining forcefully interrupted. Executing emergency save...")
-        model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
-        env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
-        
+        print("\nTraining interrupted. Executing emergency save...")
+        if 'model' in locals(): model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
+        if 'env'   in locals(): env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
+
     except Exception as e:
         print(f"\n[CRITICAL ERROR] Training crashed: {e}")
-        model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
-        env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
+        if 'model' in locals(): model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
+        if 'env'   in locals(): env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
 
     finally:
-        failsafe_env(env=env, model=model)
+        failsafe_env(
+            env=env if 'env' in dir() else None,
+            model=model if 'model' in dir() else None
+        )
 
 if __name__ == "__main__":
     train_production_PPO()
