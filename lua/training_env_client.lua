@@ -22,7 +22,7 @@ local port = comm.socketServerGetPort()
 if port == nil then
     console.log("ERROR: Socket server not started. Run via Python script.")
     return
-elseif port == "9999" or activate_visualization then
+elseif port == "9999" and activate_visualization then
     client.setwindowsize(2)
     client.invisibleemulation(false)
 end
