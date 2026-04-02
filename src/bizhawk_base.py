@@ -72,8 +72,11 @@ class BizHawkBaseEnv(gym.Env):
         try:
             formatted_reply = f"{len(command)} {command}"
             self.conn.sendall(formatted_reply.encode('utf-8'))
-        except (ConnectionResetError, BrokenPipeError):
-            pass # Socket is already dead
+        except (ConnectionResetError, BrokenPipeError) as e:
+            if self.trainable:
+                raise RuntimeError(f"Socket broken during training: {e}")
+            # Non-trainable (interactive) mode: log and continue
+            print(f"[WARN] send_command failed in interactive mode: {e}")
 
     def receive_payload(self) -> str:
         """Blocks and waits for a complete, mathematically perfect payload."""
