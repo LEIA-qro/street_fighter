@@ -236,6 +236,7 @@ class ManualCurriculumCallback(BaseCallback):
         vec_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_BEST_REWARD.pkl")
         self.model.save(path)
         self.training_env.save(vec_path)
+        self._save_phase_state()  # ADD THIS
         if self.verbose:
             print(f"[Best-Reward ✓] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase + 1} | "
@@ -246,6 +247,7 @@ class ManualCurriculumCallback(BaseCallback):
         vec_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_BEST_WINRATE.pkl")
         self.model.save(path)
         self.training_env.save(vec_path)
+        self._save_phase_state()  # ADD THIS
         if self.verbose:
             print(f"[Best-WinRate ✓] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase + 1} | "
