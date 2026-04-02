@@ -29,24 +29,26 @@ class SelectiveVecNormalize(VecEnvWrapper):
         self.count = 1e-4 # Small seed to avoid div-by-zero on first update
 
     def _update_stats(self, obs: np.ndarray):
-        if not self._training:   # Guard: skip updates when frozen
+        if not self._training:
             return
-        # Extract only the continuous slices from all stacked frames
-        cont_data = []
-        for i in range(self.n_frames):
-            start = i * self.total_dim_per_frame
-            cont_data.append(obs[:, start : start + self.n_cont].astype(np.float64))
-        
-        cont_combined = np.concatenate(cont_data, axis=0)
-        batch_mean = cont_combined.mean(axis=0)
-        batch_var  = cont_combined.var(axis=0)
-        n = cont_combined.shape[0]
-        
+
+        # Only use the NEWEST frame (last in the stacked vector) to avoid 4x duplicate counting
+        start_latest = (self.n_frames - 1) * self.total_dim_per_frame
+        latest_cont = obs[:, start_latest : start_latest + self.n_cont].astype(np.float64)
+
+        batch_mean = latest_cont.mean(axis=0)
+        batch_var  = latest_cont.var(axis=0)
+        n = latest_cont.shape[0]   # ← scalar: number of envs (e.g. 10)
+
         total = self.count + n
         delta = batch_mean - self.running_mean
 
         self.running_mean += delta * n / total
-        self.running_var   = (self.running_var * self.count + batch_var * n + delta**2 * self.count * n / total) / total
+        self.running_var   = (
+            self.running_var * self.count
+            + batch_var * n
+            + delta**2 * self.count * n / total
+        ) / total
         self.count = total
 
     # selective_norm.py — normalize_obs — obs is now float32, assignment works correctly
