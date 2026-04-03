@@ -85,13 +85,16 @@ def resume_training(model_path, vec_path,
             save_interval=config.SAVE_FREQ_STEPS
         )
         
+        # In resume_production_v2.py — after restoring phase_bests:
         callback._phase_bests = phase_state.get("phase_bests", {})
-        # reset_num_timesteps=False ensures TensorBoard continues the graph smoothly
+        callback._threshold_save_fired = phase_state.get("threshold_save_fired", set())  # ADD THIS
+        callback._save_phase_state()  # ← ensures json exists from minute 0
+
         model.learn(
             total_timesteps=config.RESUME_PRODUCTION_TIMESTEPS, 
             callback=callback,
             tb_log_name=config.MODEL_NAME,
-            reset_num_timesteps=False 
+            reset_num_timesteps=False # reset_num_timesteps=False ensures TensorBoard continues the graph smoothly
         )
         
         # Save Final Grandmaster
@@ -131,6 +134,9 @@ if __name__ == "__main__":
             break
         else:
             restart_count += 1
+             # phase_state never updated — always None
+            # This is fine because load_state() reads curriculum_state.json
+            # BUT only if ManualCurriculumCallback._save_phase_state() was called before the crash
             print(f"\n--- AUTO-RESTART #{restart_count} ---")
             current_model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
             current_vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
