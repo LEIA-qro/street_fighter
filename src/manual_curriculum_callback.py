@@ -61,6 +61,9 @@ class ManualCurriculumCallback(BaseCallback):
         self.last_eval_step = 0
         self.last_save_step   = 0
 
+        # Threshold milestone tracker
+        self._threshold_save_fired: set[int] = set()
+
     def set_phase(self, new_phase_idx: int):
         """
         Manually advance (or rewind) to any phase index.
@@ -189,6 +192,7 @@ class ManualCurriculumCallback(BaseCallback):
             "phase_bests": {
                 str(k): v for k, v in self._phase_bests.items()
             },
+            "threshold_save_fired":  list(self._threshold_save_fired),  # ADD THIS
         }
         path = os.path.join(self.save_path, "curriculum_state.json")
         with open(path, "w") as f:
@@ -217,6 +221,8 @@ class ManualCurriculumCallback(BaseCallback):
             raw["phase_bests"] = {
                 int(k): v for k, v in raw.get("phase_bests", {}).items()
             }
+            raw["threshold_save_fired"] = set(raw.get("threshold_save_fired", []))
+            
             print(f"[ManualCurriculum] Restored → Phase {raw['current_phase'] + 1} "
                   f"| {raw['num_timesteps']:,} steps")
             return raw
@@ -284,6 +290,31 @@ class ManualCurriculumCallback(BaseCallback):
                   f"Win Rate: {self._win_rate():.1%} | "
                   f"Mean Reward: {self._mean_reward():.2f}")
 
+    def _save_threshold_milestone(self, win_rate: float):
+        """
+        Fires ONCE per phase when win rate crosses WIN_RATE_THRESHOLD.
+        Does NOT advance the phase — that remains your manual decision.
+        Creates a uniquely named artifact so it's never overwritten.
+        """
+        tag = f"phase{self.current_phase + 1}_WR{int(win_rate * 100)}pct_{self.num_timesteps}steps"
+        model_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_{tag}")
+        vec_path   = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_{tag}.pkl")
+        
+        self.model.save(model_path)
+        self.training_env.save(vec_path)
+        self._save_phase_state()
+
+        # Mark this phase as fired so we never duplicate this save
+        self._threshold_save_fired.add(self.current_phase)
+
+        if self.verbose:
+            print(f"\n{'*'*60}")
+            print(f"[THRESHOLD MILESTONE] Phase {self.current_phase + 1} cleared!")
+            print(f"  Win Rate : {win_rate:.1%} >= {config.WIN_RATE_THRESHOLD:.1%}")
+            print(f"  Steps    : {self.num_timesteps:,}")
+            print(f"  Saved    : {model_path}.zip")
+            print(f"  Manually call callback.set_phase({self.current_phase + 1}) to advance.")
+            print(f"{'*'*60}\n")
     # ==================================================================
     # Status print  — call anytime to see current metrics
     # ==================================================================
@@ -332,6 +363,14 @@ class ManualCurriculumCallback(BaseCallback):
             if wr > self._get_phase_best("win_rate") and len(self.win_buffer) >= config.WIN_RATE_WINDOW // 2:
                 self._set_phase_best("win_rate", wr)
                 self._save_best_winrate()
+
+            # Threshold milestone: if we cross the win rate threshold for the first time in this phase, save a milestone checkpoint
+            if (
+                self.current_phase not in self._threshold_save_fired 
+                and len(self.win_buffer) >= config.WIN_RATE_WINDOW
+                and wr >= config.WIN_RATE_THRESHOLD
+            ):
+                self._save_threshold_milestone(wr)
  
         # ---- Periodic checkpoint every save_interval steps ----
         if self.num_timesteps - self.last_save_step >= self.save_interval:
