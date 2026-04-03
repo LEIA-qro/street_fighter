@@ -64,8 +64,8 @@ TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_vecnorma
 
 # Model Training Config
 MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_1_0"
-TRAINING_ZIP_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_model_9618370_steps.zip"
-TRAINING_PKL_FILE = "models/production/PPO_OHE_sf2_ryu_specialist_4_5_vecnormalize_9618370_steps.pkl"
+TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_CRASH_SAVE.zip"
+TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_vecnormalize_CRASH_SAVE.pkl"
 
 # Model Arquitectural config
 ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
@@ -73,7 +73,7 @@ OBS_DIM = 10 # Old obs from v1, does not consider cathegorical data -- DO NOT CH
 
 NUM_FRAMES = 4 # Frame Stacking = 4
 STARTING_TOTAL_TIMESTEPS = 3_000_000 # For train production or train sinlge PPO
-RESUME_PRODUCTION_TIMESTEPS = 10_000_000 # For resume production
+RESUME_PRODUCTION_TIMESTEPS = 3_000_000 # For resume production
 
 SAVE_FREQ_STEPS = 1_000_000
 N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
