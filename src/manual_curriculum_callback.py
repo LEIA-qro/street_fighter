@@ -222,7 +222,7 @@ class ManualCurriculumCallback(BaseCallback):
                 int(k): v for k, v in raw.get("phase_bests", {}).items()
             }
             raw["threshold_save_fired"] = set(raw.get("threshold_save_fired", []))
-            
+
             print(f"[ManualCurriculum] Restored → Phase {raw['current_phase'] + 1} "
                   f"| {raw['num_timesteps']:,} steps")
             return raw
@@ -232,6 +232,7 @@ class ManualCurriculumCallback(BaseCallback):
             "current_phase": 0,
             "num_timesteps": 0,
             "phase_bests":   {},
+            "threshold_save_fired": set(),  # ADD THIS
         }
 
     # ------------------------------------------------------------------
