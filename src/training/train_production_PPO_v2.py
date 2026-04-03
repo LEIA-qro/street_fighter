@@ -57,7 +57,7 @@ def train_production_PPO():
         save_path=directories["production"],
         start_phase=0,
         eval_interval=500,
-        save_interval=config.SAVE_FREQ_STEPS,
+        save_interval=config.SAVE_FREQ_STEPS
         )
         
         print("[Training] Press Ctrl + C to stop the training. ")
@@ -74,14 +74,14 @@ def train_production_PPO():
         print("\nProduction Training Complete!")
         
     except KeyboardInterrupt:
-        print("\nTraining interrupted. Executing emergency save...")
-        if 'model' in locals(): model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
-        if 'env'   in locals(): env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
+        print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
+        if model is not None: model.save(os.path.join(directories["production"], config.MODEL_NAME + "_EMERGENCY"))
+        if env is not None: env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
 
     except Exception as e:
         print(f"\n[CRITICAL ERROR] Training crashed: {e}")
-        if 'model' in locals(): model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
-        if 'env'   in locals(): env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
+        if model is not None: model.save(os.path.join(directories["production"], config.MODEL_NAME + "_CRASH_SAVE"))
+        if env is not None: env.save(os.path.join(directories["production"], config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
 
     finally:
         failsafe_env(
