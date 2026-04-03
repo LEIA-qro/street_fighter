@@ -79,11 +79,21 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         return arr
 
     def step(self, action):
-        # 1. Send Action via Parent Method
-        action_string = "".join(str(int(b)) for b in action)
+        try:
+            # 1. Send Action via Parent Method
+            action_string = "".join(str(int(b)) for b in action)
 
-        full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
-        self.send_command(full_command)
+            full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
+            self.send_command(full_command)
+        except RuntimeError as e:
+            # Socket is dead. Retunt a terminal state to SB3 calls reset().
+            # Do NOT let this propagate - it kills the SubpocVecEnv
+            print(f"[Rank {self.port - config.PORT}] Socket error in step: {e}. Returning terminal obs.")
+            obs = self._get_obs() if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM * config.NUM_FRAMES, dtype=np.float32)
+            return obs, -50.0, True, False, {"socket_death": True}
+        
+
+
         
         # 2. Receive State via Parent Method
         data = self.receive_payload()
@@ -91,10 +101,9 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
         self.frames.append(observation)
         
-        current_my_hp, current_enemy_hp = observation[0], observation[1]
-        
+        # =====================================================
         # 3. Calculate Reward
-        # We define reward purely based on damage dealt to the opponent. To avoid the "Coward's Local Optimum".
+        current_my_hp, current_enemy_hp = observation[0], observation[1]
         damage_dealt = max(0, self.prev_enemy_hp - current_enemy_hp)
         damage_taken = max(0, self.prev_my_hp - current_my_hp)
 
@@ -139,18 +148,22 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
-        # Random Domain Selection
-        # Phase selection
-        chosen_state_file = random.choice(self.active_training_states)
-        full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
-        
-        # Send Reset via Parent Method
-        if self.trainable:
-            self.send_command(f"RESET {full_state_path}\n")
-        
-        # Wait for resulting state
-        data = self.receive_payload()
-        observation = self._parse_payload(data, is_reset=True)
+        try:
+            # Random Domain Selection
+            # Phase selection
+            chosen_state_file = random.choice(self.active_training_states)
+            full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
+            
+            # Send Reset via Parent Method
+            if self.trainable:
+                self.send_command(f"RESET {full_state_path}\n")
+            
+            # Wait for resulting state
+            data = self.receive_payload()
+            observation = self._parse_payload(data, is_reset=True)
+
+        except (RuntimeError, OSError) as e:
+            raise RuntimeError(f"[Rank {self.port - config.PORT}] BizHawk dead on reset: {e}")
         
         self.prev_my_hp    = float(observation[0]) if observation[0] > 0 else 176.0
         self.prev_enemy_hp = float(observation[1]) if observation[1] > 0 else 176.0
