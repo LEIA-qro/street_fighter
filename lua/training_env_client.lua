@@ -56,17 +56,20 @@ while true do
     -- 2. Read RAM: Projectile State & Delta Calculation
     local raw_p1_proj_x = mainmemory.read_u16_be(0x8506)
     local raw_p2_proj_x = mainmemory.read_u16_be(0x8586)
-    
-    local active_p1_proj_x = -1
-    local active_p2_proj_x = -1
 
-    -- If moving, it is active. If frozen, it is dead (-1).
+    local p1_proj_active = 0
+    local p1_proj_x_safe = 0  -- 0 when inactive, real coord when active
+    local p2_proj_active = 0
+    local p2_proj_x_safe = 0  
+
     if raw_p1_proj_x ~= prev_p1_proj_x then
-        active_p1_proj_x = raw_p1_proj_x
+        p1_proj_active = 1
+        p1_proj_x_safe = raw_p1_proj_x
     end
-    
+
     if raw_p2_proj_x ~= prev_p2_proj_x then
-        active_p2_proj_x = raw_p2_proj_x
+        p2_proj_active = 1
+        p2_proj_x_safe = raw_p2_proj_x
     end
 
     -- Update previous states for the next frame's comparison
@@ -78,10 +81,11 @@ while true do
     local p2_char_id = mainmemory.read_u8(0x845A)
 
     -- 3. Format Payload (Now 10 dimensions) & Send
-    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
+    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
         p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
         p1_action_id, p2_action_id, 
-        active_p1_proj_x, active_p2_proj_x,
+        p1_proj_active, p1_proj_x_safe,   -- replaces old active_p1_proj_x
+        p2_proj_active, p2_proj_x_safe,
         p1_char_id, p2_char_id)
     
     comm.socketServerSend(payload)

@@ -1,4 +1,15 @@
 # env_sf2_v2.py
+"""
+This is a newer version of the Street Fighter II environment, 
+designed to support a richer observation space with one-hot encoded action and character information. 
+The continuous features now include projectile activity and position, 
+as well as velocity estimates. 
+The action space remains a 10-bit multi-binary vector representing controller inputs.
+
+The continuous observation space was changed from 10 (v2) to 12 (v2.1) dimensions.
+
+"""
+
 import os
 import random
 import numpy as np
@@ -14,7 +25,7 @@ CHAR_CATEGORIES = 16
 ONE_HOT_ACT_DIM = ACT_CATEGORIES * 2
 ONE_HOT_CHAR_DIM = CHAR_CATEGORIES * 2
 TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32 = 554
-
+_EXPECTED_PAYLOAD_FIELDS = CONTINUOUS_DIM + 2  # 10 (v2) or 12 (v2.1) obs + 2 char IDs for perspective flip validation
 
 class StreetFighterEnvV2(BizHawkBaseEnv):
     """Street Fighter II RL Environment with One-Hot Encoded Action IDs."""
@@ -37,9 +48,18 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         # --- THE NEW HYBRID SPACE ---
         # Continuous bounds: P1_HP, P2_HP, P1_X, P2_X, P1_Y, P2_Y, P1_ProjX, P2_ProjX
         # Velocity range: max observable delta per 4-frame skip is ~60px
-        cont_low  = [0., 0., 0., 0., 0., 0., -1., -1., -60., -60.]
-        cont_high = [176., 176., 500., 500., 200., 200., 500., 500., 60., 60.]
+        # Layout: p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y,
+        #         p1_proj_active, p1_proj_x_safe, p2_proj_active, p2_proj_x_safe,
+        #         p1_vel_x, p2_vel_x  →  12 dims
+        cont_low  = [0.,    0.,    0.,    0.,    0.,    0.,    0.,  0.,    0.,  0.,    -60., -60.]
+        cont_high = [176., 176., 500.,  500.,  200.,  200.,   1., 500.,   1., 500.,   60.,  60.]
         
+        # Sanity check: catch this class of bug at init time, not at first forward pass
+        assert len(cont_low) == config.OBS_DIM, (
+            f"cont_low has {len(cont_low)} dims but config.OBS_DIM={config.OBS_DIM}. "
+            f"Update the bounds list."
+            )
+
         # One-Hot bounds: 552 zeros and ones
         act_low = [0.] * ONE_HOT_ACT_DIM
         act_high = [1.] * ONE_HOT_ACT_DIM
@@ -122,11 +142,11 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         # THE COMBO-ENGINE REWARD LOGIC
         if damage_dealt > 0:
             # Hit landed: Reward Damage + 2 Flat Bonus for Hit Count (combo incentive)
-            reward = float(damage_dealt) + 2 - (0.35 * float(damage_taken)) + dist_reward
+            reward = float(damage_dealt) + 2 - (0.65 * float(damage_taken)) + dist_reward
             
         else:
             # Empty frame: Apply pain penalty and exact -0.01 bleed
-            reward = -(0.35 * float(damage_taken)) - 0.015 + dist_reward
+            reward = -(0.65 * float(damage_taken)) - 0.015 + dist_reward
 
         if current_enemy_hp <= 0: reward += 50.0
         if current_my_hp <= 0: reward -= 50.0 # To avoid a tie
@@ -174,20 +194,29 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
     def _parse_payload(self, data, is_reset=False):
         """
-        Builds a 554-dimensional float32 observation.
- 
-        Layout per frame:
-          [0-9]    Continuous: HP(2), X(2), Y(2), ProjX(2), VelX(2)
-          [10-265] P1 action one-hot (256)
-          [266-521] P2 action one-hot (256)
-          [522-537] P1 char one-hot (16)
-          [538-553] P2 char one-hot (16)
+        Builds a 556-dimensional float32 observation.
+
+        Lua protocol — 14 CSV fields:
+        [0]  p1_hp          [1]  p2_hp
+        [2]  p1_x           [3]  p2_x
+        [4]  p1_y           [5]  p2_y
+        [6]  p1_action_id   [7]  p2_action_id
+        [8]  p1_proj_active [9]  p1_proj_x_safe
+        [10] p2_proj_active [11] p2_proj_x_safe
+        [12] p1_char_id     [13] p2_char_id
+
+        Observation layout per frame (556 dims):
+        [0-11]    Continuous (12): HP(2), X(2), Y(2), ProjActive(2), ProjX(2), VelX(2)
+        [12-267]  P1 action one-hot (256)
+        [268-523] P2 action one-hot (256)
+        [524-539] P1 char one-hot (16)
+        [540-555] P2 char one-hot (16)
         """
         # Grab strictly the CSV string, stripping off the leading zero
         csv_string = data.strip().split(" ")[-1]
         parts = csv_string.split(",")
         
-        if len(parts) == 12:
+        if len(parts) == _EXPECTED_PAYLOAD_FIELDS:
             try:
                 raw = [int(x) for x in parts]
                 
@@ -196,17 +225,37 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
                 
                 # PERSPECTIVE FLIP
                 if self.player == 2:
-                    p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y = raw[1], raw[0], raw[3], raw[2], raw[5], raw[4]
-                    p1_act, p2_act, p1_proj, p2_proj, p1_char, p2_char = raw[7], raw[6], raw[9], raw[8], raw[11], raw[10]
+                    p1_hp, p2_hp       = raw[1],  raw[0]
+                    p1_x,  p2_x        = raw[3],  raw[2]
+                    p1_y,  p2_y        = raw[5],  raw[4]
+                    p1_act, p2_act     = raw[7],  raw[6]
+                    p1_proj_active     = raw[10]; p1_proj_x_safe = raw[11]
+                    p2_proj_active     = raw[8];  p2_proj_x_safe = raw[9]
+                    p1_char, p2_char   = raw[13], raw[12]
                 else:
-                    p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y = raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]
-                    p1_act, p2_act, p1_proj, p2_proj, p1_char, p2_char = raw[6], raw[7], raw[8], raw[9], raw[10], raw[11]
+                    p1_hp, p2_hp       = raw[0],  raw[1]
+                    p1_x,  p2_x        = raw[2],  raw[3]
+                    p1_y,  p2_y        = raw[4],  raw[5]
+                    p1_act, p2_act     = raw[6],  raw[7]
+                    p1_proj_active     = raw[8];  p1_proj_x_safe = raw[9]
+                    p2_proj_active     = raw[10]; p2_proj_x_safe = raw[11]
+                    p1_char, p2_char   = raw[12], raw[13]
 
                 p1_vel_x = 0 if is_reset else int(np.clip(p1_x - self.prev_p1_x, -60, 60))
                 p2_vel_x = 0 if is_reset else int(np.clip(p2_x - self.prev_p2_x, -60, 60))
                 self.prev_p1_x, self.prev_p2_x = p1_x, p2_x
                 # 1. Continuous Features
-                cont_obs = np.array([p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, p1_proj, p2_proj, p1_vel_x, p2_vel_x], dtype=np.float32)
+                cont_obs = np.array([
+                    p1_hp, p2_hp, 
+                    p1_x, p2_x, 
+                    p1_y, p2_y, 
+                    p1_proj_active, p1_proj_x_safe, 
+                    p2_proj_active, p2_proj_x_safe, 
+                    p1_vel_x, p2_vel_x], dtype=np.float32)
+                
+                # Sanity: guarantee cont_obs matches declared space at runtime
+                assert len(cont_obs) == config.OBS_DIM, \
+                    f"cont_obs={len(cont_obs)} != config.OBS_DIM={config.OBS_DIM}"
                 
                 # 2. Categorical Features (One-Hot Encoded)
                 # One-hot dims can stay int32 in the raw array, but the concat must be float32
@@ -218,11 +267,20 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
                 # 3. Smash them all together
                 return np.concatenate((cont_obs, p1_act_oh, p2_act_oh, p1_char_oh, p2_char_oh))
 
-            except ValueError: pass
+            except (ValueError, AssertionError) as e:
+                print(f"[PARSE ERROR] {e} | raw data: '{data[:120]}'")
 
-        # Failsafe: Return 554 zeros if the string is corrupted
+        else:
+            if self.corrupt_payload_count % 100 == 0:
+                print(f"[PARSE ERROR] Expected {_EXPECTED_PAYLOAD_FIELDS} fields, "
+                    f"got {len(parts)} | raw: '{data[:120]}'")
+
+        # Fallback
         self.corrupt_payload_count += 1
         if self.corrupt_payload_count % 100 == 0:
             print(f"[WARNING] {self.corrupt_payload_count} corrupt payloads received. Check socket integrity.")
         # Return last known good observation instead of zeros:
-        return self.frames[-1][:TOTAL_OBS_DIM] if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM, dtype=np.float32)
+        return (self.frames[-1][:TOTAL_OBS_DIM].copy()
+            if len(self.frames) > 0
+            else np.zeros(TOTAL_OBS_DIM, dtype=np.float32))
+    
