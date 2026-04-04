@@ -52,9 +52,9 @@ class BizHawkBaseEnv(gym.Env):
         if not self.trainable:
             print("\n[INTERACTIVE MODE] BizHawk launched.")
             print("1. Navigate the game menus manually.")
-            print("2. When the match is ready, open the BizHawk Lua Console.")
-            print(f"3. Run the script: {self.lua_path}")
-            print("Waiting for your Lua connection...")
+            print("2. When the match is ready, open the BizHawk Lua Console. Tools → Lua Console")
+            print(f"3. Run the script: {self.lua_path}. Script → Open Script → Select {self.lua_path}")
+            print(f"\n[Connection] Waiting for your Lua connection...")
             
         self.conn, addr = self.server_socket.accept()
         
@@ -64,7 +64,7 @@ class BizHawkBaseEnv(gym.Env):
         else:
             self.conn.settimeout(None) # Wait forever while human navigates menus
             
-        print(f"Connection established with BizHawk at {addr}")
+        print(f"[Connection] Connection established with BizHawk at {addr}")
             
 
     def send_command(self, command: str):
@@ -73,10 +73,13 @@ class BizHawkBaseEnv(gym.Env):
             formatted_reply = f"{len(command)} {command}"
             self.conn.sendall(formatted_reply.encode('utf-8'))
         except (ConnectionResetError, BrokenPipeError) as e:
+            print(f"[WARN] send_command failed in interactive mode: {e}")
             if self.trainable:
                 raise RuntimeError(f"Socket broken during training: {e}")
             # Non-trainable (interactive) mode: log and continue
-            print(f"[WARN] send_command failed in interactive mode: {e}")
+            else:
+                print(f"\n[Connection] Waiting for your Lua connection...")
+
 
     def receive_payload(self) -> str:
         """Blocks and waits for a complete, mathematically perfect payload."""
