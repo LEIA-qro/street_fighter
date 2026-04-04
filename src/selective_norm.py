@@ -1,6 +1,7 @@
 # selective_norm.py
 import pickle
 import numpy as np
+import config
 from stable_baselines3.common.vec_env import VecEnvWrapper
 
 class SelectiveVecNormalize(VecEnvWrapper):
@@ -17,9 +18,9 @@ class SelectiveVecNormalize(VecEnvWrapper):
         n_frames:          Number of stacked frames (default 4).
         clip:              Symmetric clip range after normalization (default 10.0).
     """
-    def __init__(self, venv, n_continuous_dims=10, n_frames=4, clip=10.0, training=True):
+    def __init__(self, venv, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES, clip=10.0, training=True):
         super().__init__(venv)
-        self.n_cont = n_continuous_dims
+        self.n_cont = n_continuous_dims # Old Obs was 10
         self.n_frames = n_frames
         self.total_dim_per_frame = venv.observation_space.shape[0] // n_frames # e.g. 2216 // 4 = 554
         self.clip = clip
