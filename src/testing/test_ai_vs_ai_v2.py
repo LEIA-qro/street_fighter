@@ -6,16 +6,36 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 import numpy as np
-import gymnasium as gym
-from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
+import gymnasium as gym
+from gymnasium import spaces
 
 import config
 from env_sf2_v2 import StreetFighterEnvV2, TOTAL_OBS_DIM
 from selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
+
+class _MockV2Env(gym.Env):
+    """
+    Zero-cost shell with correct v2 obs/action spaces.
+    Satisfies SelectiveVecNormalize.load()'s venv argument.
+    No socket, no subprocess, no blocking.
+    """
+    def __init__(self):
+        super().__init__()
+        self.action_space = spaces.MultiBinary(config.ACTION_DIM)
+        n = TOTAL_OBS_DIM * config.NUM_FRAMES  # 554 * 4 = 2216
+        self.observation_space = spaces.Box(
+            low=np.zeros(n,  dtype=np.float32),
+            high=np.ones(n,  dtype=np.float32),
+            dtype=np.float32
+        )
+    def reset(self, **kwargs):
+        return np.zeros(self.observation_space.shape, dtype=np.float32), {}
+    def step(self, action):
+        return np.zeros(self.observation_space.shape, dtype=np.float32), 0.0, False, False, {}
 
 class _FrameBuffer:
     """
@@ -87,8 +107,7 @@ def test_ai_vs_ai():
     # ── 4. Load normalizers with the correct class ──
     # SelectiveVecNormalize.load requires a venv for obs_space; use a
     # DummyVecEnv wrapping a fresh env shell (immediately closed after load).
-    dummy = DummyVecEnv([lambda: StreetFighterEnvV2(rank=99, trainable=False)])
-
+    dummy = DummyVecEnv([_MockV2Env])  # No BizHawk, no socket, instant
     vec_norm_p1 = SelectiveVecNormalize.load(
         os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P1), dummy
     )
@@ -99,20 +118,24 @@ def test_ai_vs_ai():
     )
     vec_norm_p2.training = False
 
-    dummy.close()  # Kill the shell env after stats are loaded
-
      # ── 5. Load models ──
-    print("Loading Neural Networks...")
+    print(f"\nLoading Neural Networks...")
     model_p1 = PPO.load(
         os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P1),
         device="cuda"
     )
+    print("Player 1 loaded from:", config.TESTING_ZIP_FILE_P1)
     model_p2 = PPO.load(
         os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P2),
         device="cuda"
     )
+    print("Player 2 loaded from:", config.TESTING_ZIP_FILE_P2)
 
-    print("\nFIGHT! (AI vs AI V2 running...)")
+    
+    print(f"\n{('='*50)}")
+    print("FIGHT! (AI vs AI V2 running...)")
+    print(f"{('='*50)}")
+    print("Press Ctrl + C to end the session and close the emulator.")
 
     # ── 6. Cold-start: prime frame buffers on first payload ──
     first_payload = master_env.receive_payload()
@@ -154,6 +177,7 @@ def test_ai_vs_ai():
 
     except KeyboardInterrupt:
         print("\nAI vs AI session ended by user.")
+
     finally:
         master_env.close()
 
