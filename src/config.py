@@ -56,16 +56,16 @@ PORT = 9999
 
 # ---- TESTING CONFIG ----
 
-TESTING_ZIP_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_CRASH_SAVE.zip"
-TESTING_PKL_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_vecnormalize_CRASH_SAVE.pkl"
+TESTING_ZIP_FILE_P1 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
+TESTING_PKL_FILE_P1 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
-TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_model_19775040_steps.zip"
-TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_vecnormalize_19775040_steps.pkl"
+TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WINRATE.zip"
+TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_1_0"
-TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_CRASH_SAVE.zip"
-TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_vecnormalize_CRASH_SAVE.pkl"
+MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_1_1"
+TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
+TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
 # Model Arquitectural config
 ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
@@ -73,7 +73,7 @@ OBS_DIM = 10 # Old obs from v1, does not consider cathegorical data -- DO NOT CH
 
 NUM_FRAMES = 4 # Frame Stacking = 4
 STARTING_TOTAL_TIMESTEPS = 3_000_000 # For train production or train sinlge PPO
-RESUME_PRODUCTION_TIMESTEPS = 3_000_000 # For resume production
+RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 
 SAVE_FREQ_STEPS = 1_000_000
 N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
@@ -96,7 +96,7 @@ N_STEPS = 2048 # Once set DO NOT CHANGE
 BATCH_SIZE = 1024 # Once set DO NOT CHANGE
 
 # Curriculum advancement gate
-WIN_RATE_THRESHOLD = 0.80   # Must win 80% of episodes to advance
+WIN_RATE_THRESHOLD = 0.75   # Must win 75% of episodes to advance
 WIN_RATE_WINDOW    = 250    # Rolling window of episodes to measure
 
 # Phase hyperparameter decay — applied relative to Optuna results
