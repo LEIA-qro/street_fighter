@@ -34,7 +34,9 @@ def train_production_PPO():
     try:
         env = SubprocVecEnv([SFv2_make_env(i) for i in range(n_envs)])
         # USE THE NEW SELECTIVE NORMALIZER
-        env = SelectiveVecNormalize(env, n_continuous_dims=10, n_frames=4)
+        env = SelectiveVecNormalize(env,
+                                     n_continuous_dims=config.OBS_DIM, 
+                                     n_frames=config.NUM_FRAMES)
 
         model = PPO(
         policy="MlpPolicy",
