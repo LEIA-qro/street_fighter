@@ -1,0 +1,230 @@
+import os
+
+# ===========================================================
+#                       Directories Config
+# ===========================================================
+
+# Base Directories
+SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
+
+ROMS_DIR = os.path.join(PROJECT_ROOT, "roms")
+STATES_DIR = os.path.join(PROJECT_ROOT, "states")
+LUA_DIR = os.path.join(PROJECT_ROOT, "lua")
+
+# Executables & Files
+BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
+ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
+TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "training_env_client.lua")
+MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "match_test_env_client.lua")
+
+# Reset Config Lua Script Path (if needed in the future)
+RESET_CONFIG_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "reset_config.lua")
+
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
+MODEL_PRODUCTION_DIR = os.path.join(PROJECT_ROOT, "models", "production")
+OPTUNA_DIR = os.path.join(PROJECT_ROOT, "models", "optuna_best")
+MODEL_DIR_USING = os.path.join(PROJECT_ROOT, "models", "using_model")
+
+def get_directory():
+    directories = {
+        "src": SRC_DIR,
+        "project_root": PROJECT_ROOT,
+        "roms": ROMS_DIR,
+        "states": STATES_DIR,
+        "lua": LUA_DIR,
+        "logs": LOG_DIR,
+        "production": MODEL_PRODUCTION_DIR,
+        "optuna": OPTUNA_DIR,
+        "using_model": MODEL_DIR_USING
+    }
+    for name, path in directories.items():
+        if not os.path.exists(path):
+            os.makedirs(path)
+            print(f"Created missing directory: {name} with path {path}")
+    return directories
+
+# ===========================================================
+#                       Network Config
+# ===========================================================
+HOST = '127.0.0.1'
+PORT = 9999
+
+# ===========================================================
+#                   Model & Training Config
+# ===========================================================
+
+# ---- TESTING CONFIG ----
+
+TESTING_ZIP_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_CRASH_SAVE.zip"
+TESTING_PKL_FILE_P1 = "models/production/PPO_sf2_ryu_specialist_1_3_vecnormalize_CRASH_SAVE.pkl"
+
+TESTING_ZIP_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_model_19775040_steps.zip"
+TESTING_PKL_FILE_P2 = "models/production/PPO_OHE_sf2_ryu_specialist_4_6_vecnormalize_19775040_steps.pkl"
+
+# Model Training Config
+MODEL_NAME = "PPO_MC_sf2_ryu_specialistV2_1_0"
+TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_CRASH_SAVE.zip"
+TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_0_vecnormalize_CRASH_SAVE.pkl"
+
+# Model Arquitectural config
+ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
+OBS_DIM = 10 # Old obs from v1, does not consider cathegorical data -- DO NOT CHANGE
+
+NUM_FRAMES = 4 # Frame Stacking = 4
+STARTING_TOTAL_TIMESTEPS = 3_000_000 # For train production or train sinlge PPO
+RESUME_PRODUCTION_TIMESTEPS = 3_000_000 # For resume production
+
+SAVE_FREQ_STEPS = 1_000_000
+N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
+
+# ===========================================================
+#                   Optuna Config
+# ===========================================================   
+
+N_HYPERPARAMETER_TRIALS = 50 # Number of Optuna Trials to run during hyperparameter optimization
+
+'''
+Change this every optuna study
+'''
+
+# --- HYPERPARAMETERS FROM OPTUNA TRIAL ---
+LR = 2.1083173532291324e-05
+ENT_COEF = 0.015356816943688252
+CLIP_RANGE = 0.26030337888734206
+N_STEPS = 2048 # Once set DO NOT CHANGE
+BATCH_SIZE = 1024 # Once set DO NOT CHANGE
+
+# Curriculum advancement gate
+WIN_RATE_THRESHOLD = 0.80   # Must win 80% of episodes to advance
+WIN_RATE_WINDOW    = 250    # Rolling window of episodes to measure
+
+# Phase hyperparameter decay — applied relative to Optuna results
+# Set these after your first Optuna run finishes
+OPTUNA_PHASE1_LR         = LR          # Placeholder — update after first Optuna
+OPTUNA_PHASE1_ENT_COEF   = ENT_COEF
+OPTUNA_PHASE1_CLIP_RANGE = CLIP_RANGE
+
+# Transfer Optuna results (Phase 3→4) — update after second Optuna run
+TRANSFER_LR         = 2e-5    # Placeholder
+TRANSFER_ENT_COEF   = 0.015
+TRANSFER_CLIP_RANGE = 0.15
+
+
+
+# Update PHASE_HYPERPARAMS to re-index:
+PHASE_HYPERPARAMS = {
+    # NOTE: n_steps and batch_size are FIXED after model creation.
+    # SB3's rollout buffer is sized at init. Changing them mid-training
+    # requires rebuilding the model. Set them once in train_production_v2.py.
+    0: {"lr": OPTUNA_PHASE1_LR,          "ent_coef": OPTUNA_PHASE1_ENT_COEF,          "clip": OPTUNA_PHASE1_CLIP_RANGE},
+    1: {"lr": OPTUNA_PHASE1_LR * 0.85,   "ent_coef": OPTUNA_PHASE1_ENT_COEF * 0.80,  "clip": OPTUNA_PHASE1_CLIP_RANGE},
+    2: {"lr": TRANSFER_LR,               "ent_coef": TRANSFER_ENT_COEF,               "clip": TRANSFER_CLIP_RANGE},
+    3: {"lr": TRANSFER_LR * 0.75,        "ent_coef": TRANSFER_ENT_COEF * 0.70,        "clip": TRANSFER_CLIP_RANGE},
+}
+
+
+# ===========================================================
+#                   States Config
+# ===========================================================   
+
+# Available Savestates for Randomization
+AVAILABLE_STATES = [
+    "BALROG_GUILE_R1_HARD.State",
+    "BLANKA_ZANGIEF_R1_HARD.State",
+    "CHUNLI_ZANGIEF_R1_HARD.State",
+    "DHALSIM_RYU_R1_HARD.State",
+    "EHONDA_EHONDA_R1_HARD.State",
+    "GUILE_GUILE_R1_HARD.State",
+    "KEN_BLANKA_R1_HARD.State",
+    "MBISON_KEN_R1_HARD.State",
+    "RYU_BLANKA_R1_HARD.State",
+    "RYU_CHUNLI_R1_HARD.State",
+    "RYU_DHALSIM_R1_HARD.State",
+    "RYU_EHONDA_R1_HARD.State",
+    "RYU_GUILE_R1_HARD.State",
+    "RYU_KEN_R1_HARD.State",
+    "RYU_RYU_R1_HARD.State",
+    "SAGAT_BLANKA_R1_HARD.State",
+    "VEGA_KEN_R1_HARD.State",
+    "ZANGIEF_RYU_R1_HARD.State"
+]
+
+RYU_ONLY_STATES = [
+    "RYU_BLANKA_R1_HARD.State",
+    "RYU_CHUNLI_R1_HARD.State",
+    "RYU_DHALSIM_R1_HARD.State",
+    "RYU_EHONDA_R1_HARD.State",
+    "RYU_GUILE_R1_HARD.State",
+    "RYU_KEN_R1_HARD.State",
+    "RYU_RYU_R1_HARD.State",
+    "RYU_RYU_R1_PEACEFUL.State"
+]
+
+RYU_ONLY_STATES_PHASE_0 = [
+    "RYU_RYU_R1_PEACEFUL.State"
+]
+
+RYU_ONLY_STATES_PHASE_1 = [
+    # New Challengers Blanka, ChunLi, Dhalsim, Ken
+    "RYU_CHUNLI_R1_lvl1.State",
+    "RYU_DHALSIM_R1_lvl1.State",
+    "RYU_BLANKA_R1_lvl2.State",
+    "RYU_KEN_R1_lvl2.State",
+    "RYU_BLANKA_R1_lvl3.State",
+    "RYU_KEN_R1_lvl3.State"
+]
+
+RYU_ONLY_STATES_PHASE_2 = [
+    # Legacy Roaster Blanka, ChunLi, Dhalsim, Ken
+    "RYU_BLANKA_R1_lvl5.State",
+    "RYU_CHUNLI_R1_lvl5.State",
+    "RYU_DHALSIM_R1_lvl4.State",
+    "RYU_KEN_R1_lvl4.State",
+    # New Challengers Ryu, Zangief
+    "RYU_RYU_R1_lvl5.State",
+    "RYU_ZANGIEF_R1_lvl4.State"
+
+]
+
+RYU_ONLY_STATES_PHASE_3 = [
+    # The legacy Matchups Blanka, ChunLi, Dhalsim, Ken, Ryu, Zangief
+    "RYU_BLANKA_R1_lvl7.State",
+    "RYU_CHUNLI_R1_lvl6.State",
+    "RYU_DHALSIM_R1_lvl7.State",
+    "RYU_KEN_R1_lvl7.State",
+    "RYU_RYU_R1_lvl6.State",
+    "RYU_RYU_R1_lvl7.State",
+    "RYU_ZANGIEF_R1_lvl6.State",
+    # The new Challengers Balrog, E.Honda, Guile 
+    "RYU_BALROG_R1_lvl7.State",
+    "RYU_EHONDA_R1_lvl6.State",
+    "RYU_GUILE_R1_lvl6.State"
+]
+
+RYU_ONLY_STATES_PHASE_4 = [
+    # The legacy Matchups Balrog, Blanka, ChunLi, Dhalsim, E.Honda, Guile, Ken, Ryu, Zangief
+    "RYU_BALROG_R1_HARD.State",
+    "RYU_BLANKA_R1_HARD.State",
+    "RYU_CHUNLI_R1_HARD.State",
+    "RYU_DHALSIM_R1_HARD.State",
+    "RYU_EHONDA_R1_HARD.State",
+    "RYU_GUILE_R1_HARD.State",
+    "RYU_KEN_R1_HARD.State",
+    "RYU_RYU_R1_HARD.State",
+    "RYU_ZANGIEF_R1_HARD.State",
+    # The New Challengers
+    "RYU_SAGAT_R1_HARD.State",
+    "RYU_VEGA_R1_HARD.State",
+    "RYU_MBISON_R1_HARD.State"
+]
+
+
+CURRICULUM_PHASES = [
+    RYU_ONLY_STATES_PHASE_1,   # Now Phase 0 — easy but live opponents, diverse states
+    RYU_ONLY_STATES_PHASE_2,   # Phase 1
+    RYU_ONLY_STATES_PHASE_3,   # Phase 2
+    RYU_ONLY_STATES_PHASE_4,   # Phase 3 — full difficulty
+]
+
+TRAINING_STATES = CURRICULUM_PHASES[0] # Global variable to be updated by the callback and read by the env

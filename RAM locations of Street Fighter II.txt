@@ -1,0 +1,37 @@
+RAM locations of Street Fighter II genesis
+
+# 834C & 80CC Relative distance between characters
+
+# 834E & 80CE (Not sure why it repeats) Relative distance of both characters from the floor
+
+# 86A6 & 8006 & 80D8 (repeated 3 times) X coordinate of player 1  min=55, max=457 both values are relative to both players that fix the camera space
+# initial_value=203
+
+# 800A Posible distance of ceiling to foot of player 1
+# 80DC Distance between Chest & Ceiling of Player 1
+# 80E0 Distance between Head & Ceiling of Player 1
+# All of this 3 have the same initial value of 192 and decrease as the character aproaches the ceiling
+# also, they seem to change similar but vary in some way, that is why I assume the distance is from foot, chest and head
+
+# 80C0 Binary, 0 when Player 1 is in the floor and 257 when is in the air
+
+# 81E2 Botton Pressed by Player 1, 0=iddle, 4=right, 8=left, 1=jump, 2=crouching, also account for punching
+
+
+# 8358 X coordinate of player 2 min=55, max=457 both values are relative to both players that fix the camera space
+# initial_value=307
+
+# 828A Posible distance of ceiling to foot of player 2
+# 835C Distance between Chest & Ceiling of Player 2
+# 8360 Distance between Head & Ceiling of Player 2
+# Same as the ones before, initial value of 192
+
+# 845E Botton pressed by Player 2, similar to player 1, but inverts the 4 and 8
+
+# 86F4 Binary for Player 2, 14=in floor, 13=in air
+
+
+
+# 82CE Not so sure but maybe is the position state of the player 2, 2 is when p2 is in the air & 1 when p2 is in the floor, 4 when is crouching etc.
+
+# 804E Same as 82CE but for player 1, forgot to mention that both of this also show what move/attack is realized at the exact instant

@@ -1,0 +1,40 @@
+tensorboard --logdir=logs\
+
+client.invisibleemulation(false)
+
+
+# Before OHE
+Trial 4 finished with value: 25.1 and parameters: {'learning_rate': 0.00015250752552422399, 'ent_coef': 0.020041731434032307, 'clip_range': 0.1511545175035542, 'n_steps': 1024, 'batch_size': 64}. Best is trial 4 with value: 25.1.
+
+Trial 0 finished with value: 26.2 and parameters: {'learning_rate': 0.00011034286251094867, 'ent_coef': 0.08305784188309505, 'clip_range': 0.11400379265310284, 'n_steps': 2048, 'batch_size': 64}. Best is trial 0 with value: 26.2.
+
+
+Trial 9 finished with value: 38.8 and parameters: {'learning_rate': 5.6948095644433695e-05, 'ent_coef': 0.03530287430683962, 'clip_range': 0.19964140088107324, 'n_steps': 4096, 'batch_size': 256}. Best is trial 9 with value: 38.8.
+
+# After OHE
+Trial 1 finished with value: 116.71100000000001 and parameters: {'learning_rate': 6.514947130006004e-05, 'ent_coef': 0.06701907778969503, 'clip_range': 0.1496566125298953, 'n_steps': 4096, 'batch_size': 2048}. Best is trial 1 with value: 116.71100000000001.
+
+Trial 2 finished with value: 125.997 and parameters: {'learning_rate': 9.86244486271802e-05, 'ent_coef': 0.09187284783021865, 'clip_range': 0.18525864383076907, 'n_steps': 8192, 'batch_size': 512}. Best is trial 2 with value: 125.997.
+
+# After Neural Netwprk enhancement
+Trial 4 finished with value: 176.8186 and parameters: {'learning_rate': 0.00011271924125868896, 'ent_coef': 0.03859662190384094, 'clip_range': 0.21211448956995405, 'n_steps': 4096, 'batch_size': 2048}. Best is trial 4 with value: 176.8186.
+
+Trial 19 finished with value: 177.2972 and parameters: {'learning_rate': 0.00014963345069997716, 'ent_coef': 0.058045038937880364, 'clip_range': 0.25225074436550204, 'n_steps': 2048, 'batch_size': 512}. Best is trial 19 with value: 177.2972..
+
+
+// Phase 2
+Trial 16 finished with value: 126.9374 and parameters: {'learning_rate': 3.8691815392845406e-05, 'ent_coef': 0.021233610543775434, 'clip_range': 0.13691059892976204, 'n_steps': 8192, 'batch_size': 2048}. Best is trial 16 with value: 126.9374.
+
+
+
+# After New manual Curriculumn Optimization
+============================================================
+  BEST TRIAL: #21
+  BEST MEAN REWARD: 146.4465
+  BEST HYPERPARAMETERS:
+    learning_rate: 2.1083173532291324e-05
+    ent_coef: 0.0991481575312593
+    clip_range: 0.26030337888734206
+    n_steps: 2048
+    batch_size: 1024
+============================================================

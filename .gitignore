@@ -1,2 +1,6 @@
 /venv
 venv/
+src/__pycache__/
+/logs
+/models
+/old_logs
