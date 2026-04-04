@@ -89,7 +89,7 @@ while true do
     -- 3. Strict Spinlock: Wait for Python's response before advancing
     local response = ""
     local wait_start_time = os.time() -- Record the exact time we started waiting
-    local TIMEOUT_LIMIT = 60 -- Maximum seconds to wait before assuming Python is dead
+    local TIMEOUT_LIMIT = 180 -- Maximum seconds to wait before assuming Python is dead
     
     while response == "" or response == nil do
         response = comm.socketServerResponse()

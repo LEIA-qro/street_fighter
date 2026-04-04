@@ -87,9 +87,24 @@ def resume_training(model_path, vec_path,
         
         # In resume_production_v2.py — after restoring phase_bests:
         callback._phase_bests = phase_state.get("phase_bests", {})
-        callback._threshold_save_fired = phase_state.get("threshold_save_fired", set())  # ADD THIS
-        callback._save_phase_state()  # ← ensures json exists from minute 0
-
+        callback._threshold_save_fired = phase_state.get("threshold_save_fired", set())
+        callback.last_save_step        = phase_state.get("last_save_step", 0)   # ADD
+        callback.last_eval_step        = phase_state.get("last_eval_step", 0)   # ADD
+        if start_phase is not None and start_phase != phase_state.get("current_phase", 0):
+            print(f"[Resume] start_phase override detected. "
+                f"Clearing phase {start_phase} bests for fresh tracking.")
+            callback._phase_bests.pop(start_phase, None)  # Remove stale threshold for this phase
+        # ← ADD THIS: Force-broadcast the correct states to all subprocess envs
+        # The callback's __init__ sets self.current_phase but never calls env_method.
+        # Fix 1 handles the initial spawn, but this handles any edge case where
+        # env workers miss the config mutation (e.g., different Python interpreter state).
+        if restored_phase > 0:
+            try:
+                env.env_method("set_training_states", config.CURRICULUM_PHASES[restored_phase])
+                print(f"[Resume] States broadcast to all {config.N_ENVS} workers → Phase {restored_phase + 1}")
+            except Exception as e:
+                print(f"[Resume][WARN] Could not broadcast states to workers: {e}")
+                
         model.learn(
             total_timesteps=config.RESUME_PRODUCTION_TIMESTEPS, 
             callback=callback,
@@ -124,7 +139,7 @@ if __name__ == "__main__":
     current_vec_path = os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
 
     restart_count = 0
-    phase_state = None # Placeholder for future phase advancement
+    phase_state = 1 # Placeholder for future phase advancement
     while True:
         result = resume_training(current_model_path, current_vec_path, start_phase=phase_state)
         

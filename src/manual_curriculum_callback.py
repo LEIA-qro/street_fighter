@@ -193,6 +193,8 @@ class ManualCurriculumCallback(BaseCallback):
                 str(k): v for k, v in self._phase_bests.items()
             },
             "threshold_save_fired":  list(self._threshold_save_fired),  # ADD THIS
+            "last_save_step":       self.last_save_step,   # ADD
+            "last_eval_step":       self.last_eval_step,   # ADD
         }
         path = os.path.join(self.save_path, "curriculum_state.json")
         with open(path, "w") as f:
@@ -201,6 +203,12 @@ class ManualCurriculumCallback(BaseCallback):
             print(f"[Curriculum] State saved → Phase {self.current_phase + 1} "
                   f"at {self.num_timesteps:,} steps")
 
+    def _on_training_start(self) -> None:
+        """Called by SB3 after init_callback — model and training_env are now set."""
+        self._save_phase_state()  # ← safe here: num_timesteps is now correct
+
+
+    
     @staticmethod
     def load_state(save_path: str) -> dict:
         """
@@ -222,7 +230,7 @@ class ManualCurriculumCallback(BaseCallback):
                 int(k): v for k, v in raw.get("phase_bests", {}).items()
             }
             raw["threshold_save_fired"] = set(raw.get("threshold_save_fired", []))
-            
+
             print(f"[ManualCurriculum] Restored → Phase {raw['current_phase'] + 1} "
                   f"| {raw['num_timesteps']:,} steps")
             return raw
@@ -232,6 +240,9 @@ class ManualCurriculumCallback(BaseCallback):
             "current_phase": 0,
             "num_timesteps": 0,
             "phase_bests":   {},
+            "threshold_save_fired": set(),  # ADD THIS
+            "last_save_step":       0,   # ADD
+        "last_eval_step":       0,   # ADD
         }
 
     # ------------------------------------------------------------------
@@ -283,6 +294,7 @@ class ManualCurriculumCallback(BaseCallback):
                     pass
 
         self.last_save_step = self.num_timesteps
+        self._save_phase_state()  # ← ADD: persist last_eval_step and last_save_step
 
         if self.verbose:
             print(f"\n[Checkpoint] {self.num_timesteps:,} steps | "

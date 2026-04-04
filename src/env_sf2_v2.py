@@ -55,7 +55,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32) # was int32
     
         # ------------------------------------
-        self.active_training_states = config.CURRICULUM_PHASES[0]
+        self.active_training_states = config.TRAINING_STATES
 
         self.prev_my_hp    = 176
         self.prev_enemy_hp = 176
@@ -85,6 +85,8 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
             full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
             self.send_command(full_command)
+            # 2. Receive State via Parent Method
+            data = self.receive_payload()
         except RuntimeError as e:
             # Socket is dead. Retunt a terminal state to SB3 calls reset().
             # Do NOT let this propagate - it kills the SubpocVecEnv
@@ -92,11 +94,6 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             obs = self._get_obs() if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM * config.NUM_FRAMES, dtype=np.float32)
             return obs, -50.0, True, False, {"socket_death": True}
         
-
-
-        
-        # 2. Receive State via Parent Method
-        data = self.receive_payload()
         observation = self._parse_payload(data, is_reset=False)
 
         self.frames.append(observation)
