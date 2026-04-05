@@ -119,18 +119,22 @@ This allows to have an absolute control over every variable of the training,
 
 > Note. You can Skip this part and go directly to __Training__, if you suspect something is wrong, or want to debbug then proceed.
 
-#### To check  if __Bixhawk__ and __Python__ are connected.
+#### Checking  if __Bixhawk__ and __Python__ are connected.
+
 Run `test_telemetry2.py`
+
 When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is adviced to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
 After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
 You should be able to see the player 1, doing random actions.
 
-If this is the case, the TCP bridge between Bizhawk and Python is working.
+If this is the case, the TCP bridge between Bizhawk and Python is working. You can close Bizkawk.
 
 If this is not the case, ensure you have loaded the correct BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to the Python script, match your local setup before running this test.
 Alternatively, check if all of the versions required for the project are sound. `Python 3.13.12`, `Lua 5.4.6` and `BizHawk 2.8`. Specially `Bizhawk 2.8`, Python and Lua have not been tested in other versions, but because the project was made with this specific versions, using others might cause trouble.
 
+#### Checking  if `stable_baselines3` & `gymnasium` are working.
 
+Run `random_test.py`
 
 
 
