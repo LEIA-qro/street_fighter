@@ -7,10 +7,9 @@ _Windows Setup guide (English)_
 
 ## Project overview
 
-This repository contains code and experiments for Reinforcement Learning agents applied to a Street Fighter environment. The project is designed to run with **Python 3.13.12** & **Lua 5.4.6** inside an isolated virtual environment using **BizHawk 2.8** to guarantee compatibility.
+This repository contains code and experiments for Reinforcement Learning agents applied to a Street Fighter II' - Special Champion Edition (USA) environment. The project is designed to run with **Python 3.13.12** & **Lua 5.4.6** inside an isolated virtual environment using **BizHawk 2.8** to guarantee compatibility.
 
 The project aims to make an easy and straightforward implementation of Reinforcement Learning via Python, there already exists an already implemented alternative to this project, you can find it here: [Build a Street Fighter AI Model with Python | Gaming Reinforcement Learning Full Course](https://www.youtube.com/watch?v=rzbFhu6So5U)
-
 
 This is great for understanding the basics of the project, but it relys heavily on **gym retro**, a very old library that has multiple difficulties with different configuratioons and in game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, that allows a production-grade approach to reinforcement learning. With the sole purpose of achieving a manual curriculum based architecture.
 
@@ -118,8 +117,29 @@ This allows to have an absolute control over every variable of the training,
 
 ### Testing
 
+> Note. You can Skip this part and go directly to __Training__, if you suspect something is wrong, or want to debbug then proceed.
+
+#### To check  if __Bixhawk__ and __Python__ are connected.
+Run `test_telemetry2.py`
+When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is adviced to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
+After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
+You should be able to see the player 1, doing random actions.
+
+If this is the case, the TCP bridge between Bizhawk and Python is working.
+
+If this is not the case, ensure you have loaded the correct BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to the Python script, match your local setup before running this test.
+Alternatively, check if all of the versions required for the project are sound. `Python 3.13.12`, `Lua 5.4.6` and `BizHawk 2.8`. Specially `Bizhawk 2.8`, Python and Lua have not been tested in other versions, but because the project was made with this specific versions, using others might cause trouble.
+
+
+
+
+
 ### Training
 
 ### Testing AI Models
+
+---
+## Creating a Model
+
 
 
