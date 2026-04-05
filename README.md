@@ -14,8 +14,19 @@ The project aims to make an easy and straightforward implementation of Reinforce
 
 This is great for understanding the basics of the project, but it relys heavily on **gym retro**, a very old library that has multiple difficulties with different configuratioons and in game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, that allows a production-grade approach to reinforcement learning. With the sole purpose of achieving a manual curriculum based architecture.
 
-This allows to have an absolute control over every variable of the training,  
+This allows to have an absolute control over every variable of the training, 
 
+---
 
+## Video Tutorial
 
-<br>
+---
+
+## Prerequisites
+
+---
+
+## Virtual environment (venv)
+
+> Using a virtual environment is heavily recommended for this project.
+
