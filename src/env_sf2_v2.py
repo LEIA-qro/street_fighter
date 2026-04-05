@@ -27,6 +27,13 @@ ONE_HOT_CHAR_DIM = CHAR_CATEGORIES * 2
 TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32 = 554
 _EXPECTED_PAYLOAD_FIELDS = CONTINUOUS_DIM + 2  # 10 (v2) or 12 (v2.1) obs + 2 char IDs for perspective flip validation
 
+# ─── Action Economy Constants  ─────────────────────────────────
+"""These constants are used in the reward function to penalize wasted attack buttons, encouraging more strategic play."""
+ATTACK_BUTTON_INDICES = [4, 5, 6, 7, 8, 9]  # A, B, C, X, Y, Z — not directionals
+ACTION_ECONOMY_PENALTY = -0.05              # per wasted attack button
+MAX_FREE_ATTACK_BUTTONS = 1                 # first button is "free" — allows simple normals
+# ────────────────────────────────────────────────────────────────────────────
+
 class StreetFighterEnvV2(BizHawkBaseEnv):
     """Street Fighter II RL Environment with One-Hot Encoded Action IDs."""
     

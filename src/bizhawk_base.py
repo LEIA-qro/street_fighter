@@ -88,6 +88,7 @@ class BizHawkBaseEnv(gym.Env):
             while '\n' not in self.stream_buffer:
                 chunk = self.conn.recv(4096).decode('utf-8')
                 if not chunk:
+                    print("\n[Connection] No response from BizHawk.")
                     return ""
                 self.stream_buffer += chunk
             
@@ -101,6 +102,7 @@ class BizHawkBaseEnv(gym.Env):
             raise RuntimeError("BizHawk Socket Timeout")
             
         except (ConnectionResetError, ConnectionAbortedError):
+            print("\n[FAILSAFE] No Connection from BizHawk.")
             return ""  
 
     def close(self):
