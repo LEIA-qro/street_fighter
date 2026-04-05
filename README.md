@@ -225,7 +225,17 @@ If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the mod
 
 ### Other Metrics
 
-There Should be something here...
+`train/policy_gradient_loss`: measures how much the policy is being pushed to change each update. You want this to trend gradually downward and stay small. If it's spiking erratically, the agent is receiving inconsistent gradient signals, which usually means the reward function has too much variance or your learning rate is too high.
+
+`train/value_loss`: how wrong the critic (value function) is when predicting expected return. Early training: high and dropping. If it plateaus at a high value, the critic can't accurately predict reward from the 554-dim obs, which starves the policy of good advantage estimates. Watch this alongside `ep_rew_mean`.
+
+`train/entropy_loss`: measures action diversity. High entropy means the agent is still exploring broadly; low entropy means it's committing to specific moves. If this collapses to near zero early in training, the agent has latched onto a narrow strategy (like spamming one button) and stopped exploring. The `ent_coef` in config directly controls this.
+
+`train/approx_kl`: the KL divergence between the old and new policy per update. The config sets `target_kl=0.03`. If this consistently exceeds that threshold, SB3 will cut the update short, meaning the `n_epochs=10` is never fully used. A persistently high KL suggests the learning rate is too aggressive for the current phase.
+
+`train/clip_fraction`: the fraction of gradient steps where the PPO clipping mechanism activated. Healthy range is roughly 0.05–0.20. Values above 0.30 mean the policy is trying to change too fast and PPO is constantly clamping it, wasting compute. Values near zero mean the policy is barely updating.
+
+`train/explained_variance`: how much of the return variance the value function actually explains. Ranges from -∞ to 1.0; values below 0 mean the critic is worse than a constant baseline. You want this above 0.8 during stable training. Starting with a low explained variance is normal; if it's still low after a long time, the network architecture may need attention.
 
 ### Callback Metricks
 
