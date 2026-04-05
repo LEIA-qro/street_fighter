@@ -2,6 +2,10 @@ import socket
 import subprocess
 import random
 
+"""
+Change the BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to match your local setup before running this test.
+"""
+
 BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
 ROM_PATH = r"C:\\Users\Diego Perea\Documents\\Code\street_fighter\\roms\Street Fighter II' - Special Champion Edition (USA).md"
 LUA_SCRIPT_PATH = r"C:\\Users\Diego Perea\Documents\\Code\street_fighter\\lua\\match_test_env_client.lua"
@@ -12,11 +16,7 @@ ACTION_DIM = 10 # Instead of 12 buttons, we will only use 10
 EXPECTED_DIMS = 12  # ← FIX #1: The correct number of CSV values from Lua
 
 def recv_line(conn: socket.socket) -> str:
-    """
-    FIX #3: Read from the TCP stream byte-by-byte until a newline delimiter
-    is found. This guarantees we always process exactly one complete message,
-    regardless of how TCP segments the data.
-    """
+    # Data may arrive in chunks, so we need to buffer until we get a full line (ending with '\n').
     data = b""
     while True:
         chunk = conn.recv(1)
@@ -42,7 +42,7 @@ def test_telemetry():
             ROM_PATH, 
             f"--socket_ip={HOST}", 
             f"--socket_port={PORT}",
-            f"--lua={LUA_SCRIPT_PATH}" # Optional: Automatically load and run your Lua script!
+            f"--lua={LUA_SCRIPT_PATH}" # Optional: Automatically load and run the Lua script
         ])
 
         # 3. Block and wait for BizHawk's internal engine to connect
@@ -78,7 +78,7 @@ def test_telemetry():
                         if p1_hp <= 0 or p2_hp <= 0:
                             print(f"Match Over at Step {step_count}! P1 HP: {p1_hp}, P2 HP: {p2_hp}.")
                         
-                        action_string = "".join('1' if random.random() > 0.5 else '0' for _ in range(ACTION_DIM))
+                        action_string = "".join('1' if random.random() > 0.5 else '0' for _ in range(ACTION_DIM)) # Generate a random action string of length ACTION_DIM (10)
                         reply = action_string + "\n"
 
                         # Dedugging
