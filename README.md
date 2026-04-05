@@ -111,6 +111,15 @@ This allows to have an absolute control over every variable of the training,
   <li>tensorboard</li>
 </ul>
 
+To install the dependencies, in a new terminal, go to the project folder _(it is recommended to have a venv activated)_, and run the following:
+```
+pip install stable_baselines3 gymnasium torch optuna numpy pandas tensorboard
+```
+Alternatively you can run:
+```
+pip install  requirements.txt
+```
+
 ---
 
 ## Getting Started
@@ -136,7 +145,11 @@ Alternatively, check if all of the versions required for the project are sound. 
 
 Run `random_test.py`
 
+When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how the training will be happening, but with more instances.
 
+If this i the case then, you have all set to start.
+
+If this is not the case, check if you have correctly installed the dependencies. 
 
 ### Training
 
