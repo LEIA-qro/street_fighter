@@ -13,7 +13,11 @@ The project aims to make an easy and straightforward implementation of Reinforce
 
 This is great for understanding the basics of the project, but it relys heavily on **gym retro**, a very old library that has multiple difficulties with different configuratioons and in game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, that allows a production-grade approach to reinforcement learning. With the sole purpose of achieving a manual curriculum based architecture.
 
-This allows to have an absolute control over every variable of the training, 
+This allows to have an absolute control over every variable of the training.
+
+### How Does it works?
+
+
 
 ---
 
@@ -130,7 +134,7 @@ pip install  requirements.txt
 
 #### Checking  if __Bixhawk__ and __Python__ are connected.
 
-Run `test_telemetry2.py`
+Run `test_telemetry2.py`. You can find this script in the `testing` folder. 
 
 When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is adviced to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
 After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
@@ -143,7 +147,7 @@ Alternatively, check if all of the versions required for the project are sound. 
 
 #### Checking  if `stable_baselines3` & `gymnasium` are working.
 
-Run `random_test.py`
+Run `random_test.py`. You can find this script in the `testing` folder. 
 
 When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how the training will be happening, but with more instances.
 
@@ -153,10 +157,153 @@ If this is not the case, check if you have correctly installed the dependencies.
 
 ### Training
 
-### Testing AI Models
+Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed, check the documentation if you wish to train the model with another character or another configuration.
+
+There are only four training scripts:
+
+<ul>
+  <li><code>train_production_PPO_v2.py</code></li>
+  <li><code>resume_production_v2.py</code></li>
+  <li><code>train_optuna.py</code></li>
+  <li><code>transfer_optuna.py</code></li>  
+</ul>
+
+> Note. <code>transfer_optuna.py</code> is currently under development
+
+#### `train_production_PPO_v2.py`
+
+You can find this script in the `training` folder. 
+
+This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `resume_production_v2.py`
+
+You can find this script in the `training` folder. 
+
+This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `train_optuna.py`
+
+You can find this script in the `training` folder. 
+
+One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way. Slowing down the conversion, and in some cases, making it imposible to converge if the hyperparameter are not well tuned.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `transfer_optuna.py`
+
+> Currently under development
+
+You will be able to find this script in the `training` folder. 
+
+This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
 
 ---
-## Creating a Model
+## Checking How good is the model
+
+To check how good is the model we handle different metrics.
+
+You can check all of them running in the Terminal of the project:
+
+```Terminal
+tensorboard --logdir=logs\
+```
+
+### `ep_len_mean` and `ep_rew_mean`
+
+`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 100 seconds, since a second is 60 frames and we are using a FRAME SKIPING of 4 (Check the documentation), it means that 1500 * 4 / 60 = 100
+
+`ep_rew_mean`: Episode reward mean, this indicates what it the reard average of the episodes, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
+
+If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the model is succesfully beating every oponent. But if the `ep_len_mean` is low and the `ep_rew_mean` is also very low, this means the model is getting his ass kicked.
+
+### Other Metrics
+
+There Should be something here...
+
+### Callback Metricks
+
+Here we have the metric of `win_rate`, which obviously means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
+
+### Testing AI Models
+
+Once you have a trained Model, you can test it with the following:
+
+<ul>
+  <li>
+    <code>test_agent_v2.py</code>
+  </li>
+  <li>
+    <code>test_ai_vs_ai_v2.py</code>
+  </li>
+</ul>
+
+#### `test_agent_v2.py`
+
+You can find this script in the `testing` folder. 
+
+Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
+Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `test_ai_vs_ai_v2.py`
+
+You can find this script in the `testing` folder. 
+
+This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
+Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
+
+Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+
+---
+## Creating a custom Model
+
+There are different ways to create a custom model:
+
+<ul>
+  <li>
+    Change the REWARD function inside env_sf2_v2.py. This affects the overall behavior of the model. 
+  </li>
+
+  <li>
+    Change the Observation Space or the data passed to the model. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. [Note] Be carefull when editing the Lua script.
+  </li>
+
+  <li>
+    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The documentation for full guide.
+  </li>
+</ul>
+
+
+---
+## Future Implementations
+
+<ul>
+  <li>
+    Enhancing the Obs space, the actual model strugles heavily with projectiles. Even with pojectile tracking it still has a big trouble understanding why avoiding or protecting from a projectile is a good idea.
+  </li>
+
+  <li>
+    Enhancing the REWARD function, it os very hard to get the best REWARD function while aboiding the cowards local optimum, or REWARD hacking, the current REARD function works, but there can be a posible better REWARD function that accelerates the convergence of the model.
+  </li>
+
+  <li>
+    Including a UI and a compiled version of the project, currently everything runs with scripts and can be messy to explore and understand.
+  </li>
+</ul>
+
+---
+## Extra
+
+There should be something here...
+
 
 
 
