@@ -11,13 +11,13 @@ This repository contains code and experiments for Reinforcement Learning agents 
 
 The project aims to make an easy and straightforward implementation of Reinforcement Learning via Python, there already exists an already implemented alternative to this project, you can find it here: [Build a Street Fighter AI Model with Python | Gaming Reinforcement Learning Full Course](https://www.youtube.com/watch?v=rzbFhu6So5U)
 
-This is great for understanding the basics of the project, but it relys heavily on **gym retro**, a very old library that has multiple difficulties with different configuratioons and in game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, that allows a production-grade approach to reinforcement learning. With the sole purpose of achieving a manual curriculum based architecture.
+This is great for understanding the basics of the project, but it relies heavily on **gym retro**, a very old library that has multiple difficulties with different configurations and in-game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, enabling a production-grade approach to reinforcement learning, with the sole purpose of achieving a manual curriculum based architecture.
 
 This allows to have an absolute control over every variable of the training.
 
 ### How Does it works?
 
-
+(1) Python launches BizHawk → (2) Lua reads RAM → (3) TCP sends game state → (4) Python computes action → (5) Lua injects inputs.
 
 ---
 
@@ -130,13 +130,13 @@ pip install  requirements.txt
 
 ### Testing
 
-> Note. You can Skip this part and go directly to __Training__, if you suspect something is wrong, or want to debbug then proceed.
+> Note. You can Skip this part and go directly to __Training__, if you suspect something is wrong, or want to debug then proceed.
 
 #### Checking  if __Bixhawk__ and __Python__ are connected.
 
 Run `test_telemetry2.py`. You can find this script in the `testing` folder. 
 
-When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is adviced to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
+When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is advised to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
 After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
 You should be able to see the player 1, doing random actions.
 
@@ -149,9 +149,9 @@ Alternatively, check if all of the versions required for the project are sound. 
 
 Run `random_test.py`. You can find this script in the `testing` folder. 
 
-When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how the training will be happening, but with more instances.
+When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances.
 
-If this i the case then, you have all set to start.
+If this is the case then, you have all set to start.
 
 If this is not the case, check if you have correctly installed the dependencies. 
 
@@ -190,7 +190,7 @@ Check the documentation (`doc` folder) for further explanation on how the code w
 
 You can find this script in the `training` folder. 
 
-One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way. Slowing down the conversion, and in some cases, making it imposible to converge if the hyperparameter are not well tuned.
+One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way, slowing down the convergence , and in some cases, making it impossible to converge if the hyperparameter are not well tuned.
 
 Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
 
@@ -219,7 +219,7 @@ tensorboard --logdir=logs\
 
 `ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 100 seconds, since a second is 60 frames and we are using a FRAME SKIPING of 4 (Check the documentation), it means that 1500 * 4 / 60 = 100
 
-`ep_rew_mean`: Episode reward mean, this indicates what it the reard average of the episodes, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
+`ep_rew_mean`: Episode reward mean, this indicates what the reward average of the episodes is, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
 
 If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the model is succesfully beating every oponent. But if the `ep_len_mean` is low and the `ep_rew_mean` is also very low, this means the model is getting his ass kicked.
 
@@ -287,11 +287,11 @@ There are different ways to create a custom model:
 
 <ul>
   <li>
-    Enhancing the Obs space, the actual model strugles heavily with projectiles. Even with pojectile tracking it still has a big trouble understanding why avoiding or protecting from a projectile is a good idea.
+    Enhancing the Obs space, the actual model struggles heavily with projectiles. Even with projectile tracking it still has a big trouble understanding why avoiding or protecting from a projectile is a good idea.
   </li>
 
   <li>
-    Enhancing the REWARD function, it os very hard to get the best REWARD function while aboiding the cowards local optimum, or REWARD hacking, the current REARD function works, but there can be a posible better REWARD function that accelerates the convergence of the model.
+    Enhancing the REWARD function, it is very hard to get the best REWARD function while avoiding the coward's local optimum, or REWARD hacking, the current REWARD function works, but there can be a posible better REWARD function that could accelerate convergence of the model.
   </li>
 
   <li>
@@ -302,7 +302,14 @@ There are different ways to create a custom model:
 ---
 ## Extra
 
-There should be something here...
+For this project it was used a CPU Intel(R) Core(TM) Ultra 9 275HX. With a NVIDIA GeForce RTX 5070 Ti Laptop GPU
+
+
+
+	
+
+
+
 
 
 
