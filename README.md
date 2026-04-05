@@ -1,5 +1,7 @@
 # Reinforcement Learning – Street Fighter
 
+[![Python](https://img.shields.io/badge/python-3.13.12-blue.svg)](https://www.python.org/)
+
 
 _Windows Setup guide (English)_
 
@@ -27,11 +29,21 @@ This allows to have an absolute control over every variable of the training.
 
 ## Prerequisites
 
-### Install Python
+### Install Python 3.13.12
 
-### Install Lua
+> Note. It could work in any version, but this project was built using [Python 3.13.12](https://www.python.org/downloads/release/python-31312/) to ensure full compatibility and avoid unwanted problems.
 
-### Install Bizhawk
+Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/).
+
+### Install Lua 5.4.6
+
+Install [Lua](https://www.lua.org/download.html)
+
+### Install Bizhawk 2.8
+
+Install [Bizhawk 2.8 from web](https://tasvideos.org/Bizhawk/PreviousReleaseHistory)
+
+Install [Bizhawk 2.8 from Github](https://github.com/TASEmulators/BizHawk/releases/tag/2.8)
 
 ---
 
