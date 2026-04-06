@@ -23,7 +23,9 @@ This allows to have an absolute control over every variable of the training.
 
 ---
 
-## Video Tutorial
+## Video Demonstration
+
+[![Watch here on Youtube](https://img.youtube.com/vi/Hes7ECdo3y0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hes7ECdo3y0)
 
 ---
 
