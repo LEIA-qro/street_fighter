@@ -15,6 +15,8 @@ from selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
 
+PLAYER = 1 # The agent's assigned player number (1 or 2)
+
 def test_agent():
     print("Initializing Street Fighter Evaluation Mode...")
     
@@ -26,7 +28,7 @@ def test_agent():
         lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH , 
         trainable = False, 
         rank=-1, 
-        player=2 # AI controls the asigned player; the perspective parser will handle the rest. Use rank=-1 for a single env that won't be part of training.
+        player=PLAYER # AI controls the asigned player; the perspective parser will handle the rest. Use rank=-1 for a single env that won't be part of training.
         ) 
     
     env = DummyVecEnv([lambda: env])
