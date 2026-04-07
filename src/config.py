@@ -8,12 +8,18 @@ import os
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SRC_DIR)
 
+# Ensure to place the project folder inside the BizHawk directory for correct relative paths
+BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
+
 ROMS_DIR = os.path.join(PROJECT_ROOT, "roms")
 STATES_DIR = os.path.join(PROJECT_ROOT, "states")
 LUA_DIR = os.path.join(PROJECT_ROOT, "lua")
 
 # Executables & Files
-BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
+BIZHAWK_PATH = os.path.join(BIZHAWK_FOLDER_DIR, "EmuHawk.exe")
+
+if not os.path.exists(BIZHAWK_PATH): raise FileNotFoundError(f"ERROR: BizHawk executable not found at {BIZHAWK_PATH}. Please check the path and try again.")
+
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
 TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "training_env_client.lua")
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "match_test_env_client.lua")
