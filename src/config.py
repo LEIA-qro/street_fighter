@@ -1,5 +1,7 @@
 import os
 
+VERSION = "2.0"
+
 # ===========================================================
 #                       Directories Config
 # ===========================================================
@@ -21,8 +23,8 @@ BIZHAWK_PATH = os.path.join(BIZHAWK_FOLDER_DIR, "EmuHawk.exe")
 if not os.path.exists(BIZHAWK_PATH): raise FileNotFoundError(f"ERROR: BizHawk executable not found at {BIZHAWK_PATH}. Please check the path and try again.")
 
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
-TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "training_env_client.lua")
-MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, "match_test_env_client.lua")
+TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "training_env_client.lua")
+MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
 
 # Reset Config Lua Script Path (if needed in the future)
 RESET_CONFIG_LUA_SCRIPT_PATH = os.path.join(LUA_DIR, "reset_config.lua")
