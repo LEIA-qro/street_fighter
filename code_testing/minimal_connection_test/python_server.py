@@ -1,8 +1,29 @@
 import socket
 import subprocess
 
-# Configuration (Ensure this path is perfectly correct)
-BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
+import os, sys
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+CODE_TESTING_DIR = os.path.dirname(CURRENT_DIR)
+PROJECT_ROOT = os.path.dirname(CODE_TESTING_DIR)
+sys.path.append(PROJECT_ROOT)
+
+# Ensure to place the project folder inside the BizHawk directory for correct relative paths
+BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
+
+BIZHAWK_PATH = os.path.join(BIZHAWK_FOLDER_DIR, "EmuHawk.exe")
+LUA_SCRIPT_PATH = os.path.join(CURRENT_DIR, "myhook.lua")
+
+# Check if BizHawk executable exists at the specified path
+if not os.path.exists(BIZHAWK_PATH):
+    print(f"ERROR: BizHawk executable not found at {BIZHAWK_PATH}. Please check the path and try again.")
+    sys.exit(1)
+
+# Check if the Lua script exists
+if not os.path.exists(LUA_SCRIPT_PATH):
+    print(f"ERROR: Lua script not found at {LUA_SCRIPT_PATH}. Please check the path and try again.")
+    sys.exit(1)
+
 HOST = '127.0.0.1'
 PORT = 9999
 
@@ -17,7 +38,12 @@ def start_pipeline():
 
         # 2. Launch BizHawk (which acts as the Client)
         print("Launching BizHawk as a subprocess...")
-        subprocess.Popen([BIZHAWK_PATH, f"--socket_ip={HOST}", f"--socket_port={PORT}"])
+        subprocess.Popen([
+            BIZHAWK_PATH, 
+            f"--socket_ip={HOST}", 
+            f"--socket_port={PORT}",
+            f"--lua={LUA_SCRIPT_PATH}"
+            ])
 
         # 3. Block and wait for BizHawk's internal engine to connect
         print("Waiting for BizHawk to establish connection...")
