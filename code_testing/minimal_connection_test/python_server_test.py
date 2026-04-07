@@ -12,7 +12,7 @@ sys.path.append(PROJECT_ROOT)
 BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
 
 BIZHAWK_PATH = os.path.join(BIZHAWK_FOLDER_DIR, "EmuHawk.exe")
-LUA_SCRIPT_PATH = os.path.join(CURRENT_DIR, "myhook.lua")
+LUA_SCRIPT_PATH = os.path.join(CURRENT_DIR, "python_server_test.lua")
 
 # Check if BizHawk executable exists at the specified path
 if not os.path.exists(BIZHAWK_PATH):
