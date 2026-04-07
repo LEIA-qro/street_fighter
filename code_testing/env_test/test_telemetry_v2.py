@@ -2,18 +2,21 @@ import socket
 import subprocess
 import random
 
-"""
-Change the BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to match your local setup before running this test.
-"""
+import os, sys
 
-BIZHAWK_PATH = r"C:\\Users\Diego Perea\Documents\Apps\BizHawk-2.8-win-x64\\EmuHawk.exe"
-ROM_PATH = r"C:\\Users\Diego Perea\Documents\\Code\street_fighter\\roms\Street Fighter II' - Special Champion Edition (USA).md"
-LUA_SCRIPT_PATH = r"C:\\Users\Diego Perea\Documents\\Code\street_fighter\\lua\\match_test_env_client.lua"
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+CODE_TESTING_DIR = os.path.dirname(CURRENT_DIR)
+PROJECT_ROOT = os.path.dirname(CODE_TESTING_DIR)
+sys.path.append(PROJECT_ROOT)
 
-HOST = '127.0.0.1'
-PORT = 9999
-ACTION_DIM = 10 # Instead of 12 buttons, we will only use 10 
-EXPECTED_DIMS = 12  # ← FIX #1: The correct number of CSV values from Lua
+# Ensure to place the project folder inside the BizHawk directory for correct relative paths
+BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
+
+import src.config as config 
+
+
+
+EXPECTED_DIMS = config.ACTION_DIM + 2  # ← FIX #1: The correct number of CSV values from Lua
 
 def recv_line(conn: socket.socket) -> str:
     # Data may arrive in chunks, so we need to buffer until we get a full line (ending with '\n').
@@ -30,19 +33,19 @@ def test_telemetry():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         # Allow immediate reuse of the port to prevent "Address already in use" errors
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind((HOST, PORT))
+        server_socket.bind((config.HOST, config.PORT))
         server_socket.listen(1)
-        print(f"Python ML Server actively listening on {HOST}:{PORT}...")
+        print(f"Python ML Server actively listening on {config.HOST}:{config.PORT}...")
 
         # 2. Launch BizHawk (which acts as the Client)
         print("Launching BizHawk as a subprocess...")
         # Pass the ROM path as the FIRST argument after the executable
         subprocess.Popen([
-            BIZHAWK_PATH, 
-            ROM_PATH, 
-            f"--socket_ip={HOST}", 
-            f"--socket_port={PORT}",
-            f"--lua={LUA_SCRIPT_PATH}" # Optional: Automatically load and run the Lua script
+            config.BIZHAWK_PATH, 
+            config.ROM_PATH, 
+            f"--socket_ip={config.HOST}", 
+            f"--socket_port={config.PORT}",
+            f"--lua={config.MATCH_TEST_ENV_CLIENT_LUA_PATH}" # Optional: Automatically load and run the Lua script
         ])
 
         # 3. Block and wait for BizHawk's internal engine to connect
@@ -69,8 +72,12 @@ def test_telemetry():
                         # Now you can safely split by comma to get your integers
                         ram_values = [int(x) for x in parts]
 
-                        p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y = ram_values[0], ram_values[1], ram_values[2], ram_values[3], ram_values[4], ram_values[5]
-                        p1_act, p2_act, p1_proj, p2_proj, p1_char, p2_char = ram_values[6], ram_values[7], ram_values[8], ram_values[9], ram_values[10], ram_values[11]
+                        p1_hp, p2_hp = ram_values[0], ram_values[1]
+                        p1_x, p2_x = ram_values[2], ram_values[3]
+                        p1_y, p2_y = ram_values[4], ram_values[5]
+                        p1_act, p2_act = ram_values[6], ram_values[7]
+                        p1_proj, p2_proj = ram_values[8], ram_values[9]
+                        p1_char, p2_char = ram_values[10], ram_values[11]
 
                         p1_hp = 0 if p1_hp >= 65535 else p1_hp
                         p2_hp = 0 if p2_hp >= 65535 else p2_hp
@@ -78,7 +85,7 @@ def test_telemetry():
                         if p1_hp <= 0 or p2_hp <= 0:
                             print(f"Match Over at Step {step_count}! P1 HP: {p1_hp}, P2 HP: {p2_hp}.")
                         
-                        action_string = "".join('1' if random.random() > 0.5 else '0' for _ in range(ACTION_DIM)) # Generate a random action string of length ACTION_DIM (10)
+                        action_string = "".join('1' if random.random() > 0.5 else '0' for _ in range(config.ACTION_DIM)) # Generate a random action string of length ACTION_DIM (10)
                         reply = action_string + "\n"
 
                         # Dedugging
