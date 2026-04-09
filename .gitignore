@@ -7,3 +7,5 @@ src/__pycache__/
 /Old
 
 lua/v2.0/generated_config.lua
+lua/testing.lua
+lua/test2.lua
