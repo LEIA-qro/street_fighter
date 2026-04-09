@@ -175,14 +175,14 @@ You should be able to see the player 1, doing random actions.
 
 If this is the case, the TCP bridge between Bizhawk and Python is working. You can close Bizkawk.
 
-If this is not the case, ensure you have loaded the correct BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to the Python script, match your local setup before running this test.
+If this is not the case, ensure you have correctly placed the project directory inside the Bizhawk folder. Also you can manualy load the correct BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to the Python script, match your local setup before running this test.
 Alternatively, check if all of the versions required for the project are sound. `Python 3.13.12`, `Lua 5.4.6` and `BizHawk 2.8`. Specially `Bizhawk 2.8`, Python and Lua have not been tested in other versions, but because the project was made with this specific versions, using others might cause trouble.
 
 #### Checking  if `stable_baselines3` & `gymnasium` are working.
 
 Run `random_test.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
 
-When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances.
+When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances. If you prefer to not unthrotle your envs, you can check how to change the performance in the [documentation](doc).
 
 If this is the case then, you have all set to start.
 
@@ -231,7 +231,7 @@ Check the documentation ([`doc`](doc) folder) for further explanation on how the
 
 > Currently under development
 
-You will be able to find this script iinside [`src/training`](src/training) folder.  
+You will be able to find this script inside [`src/training`](src/training) folder.  
 
 This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
 
@@ -250,7 +250,7 @@ tensorboard --logdir=logs\
 
 ### `ep_len_mean` and `ep_rew_mean`
 
-`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 100 seconds, since a second is 60 frames and we are using a FRAME SKIPING of 4 (Check the [documentation](doc)), it means that 1500 * 4 / 60 = 100
+`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 150 seconds, since a second is 40 frames and we are using a FRAME SKIPING of 4 (Check the [documentation](doc)), it means that 1500 * 4 / 40 = 150
 
 `ep_rew_mean`: Episode reward mean, this indicates what the reward average of the episodes is, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
 
@@ -272,7 +272,7 @@ If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the mod
 
 ### Callback Metricks
 
-Here we have the metric of `win_rate`, which obviously means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
+Here we have the metric of `win_rate`, which as the name suggests, means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
 
 ### Testing AI Models
 
@@ -289,7 +289,7 @@ Once you have a trained Model, you can test it with the following:
 
 #### `test_agent_v2.py`
 
-You can find this script in the `testing` folder. 
+You can find this script in the [`testing`](src/testing) folder. 
 
 Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
 Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
@@ -298,7 +298,7 @@ Check the documentation ([`doc`](doc) folder) for further explanation on how the
 
 #### `test_ai_vs_ai_v2.py`
 
-You can find this script in the `testing` folder. 
+You can find this script in the [`testing`](src/testing) folder. 
 
 This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
 Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
@@ -312,11 +312,11 @@ There are different ways to create a custom model:
 
 <ul>
   <li>
-    Change the REWARD function inside env_sf2_v2.py. This affects the overall behavior of the model. 
+    Change the <strong>REWARD</strong> function inside <a href=src/env_sf2_v2.py>env_sf2_v2.py</a>. This affects the overall behavior of the model. 
   </li>
 
   <li>
-    Change the Observation Space or the data passed to the model. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. [Note] Be carefull when editing the Lua script.
+    Change the <strong>Observation Space</strong> or the <strong>data passed to the model</strong>. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. [Note] Be carefull when editing the Lua script.
   </li>
 
   <li>
