@@ -13,16 +13,23 @@ client.SetSoundOn(false)        -- Disables audio processing, which can be a sig
 
 -- ==========================================
 
--- Hardcode the states directory so Lua knows where to look
-local STATES_DIR = "C:\\Users\\Diego Perea\\Documents\\Code\\street_fighter\\states\\"
+-- Load the dynamically generated configuration from Python
+package.loaded["generated_config"] = nil 
+local python_config = require("generated_config")
+
+local STATES_DIR = python_config.STATES_DIR
+
+-- Change this flag to true if you want to visualize the emulator
 local activate_visualization = true
 
--- 1. Check if the server was initialized properly via the command line
+-- Check if the server was initialized properly via the command line
 local port = comm.socketServerGetPort()
 if port == nil then
     console.log("ERROR: Socket server not started. Run via Python script.")
     return
-elseif (port == "9999" or port == 9999) and activate_visualization then
+end
+
+if (port == "9999" or port == 9999) and activate_visualization then
     client.setwindowsize(2)
     client.invisibleemulation(false)
 end
@@ -32,28 +39,27 @@ comm.socketServerSetTimeout(10)
 
 -- Implemented frame skipping
 local FRAME_SKIP = 4
-local step_count = 0 -- Renamed from frame_count to reflect agent steps
+local step_count = 0 -- Tracks agent steps for debugging
 
 -- Initialize Previous Projectile Variables outside the loop
 local prev_p1_proj_x = 0
 local prev_p2_proj_x = 0
 
 while true do
-    -- 1. Read RAM
+    -- Read RAM
     local p1_hp = mainmemory.read_u16_be(0x8042)
     local p2_hp = mainmemory.read_u16_be(0x82C2)
     local p1_x  = mainmemory.read_u16_be(0x8006)
     local p2_x  = mainmemory.read_u16_be(0x8358)
     local p1_y  = mainmemory.read_u16_be(0x800A)
     local p2_y  = mainmemory.read_u16_be(0x828A)
-
-    -- We are back on BizHawk 2.8, so the 'bit' library is restored!
+    
     local p1_state_raw = mainmemory.read_u16_be(0x804E)
     local p2_state_raw = mainmemory.read_u16_be(0x82CE)
     local p1_action_id = bit.rshift(p1_state_raw, 8)
     local p2_action_id = bit.rshift(p2_state_raw, 8)
 
-    -- 2. Read RAM: Projectile State & Delta Calculation
+    -- Read RAM: Projectile State & Delta Calculation
     local raw_p1_proj_x = mainmemory.read_u16_be(0x8506)
     local raw_p2_proj_x = mainmemory.read_u16_be(0x8586)
     
@@ -77,7 +83,7 @@ while true do
     local p1_char_id = mainmemory.read_u8(0x81DA)
     local p2_char_id = mainmemory.read_u8(0x845A)
 
-    -- 3. Format Payload (Now 10 dimensions) & Send
+    -- Format Payload (Now 10 dimensions) & Send
     local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
         p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
         p1_action_id, p2_action_id, 
@@ -86,7 +92,7 @@ while true do
     
     comm.socketServerSend(payload)
     
-    -- 3. Strict Spinlock: Wait for Python's response before advancing
+    -- Strict Spinlock: Wait for Python's response before advancing
     local response = ""
     local wait_start_time = os.time() -- Record the exact time we started waiting
     local TIMEOUT_LIMIT = 180 -- Maximum seconds to wait before assuming Python is dead
