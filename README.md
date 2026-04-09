@@ -102,14 +102,33 @@ Install [Bizhawk 2.8 from Github](https://github.com/TASEmulators/BizHawk/releas
 <details>
   <strong>PowerShell</strong>:
 
-  ```powershell
-  .\venv\Scripts\Activate
-  ```
+```powershell
+.\venv\Scripts\Activate
+```
   
   **Warning**
   > PowerShell may block script execution by default.  
   > If you see an error about `ExecutionPolicy`, either switch to **CMD** (below)  
   > or run PowerShell as administrator (this might be more flexible, but for simplicity use CMD):
+
+  <strong>Command Prompt (CMD)</strong>:
+
+```cmd
+venv\Scripts\activate
+```
+	
+When active, one should see the prompt prefixed with `(venv)`:
+
+```
+(venv) C:\Users\User\project>
+```
+
+To **deactivate** the `venv` simply type:
+
+```bash
+deactivate
+```
+  
 </details>
 
 
