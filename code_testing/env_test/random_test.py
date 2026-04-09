@@ -1,8 +1,14 @@
-import os, sys, traceback
+import os, sys, traceback, time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
+project_root = os.path.dirname(parent_dir)
+sys.path.append(os.path.join(project_root, "src"))
+
+"""print(f"[TEST] Current Directory: {current_dir}")
+print(f"[TEST] Parent Directory: {parent_dir}")
+print(f"[TEST] Project Root: {project_root}")"""
+
 
 from env_sf2_v2 import StreetFighterEnvV2
 from env_tools import failsafe_env
@@ -12,15 +18,20 @@ import config
 def random_test_telemetry():
     
     print("[TEST] Starting random telemetry test...")
+    print("[TEST] Press Ctrl + C to stop the test. ")
+    time.sleep(5)  # Give the user a moment to read the message before the test starts
+    
     env = None   
 
     try:
         env = StreetFighterEnvV2() 
+        env.active_training_states = config.RYU_ONLY_STATES_PHASE_0
         obs, _ = env.reset()
         print(f"[TEST] Environment reset. Observation shape: {obs.shape}") 
         print(f"[TEST] Active Training States: {env.active_training_states}")
         step = 0
         print("[TEST] Press Ctrl + C to stop the test. ")
+
         while True:
             random_action = env.action_space.sample()
             obs, reward, terminated, truncated, info = env.step(random_action)
