@@ -1,0 +1,33 @@
+SystemID GEN
+00834C	w	u	1	68K RAM	Relative distance between characters
+00834E	w	u	1	68K RAM	Relative distance of both characters from the floor
+0086A6	w	u	1	68K RAM	X coordinate of player 1
+008006	w	u	1	68K RAM	X coordinate player 1
+0080D8	w	u	1	68K RAM	
+00800A	w	u	1	68K RAM	Posible distance of ceiling to foot of player 1
+0080DC	w	u	1	68K RAM	Distance between Chest ceiling player 1
+0080E0	w	u	1	68K RAM	Distance between Head ceiling player 1
+0080C0	w	u	1	68K RAM	Binary Player 1 in the air
+00804E	w	h	1	68K RAM	Position state of the player 1
+0081E2	w	h	1	68K RAM	Botton Pressed by Player 1
+008358	w	u	1	68K RAM	X coordinate of player 2
+00828A	w	u	1	68K RAM	Distance between Foot ceiling player 2
+00835C	w	u	1	68K RAM	Distance between Chest ceiling player 2
+008360	w	u	1	68K RAM	Distance between Head ceiling player 2
+0082CE	w	h	1	68K RAM	Position state of the player 2
+00845E	w	h	1	68K RAM	Botton pressed by Player 2
+0086F4	w	u	1	68K RAM	Binary Player 2 in the air
+00846A	w	u	1	68K RAM	Increases every time Player 1 takes a hit
+008040	w	u	1	68K RAM	Player 1 Health
+008042	w	s	1	68K RAM	Player 1 Health
+0082C0	w	u	1	68K RAM	Player 2 Health
+0082C2	w	u	1	68K RAM	Player 2 Health
+0081EA	w	u	1	68K RAM	Increases every time Player 2 takes a hit
+0081D5	w	u	1	68K RAM	Timer
+008506	w	u	1	68K RAM	X coord Proyectile Player 1
+008034	w	h	1	68K RAM	if=2800 Player 1 proyectile thrown
+008586	w	u	1	68K RAM	X coord Proyectile Player 2
+0082B4	w	h	1	68K RAM	if=2800 Player 2 proyectile thrown
+0081DA	w	u	1	68K RAM	Character Player 1
+00845A	w	u	1	68K RAM	Character Player 2
+
