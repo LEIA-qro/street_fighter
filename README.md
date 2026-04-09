@@ -148,7 +148,7 @@ pip install  requirements.txt
 
 #### Checking  if __Bixhawk__ and __Python__ are connected.
 
-Run `test_telemetry2.py`. You can find this script in the `testing` folder. 
+Run `test_telemetry2.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
 
 When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is advised to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
 After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
@@ -161,7 +161,7 @@ Alternatively, check if all of the versions required for the project are sound. 
 
 #### Checking  if `stable_baselines3` & `gymnasium` are working.
 
-Run `random_test.py`. You can find this script in the `testing` folder. 
+Run `random_test.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
 
 When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances.
 
@@ -186,37 +186,37 @@ There are only four training scripts:
 
 #### `train_production_PPO_v2.py`
 
-You can find this script in the `training` folder. 
+You can find this script inside [`src/training`](src/training) folder. 
 
 This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `resume_production_v2.py`
 
-You can find this script in the `training` folder. 
+You can find this script inside [`src/training`](src/training) folder. 
 
 This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `train_optuna.py`
 
-You can find this script in the `training` folder. 
+You can find this script inside [`src/training`](src/training) folder. 
 
 One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way, slowing down the convergence , and in some cases, making it impossible to converge if the hyperparameter are not well tuned.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `transfer_optuna.py`
 
 > Currently under development
 
-You will be able to find this script in the `training` folder. 
+You will be able to find this script iinside [`src/training`](src/training) folder.  
 
 This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 ---
 ## Checking How good is the model
@@ -231,7 +231,7 @@ tensorboard --logdir=logs\
 
 ### `ep_len_mean` and `ep_rew_mean`
 
-`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 100 seconds, since a second is 60 frames and we are using a FRAME SKIPING of 4 (Check the documentation), it means that 1500 * 4 / 60 = 100
+`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 100 seconds, since a second is 60 frames and we are using a FRAME SKIPING of 4 (Check the [documentation](doc)), it means that 1500 * 4 / 60 = 100
 
 `ep_rew_mean`: Episode reward mean, this indicates what the reward average of the episodes is, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
 
@@ -275,7 +275,7 @@ You can find this script in the `testing` folder.
 Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
 Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `test_ai_vs_ai_v2.py`
 
@@ -284,7 +284,7 @@ You can find this script in the `testing` folder.
 This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
 Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
 
-Check the documentation (`doc` folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 ---
 ## Creating a custom Model
@@ -301,7 +301,7 @@ There are different ways to create a custom model:
   </li>
 
   <li>
-    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The documentation for full guide.
+    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The <a href=doc>documentation</a> for full guide.
   </li>
 </ul>
 
