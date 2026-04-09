@@ -6,4 +6,4 @@ emu.displayvsync(false)         -- Disables V-Sync to allow the emulator to run 
 emu.limitframerate(true)        -- Re-enables built-in frame rate limits to cap the emulator at a standard speed, which is important for normal gameplay and debugging.
 client.displaymessages(true)  
 client.SetSoundOn(true)       
-client.exit()
+-- client.exit()
