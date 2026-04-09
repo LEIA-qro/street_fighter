@@ -9,3 +9,4 @@ src/__pycache__/
 lua/v2.0/generated_config.lua
 lua/testing.lua
 lua/test2.lua
+/src/testing_auto_curriculum
