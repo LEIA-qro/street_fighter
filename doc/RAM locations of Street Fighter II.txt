@@ -1,6 +1,7 @@
 RAM locations of Street Fighter II genesis
 
 # 834C & 80CC Relative distance between characters
+Min = 0, Max = 187, # The ideal distance would be <= 100
 
 # 834E & 80CE (Not sure why it repeats) Relative distance of both characters from the floor
 
