@@ -157,7 +157,9 @@ Shrink the BizHawk window to its minimum possible size on your desktop. Fewer pi
 These settings are applied automatically by the Lua training script; manual configuration is only needed when running BizHawk outside of training mode.
 
 
-# Code Testing
+# Training a Model
+## PPO
+
 
 
 
