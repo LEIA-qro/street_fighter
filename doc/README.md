@@ -139,15 +139,25 @@ We must apply the following three optimizations to BizHawk:
 We must uncap the framerate so the CPU processes emu.frameadvance() as fast as its clock speed allows (often pushing the emulator to 400–800 FPS depending on your processor).
 How to apply: In BizHawk's top menu, go to Config -> Speed/Skip -> Unthrottle (or press the Tab key). Alternatively, we will force this via Lua.
 
-2. Disable Audio Emulation (Highly Recommended)
+However, if you wish **not to unthrottle** the Bizhawks instances, you can also set the game speed to a higher more stable speed. Inside the Lua script, check for `emu.limitframerate(false)`
+ and replace it with:
+ ```Lua
+client.speedmode(200) -- current speed is %200, change the argument for other configurations
+```
+
+3. Disable Audio Emulation (Highly Recommended)
 Generating audio waveforms and syncing them to the soundcard is highly CPU-intensive. Because the agent is learning purely from RAM vectors (X/Y coordinates, HP, Action IDs), audio provides zero mathematical value to the Markov Decision Process.
 How to apply: In BizHawk, go to Config -> Sound -> uncheck Enable Sound. Alternatively, this will be forced via Lua.
 
-3. Minimize Video Rendering Overhead (Highly Recommended)
+4. Minimize Video Rendering Overhead (Highly Recommended)
 While we cannot easily run BizHawk purely "headless" (without a GUI) in this specific configuration, we can minimize the resources it spends drawing pixels.
 How to apply: * Go to Config -> Display -> Ensure VSync is strictly Off. VSync forces the emulator to wait for your monitor's physical refresh rate, destroying training speed.
 Shrink the BizHawk window to its minimum possible size on your desktop. Fewer pixels to scale and draw means fewer CPU/GPU cycles wasted on UI rendering.
 
 These settings are applied automatically by the Lua training script; manual configuration is only needed when running BizHawk outside of training mode.
+
+
+# Code Testing
+
 
 
