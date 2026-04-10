@@ -184,7 +184,7 @@ Alternatively, check if all of the versions required for the project are sound. 
 
 Run `random_test.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
 
-When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances. If you prefer to not unthrotle your envs, you can check how to change the performance in the [documentation](doc).
+When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances. If you prefer to not unthrotle your envs, you can check how to change the performance in the [documentation](doc/README.md#optimization-maximizing-throughput).
 
 If this is the case then, you have all set to start.
 
