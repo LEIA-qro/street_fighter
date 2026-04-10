@@ -15,7 +15,9 @@ Thankfully Bizhawk already counts with integrated tools that can help us map the
 
 > However, you could use 845E (Player 2's inputs), or its counterpart 81E2 (when training as player 2), if you want your AI to have superhuman reaction times (reading inputs before animations start), but for fair "human-like" AI, rely only on P2's physical state/position.
 
-With this set, in the Lua script the RAM values will be read with `mainmemory.read_u16_be(RAM_LOCATION)`. Example:
+With this set, in the Lua script the RAM values will be read with `mainmemory.read_u16_be(RAM_LOCATION)`. 
+
+Example:
 
 ```Lua
 local p1_hp = mainmemory.read_u16_be(0x8042)
@@ -25,6 +27,20 @@ local p2_x  = mainmemory.read_u16_be(0x8358)
 local p1_y  = mainmemory.read_u16_be(0x800A)
 local p2_y  = mainmemory.read_u16_be(0x828A)
 ```
+
+After this Lua will create a formate repply with  `string.format("0 %d\n")`.
+
+Example:
+```Lua
+local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
+    p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
+    p1_action_id, p2_action_id, 
+    active_p1_proj_x, active_p2_proj_x,
+    p1_char_id, p2_char_id)
+
+comm.socketServerSend(payload) -- This will send the string to Python
+```
+
 
 
 ## Optimization: Maximizing Throughput
