@@ -10,7 +10,7 @@ PROJECT_ROOT = os.path.dirname(CODE_TESTING_DIR)
 sys.path.append(PROJECT_ROOT)
 
 # Ensure to place the project folder inside the BizHawk directory for correct relative paths
-BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
+# BIZHAWK_FOLDER_DIR = os.path.dirname(PROJECT_ROOT) 
 
 import src.config as config 
 
