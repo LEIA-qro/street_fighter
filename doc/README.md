@@ -52,7 +52,7 @@ comm.socketServerSend(payload) -- This will send the string to Python
 
 ### Python
 
-After the payload has been sent via Lua script, Python receives an encoded formated repply. Lets take for example the code inside `bizhawk_base.py`, found in [src](https://github.com/LEIA-qro/street_fighter/tree/main/src). In the `receive_payload()` function, inside the `BizHawkBaseEnv` class, we habe the following:
+After the payload has been sent via Lua script, Python receives an encoded formated repply. Python has to decode the repply and separate the data. Lets take for example the code inside `bizhawk_base.py`, found in [src](https://github.com/LEIA-qro/street_fighter/tree/main/src). In the `receive_payload()` function, inside the `BizHawkBaseEnv` class, we habe the following:
 
 ```Python
 def receive_payload(self) -> str:
@@ -75,7 +75,7 @@ Together, this line receives up to 4096 bytes of data from the network and conve
 
 ## Input Injection
 
-Once the model decides what is his action according to the data, Python 
+Once the model decides what is his action according to the data, Python sends a formatted repply. Lua accepts a specific format in the replies, 
 
 
 ## Optimization: Maximizing Throughput
