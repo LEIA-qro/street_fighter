@@ -32,7 +32,7 @@ local p1_y  = mainmemory.read_u16_be(0x800A)
 local p2_y  = mainmemory.read_u16_be(0x828A)
 ```
 
-With this values stored, Lua has to create a formated repply with  `string.format("0 %d\n")`.
+With this values stored, Lua has to create a formated reply with  `string.format("0 %d\n")`.
 
 Example:
 
@@ -44,7 +44,7 @@ local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
     p1_char_id, p2_char_id)
 ```
 
-Finally, once we have a formatted repply we use `comm.socketServerSend(payload)` to send it to Python.
+Finally, once we have a formatted reply we use `comm.socketServerSend(payload)` to send it to Python.
 
 ```Lua
 comm.socketServerSend(payload) -- This will send the string to Python
@@ -52,7 +52,7 @@ comm.socketServerSend(payload) -- This will send the string to Python
 
 ### Python
 
-After the payload has been sent via Lua script, Python receives an encoded formated repply. Python has to decode the repply and separate the data. Lets take for example the code inside `bizhawk_base.py`, found in [src](https://github.com/LEIA-qro/street_fighter/tree/main/src). In the `receive_payload()` function, inside the `BizHawkBaseEnv` class, we habe the following:
+After the payload has been sent via Lua script, Python receives an encoded formated reply. Python has to decode the reply and separate the data. Lets take for example the code inside `bizhawk_base.py`, found in [src](https://github.com/LEIA-qro/street_fighter/tree/main/src). In the `receive_payload()` function, inside the `BizHawkBaseEnv` class, we habe the following:
 
 ```Python
 def receive_payload(self) -> str:
@@ -75,8 +75,63 @@ Together, this line receives up to 4096 bytes of data from the network and conve
 
 ## Input Injection
 
-Once the model decides what is his action according to the data, Python sends a formatted repply. Lua accepts a specific format in the replies, 
+Once the model decides what is his action according to the data, Python sends a formatted reply. 
 
+Lua expects a specific format in the replies being:
+
+```Python
+formatted_reply = f"{len(command)} {command}" # Here we send first the legth of the command and 
+```
+
+Then Python encodes the formatted reply with.
+
+```Python
+conn.sendall(formatted_reply.encode('utf-8'))
+```
+
+After this, Lua receives and reads the formatted reply.
+
+```Lua
+local response = ""  
+while response == "" or response == nil do
+    response = comm.socketServerResponse()
+end
+
+-- Remove the newline character for clean processing
+response = string.gsub(response, "\n", "")
+```
+
+Then Lua parses the response and injects the inputs via Bizhawk commands.
+
+```Lua
+local input = {}
+
+if string.sub(response, 1, 1) == "1" then input["P1 Up"] = true end
+if string.sub(response, 2, 2) == "1" then input["P1 Down"] = true end
+if string.sub(response, 3, 3) == "1" then input["P1 Left"] = true end
+if string.sub(response, 4, 4) == "1" then input["P1 Right"] = true end
+if string.sub(response, 5, 5) == "1" then input["P1 A"] = true end
+if string.sub(response, 6, 6) == "1" then input["P1 B"] = true end
+if string.sub(response, 7, 7) == "1" then input["P1 C"] = true end
+if string.sub(response, 8, 8) == "1" then input["P1 X"] = true end
+if string.sub(response, 9, 9) == "1" then input["P1 Y"] = true end
+if string.sub(response, 10, 10) == "1" then input["P1 Z"] = true end
+-- We sleep the Start and Mode buttons to avoid the agent accidentally pausing or opening the menu
+-- if string.sub(response, 11, 11) == "1" then input["P1 Start"] = true end
+-- if string.sub(response, 12, 12) == "1" then input["P1 Mode"] = true end
+
+joypad.set(input)
+emu.frameadvance()
+```
+
+Alternatively, inside the scripts of the project, it is applied a FRAME skipping technique to emulate real human input.
+
+``` Lua
+for i = 1, FRAME_SKIP do
+    joypad.set(input)
+    emu.frameadvance()
+end
+```
 
 ## Optimization: Maximizing Throughput
 
