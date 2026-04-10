@@ -5,7 +5,7 @@
 
 Transitioning from mathematical theory to bare-metal implementation requires strict modularity. To successfully bridge BizHawk and Python via Inter-Process Communication (IPC), we will establish a rigid synchronous TCP Client-Server architecture. Python will act as the TCP Server, waiting for a connection. BizHawk (via Lua) will act as the TCP Client, connecting to Python, sending the RAM state, and waiting for the neural network's action before advancing the emulator frame.
 
-## Data recolection and BizHawk (Lua) - Python connection
+## Data recolection
 
 The Street Fighter II' - Special Champion Edition (USA) rom uses a base-conversion artifact of the Motorola 68000 processor architecture used in the Genesis. The Genesis WRAM is mapped to the 0xFF0000 memory range this is an **Hexadecimal (Base-16)** address format. To extract this data we have to figure out, where are the changes or the data adresses that we want. 
 
@@ -15,7 +15,11 @@ Thankfully Bizhawk already counts with integrated tools that can help us map the
 
 > However, you could use 845E (Player 2's inputs), or its counterpart 81E2 (when training as player 2), if you want your AI to have superhuman reaction times (reading inputs before animations start), but for fair "human-like" AI, rely only on P2's physical state/position.
 
-With this set, in the Lua script the RAM values will be read with `mainmemory.read_u16_be(RAM_LOCATION)`. 
+## BizHawk (Lua) - Python connection
+
+### Lua
+
+Once the desired RAM location are found, in the Lua script the RAM values will be read with `mainmemory.read_u16_be(RAM_LOCATION)`. 
 
 Example:
 
@@ -28,19 +32,50 @@ local p1_y  = mainmemory.read_u16_be(0x800A)
 local p2_y  = mainmemory.read_u16_be(0x828A)
 ```
 
-After this Lua will create a formate repply with  `string.format("0 %d\n")`.
+With this values stored, Lua has to create a formated repply with  `string.format("0 %d\n")`.
 
 Example:
+
 ```Lua
 local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
     p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
     p1_action_id, p2_action_id, 
     active_p1_proj_x, active_p2_proj_x,
     p1_char_id, p2_char_id)
+```
 
+Finally, once we have a formatted repply we use `comm.socketServerSend(payload)` to send it to Python.
+
+```Lua
 comm.socketServerSend(payload) -- This will send the string to Python
 ```
 
+### Python
+
+After the payload has been sent via Lua script, Python receives an encoded formated repply. Lets take for example the code inside `bizhawk_base.py`, found in [src](https://github.com/LEIA-qro/street_fighter/tree/main/src). In the `receive_payload()` function, inside the `BizHawkBaseEnv` class, we habe the following:
+
+```Python
+def receive_payload(self) -> str:
+    while '\n' not in self.stream_buffer:
+        chunk = self.conn.recv(4096).decode('utf-8')
+        if not chunk:
+            return ""
+        self.stream_buffer += chunk # We add the new elements for each iteration
+    
+    line, self.stream_buffer = self.stream_buffer.split('\n', 1) # We reset self.stream_buffer
+    
+    return line # We return line, where the RAM data is stored
+```
+
+`self.conn.recv(4096)`, this calls the `recv()` method on a socket connection object (stored in `self.conn`). The **4096** parameter specifies the maximum number of bytes to receive from the network buffer. The method returns a **bytes** object containing the raw data received from the network. This is a blocking call, meaning your program pauses here until data arrives. If no data is available, it blocks until data arrives or the connection closes. 
+
+`.decode('utf-8')`, this method is called immediately on the bytes object returned from `recv()`. It converts the raw bytes into a human-readable string using UTF-8 encoding, which is the most common text encoding for modern applications. The method returns a `str` object.
+
+Together, this line receives up to 4096 bytes of data from the network and converts them from bytes to UTF-8 text in one chained operation.
+
+## Input Injection
+
+Once the model decides what is his action according to the data, Python 
 
 
 ## Optimization: Maximizing Throughput
