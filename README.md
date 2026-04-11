@@ -45,7 +45,7 @@ Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/)
 Install [Lua](https://www.lua.org/download.html)
 -->
 
-### Install Bizhawk 2.8
+### Install Bizhawk 2.8 (Very Important)
 
 Install [Bizhawk 2.8 from web](https://tasvideos.org/Bizhawk/PreviousReleaseHistory)
 
