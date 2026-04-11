@@ -39,9 +39,11 @@ To check more about the functionality of the project check the [documentation](d
 
 Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/).
 
+<!--
 ### Install Lua 5.4.6
 
 Install [Lua](https://www.lua.org/download.html)
+-->
 
 ### Install Bizhawk 2.8
 
