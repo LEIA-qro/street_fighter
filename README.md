@@ -156,10 +156,13 @@ To install the dependencies, in a new terminal, go to the project folder _(it is
 ```
 pip install stable_baselines3 gymnasium torch optuna numpy pandas tensorboard
 ```
+
+<!--
 Alternatively you can run:
 ```
 pip install  requirements.txt
 ```
+-->
 
 ---
 
