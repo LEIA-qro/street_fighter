@@ -9,7 +9,7 @@ Transitioning from mathematical theory to bare-metal implementation requires str
 
 The Street Fighter II' - Special Champion Edition (USA) ROM stores memory using the Motorola 68000 processor's big-endian addressing convention, mapped to the Genesis WRAM at the 0xFF0000 range, this is an **Hexadecimal (Base-16)** address format. To extract this data we have to figure out, where are the changes or the data adresses that we want. 
 
-Thankfully Bizhawk already counts with integrated tools that can help us map the desired addresses. Inside BizHawk/EmuHawk, go to Tools -> There you will be able to find RAM Watch & RAM Search. Open both. In [`doc`](https://github.com/LEIA-qro/street_fighter/blob/main/doc/) there is a file called **Street Fighter II' - Special Champion Edition (U) [!].wch**, you can load this inside RAM Watch to continue searching for other desired RAM addresses. There are different techniques to finding new RAM locations, most of the player-related RAM locations are in the 0xFF8000 - 0xFF9000 range.
+Thankfully Bizhawk already counts with integrated tools that can help us map the desired addresses. Inside BizHawk/EmuHawk, go to Tools -> There you will be able to find RAM Watch & RAM Search. Open both. In [`doc`](https://github.com/LEIA-qro/street_fighter/tree/main/doc) there is a file called **Street Fighter II' - Special Champion Edition (U) [!].wch**, you can load this inside RAM Watch to continue searching for other desired RAM addresses. There are different techniques to finding new RAM locations, most of the player-related RAM locations are in the 0xFF8000 - 0xFF9000 range.
 
 > Potential Data Leakage in addresses 81E2 & 845E, this correspond to the "Buttons Pressed by Player 1" (81E2) and "Buttons Pressed by Player 2" (845E). Including "Buttons Pressed by Player 1" (81E2) in Player 1's observation space is a classic Machine Learning pitfall known as Data Leakage. The agent's policy network is responsible for generating the button presses. If you feed the current button press as an input state, the network can collapse into an identity-mapping loop.
 
@@ -158,8 +158,117 @@ These settings are applied automatically by the Lua training script; manual conf
 
 
 # Training a Model
+
+Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed following this steps [Changing the trained character](#changing-the-trained-character).
+
+## Training Configurations
+
+
+
+### Changing the trained character
+
+If you wish to change your focused character (the character played by the AI), do this:
+
+1. Open Bizhawk without Python
+2. Load the ROM, File -> Open ROM.. or `Crtl` + `O`.
+3. Set the In-Game configurations. Go to Options -> Set your configurations -> Press `Enter` or the **Start** button when ready.
+
+> It is highly recommended to set the In-Game configuraitions as they were used in the project, being: No time limit (there is no timer, the game has to have a winner) and for the manual curriculumn we used a scaling difficulty, you can select the difficulty you want to train  your model, just remember that for every increasing difficulty the model might have more problems to converge. Every other configuration was left as default.
+
+4. Start a match. Go to Champion -> Gane Start -> **Select your DESIRED CHARACTER** -> Pause the game **Very Important**, see the next step.
+
+> There is no easy way to manually select your oponent, the game handles an initial random phase, where you fight the first 8 opponents in a random order, being Ryu, Ken, E. Honda, Chun-Li, Blanka, Zangief, Guile and Dhalsim. The remaining oponents Balrog, Vega, Sagat and M Bison, appear in that order.
+
+5. Before the match begins, there is a screen title where the characters can't move. With the game paused use the advance frame key, set to `F` in the default config and in the exact frame the fight title disapears. Go to File -> Save State -> Save Named State... -> Go to the project directory -> Change the name (A name easy to understand example: RYU_BLANKA_R1_lvl3, standing for player 1 then player 2, the round number and the lvl or stars difficulty) -> Then place the file inside the **states** folder.
+
+> The way the code is made is to work with no limit time, therefore the game has to have a winner, this is to have a correct and easy implementation of truncated and terminated values of Python. 
+
+7. Repeat for the amount of Batles your Model will have, for most of the times more is better. At least have more than one available state.
+
+8. Give Python the instructions to find the states, in `config.py` inside [src](https://github.com/LEIA-qro/street_fighter/tree/main/src) folder, go to the bottom of the file in **States configuration** and create or edit a list, for example:
+
+```Python
+NEW_VEGA_STATES = [
+    "VEGA_ZANGIEF_R1_lvl2.State", # Important: Be sure that this match the file names
+    "VEGA_RYU_R1_lvl2.State",
+    "VEGA_CHUNLI_R1_lvl2.State",
+    "VEGA_KEN_R1_lvl2.State",
+]
+```
+
+7. Just to make sure, change the `TRAINING_STATES` variable to your new variable.
+
+``` Python
+TRAINING_STATES = NEW_VEGA_STATES
+```
+
+8. With this set, check the training tutorials to see how to train yoour model!
+
 ## PPO
 
+> Currently this is the only method to train the model, in the future there will be added more ways or other algorithms.
+
+There are only four training scripts:
+
+<ul>
+  <li><code>train_production_PPO_v2.py</code></li>
+  <li><code>resume_production_v2.py</code></li>
+  <li><code>train_optuna.py</code></li>
+  <li><code>transfer_optuna.py</code></li>  
+</ul>
+
+> Note. <code>transfer_optuna.py</code> is currently under development
+
+#### `train_production_PPO_v2.py`
+
+You can find this script inside [`src/training`](src/training) folder. 
+
+This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
+
+The code has the states hardcoded for the manual curriculumn, but you can change it at any time:
+
+```Python
+# In this part
+config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
+
+# You can change it to other states, or leave the ones already set in config.py
+config.TRAINING_STATES = config.NEW_VEGA_STATES
+```
+
+This script create a N amount of RL instances declared with `config.N_ENVS`.
+
+An important thing to understand about PPO are its **Hyperparameters** and other model configurations.
+
+``` Python
+
+```
+
+
+#### `resume_production_v2.py`
+
+You can find this script inside [`src/training`](src/training) folder. 
+
+This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
+
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `train_optuna.py`
+
+You can find this script inside [`src/training`](src/training) folder. 
+
+One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way, slowing down the convergence , and in some cases, making it impossible to converge if the hyperparameter are not well tuned.
+
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+
+#### `transfer_optuna.py`
+
+> Currently under development
+
+You will be able to find this script inside [`src/training`](src/training) folder.  
+
+This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
+
+Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 
 
