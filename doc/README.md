@@ -175,9 +175,9 @@ If you wish to change your focused character (the character played by the AI), d
 
 > It is highly recommended to set the In-Game configuraitions as they were used in the project, being: No time limit (there is no timer, the game has to have a winner) and for the manual curriculumn we used a scaling difficulty, you can select the difficulty you want to train  your model, just remember that for every increasing difficulty the model might have more problems to converge. Every other configuration was left as default.
 
-4. Start a match. Go to Champion -> Gane Start -> **Select your DESIRED CHARACTER** -> Pause the game **Very Important**, see the next step.
+4. Start a match. Go to Champion -> Game Start -> **Select your DESIRED CHARACTER** -> Pause the game **Very Important**, see the next step.
 
-> There is no easy way to manually select your oponent, the game handles an initial random phase, where you fight the first 8 opponents in a random order, being Ryu, Ken, E. Honda, Chun-Li, Blanka, Zangief, Guile and Dhalsim. The remaining oponents Balrog, Vega, Sagat and M Bison, appear in that order.
+> There is no easy way to manually select your oponent, the game handles an initial random phase, where you fight the first 8 opponents in a random order, being Ryu, Ken, E. Honda, Chun-Li, Blanka, Zangief, Guile and Dhalsim. The remaining oponents Balrog, Vega, Sagat and M Bison, appear in that order after you have defeated the first 8 opponents.
 
 5. Before the match begins, there is a screen title where the characters can't move. With the game paused use the advance frame key, set to `F` in the default config and in the exact frame the fight title disapears. Go to File -> Save State -> Save Named State... -> Go to the project directory -> Change the name (A name easy to understand example: RYU_BLANKA_R1_lvl3, standing for player 1 then player 2, the round number and the lvl or stars difficulty) -> Then place the file inside the **states** folder.
 
@@ -202,13 +202,14 @@ NEW_VEGA_STATES = [
 TRAINING_STATES = NEW_VEGA_STATES
 ```
 
-8. With this set, check the training tutorials to see how to train yoour model!
+8. With this set, check the training tutorials to see how to train yoour model!}
 
+---
 ## PPO
 
 > Currently this is the only method to train the model, in the future there will be added more ways or other algorithms.
 
-There are only four training scripts:
+Fort PPO there are only four training scripts:
 
 <ul>
   <li><code>train_production_PPO_v2.py</code></li>
@@ -223,24 +224,50 @@ There are only four training scripts:
 
 You can find this script inside [`src/training`](src/training) folder. 
 
-This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
+This script initializes a model, creates it from the imported code `env_tools`, which initializes a gymnasium class containing the SF (Street Fighter) env. The  code also uses the hyperparameters set in `config.py`.
 
-The code has the states hardcoded for the manual curriculumn, but you can change it at any time:
+An important thing to know is that the code has the states hardcoded for the manual curriculumn, but you can change it at any time:
 
 ```Python
 # In this part
 config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
 
 # You can change it to other states, or leave the ones already set in config.py
-config.TRAINING_STATES = config.NEW_VEGA_STATES
+config.TRAINING_STATES = config.NEW_VEGA_STATES # Alternatively you can delete this line
+                                                # and automatically will select the states from config.TRAINING_STATES
 ```
 
 This script create a N amount of RL instances declared with `config.N_ENVS`.
 
-An important thing to understand about PPO are its **Hyperparameters** and other model configurations.
+An important thing to understand about PPO are its **Hyperparameters** and other model configurations. When the model is initialized:
 
 ``` Python
+model = PPO(
+        policy="MlpPolicy", # 
+        env=env,    # Here it uses the already instantiated SF envs
+        learning_rate=phase["lr"],    # Hyperparameter
+        n_steps=config.N_STEPS,    # Hyperparameter
+        batch_size=config.BATCH_SIZE,    # Hyperparameter
+        ent_coef=phase["ent_coef"],    # Hyperparameter
+        clip_range=phase["clip"],    # Hyperparameter
+        n_epochs=10,    # Hyperparameter
+        gamma=0.99,    # Hyperparameter
+        target_kl=0.03,    # Hyperparameter
+        policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),    # Hyperparameter
+        verbose=1,    # Sets the verbose to 1
+        tensorboard_log=directories["logs"],    # Allows graphic visualization
+        device="cuda"    # Allows the use of the GPU for the calculations
+        )
+```
 
+After this, the models learning process is initialized:
+
+```Python
+model.learn(
+            total_timesteps=config.STARTING_TOTAL_TIMESTEPS, # The amount of steps the model will learn
+            callback=callback, # This allows further model monitoring
+            tb_log_name=config.MODEL_NAME # The name the model will have
+        )
 ```
 
 
