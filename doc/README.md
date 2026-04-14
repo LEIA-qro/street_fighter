@@ -277,6 +277,8 @@ You can find this script inside [`src/training`](src/training) folder.
 
 This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
 
+Similar to the `train_production_PPO_v2.py` file. 
+
 Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `train_optuna.py`
