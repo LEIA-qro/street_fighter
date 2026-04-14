@@ -159,7 +159,7 @@ These settings are applied automatically by the Lua training script; manual conf
 
 # Training a Model
 
-Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed following this steps [Changing the trained character](#changing-the-trained-character).
+Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed following these steps [Changing the trained character](#changing-the-trained-character).
 
 ## Training Configurations
 
@@ -170,22 +170,20 @@ Training a model is the sole purpose of this project. The way the code is built 
 If you wish to change your focused character (the character played by the AI), do this:
 
 1. Open Bizhawk without Python
-2. Load the ROM, File -> Open ROM.. or `Crtl` + `O`.
-3. Set the In-Game configurations. Go to Options -> Set your configurations -> Press `Enter` or the **Start** button when ready.
+2. Load the ROM, File -> Open ROM.. or `Ctrl` + `O`.
+3. Go to Options and set your in-game configurations -> Set your configurations -> Press `Enter` or the **Start** button when ready.
 
-> It is highly recommended to set the In-Game configuraitions as they were used in the project, being: No time limit (there is no timer, the game has to have a winner) and for the manual curriculumn we used a scaling difficulty, you can select the difficulty you want to train  your model, just remember that for every increasing difficulty the model might have more problems to converge. Every other configuration was left as default.
+> It is highly recommended to set the In-Game configurations as they were used in the project, specifically: no time limit, so the match always ends with a winner rather than a timeout. For the manual curriculum we used a scaling difficulty, you can select the difficulty you want to train  your model, just remember that for every increasing difficulty the model might have more problems to converge. Every other configuration was left as default.
 
 4. Start a match. Go to Champion -> Game Start -> **Select your DESIRED CHARACTER** -> Pause the game **Very Important**, see the next step.
 
 > There is no easy way to manually select your oponent, the game handles an initial random phase, where you fight the first 8 opponents in a random order, being Ryu, Ken, E. Honda, Chun-Li, Blanka, Zangief, Guile and Dhalsim. The remaining oponents Balrog, Vega, Sagat and M Bison, appear in that order after you have defeated the first 8 opponents.
 
-5. Before the match begins, there is a screen title where the characters can't move. With the game paused use the advance frame key, set to `F` in the default config and in the exact frame the fight title disapears. Go to File -> Save State -> Save Named State... -> Go to the project directory -> Change the name (A name easy to understand example: RYU_BLANKA_R1_lvl3, standing for player 1 then player 2, the round number and the lvl or stars difficulty) -> Then place the file inside the **states** folder.
+5. Before the match begins, there is a screen title where the characters cannot yet move. With the game paused use the advance frame key, set to `F` in the default config and in the exact frame the fight title disappears. Go to File -> Save State -> Save Named State... -> Go to the project directory -> Change the name (A name easy to understand example: RYU_BLANKA_R1_lvl3, where RYU is player 1, BLANKA is player 2, R1 is round 1, and lvl3 is the difficulty level) -> Then place the file inside the **states** folder.
 
-> The way the code is made is to work with no limit time, therefore the game has to have a winner, this is to have a correct and easy implementation of truncated and terminated values of Python. 
+6. Repeat for the amount of Battles your Model will have. In most cases, more states is better. At least have more than one available state.
 
-7. Repeat for the amount of Batles your Model will have, for most of the times more is better. At least have more than one available state.
-
-8. Give Python the instructions to find the states, in `config.py` inside [src](https://github.com/LEIA-qro/street_fighter/tree/main/src) folder, go to the bottom of the file in **States configuration** and create or edit a list, for example:
+7. Give Python the instructions to find the states, in `config.py` inside [src](https://github.com/LEIA-qro/street_fighter/tree/main/src) folder, go to the bottom of the file in **States configuration** and create or edit a list, for example:
 
 ```Python
 NEW_VEGA_STATES = [
@@ -196,20 +194,22 @@ NEW_VEGA_STATES = [
 ]
 ```
 
-7. Just to make sure, change the `TRAINING_STATES` variable to your new variable.
+8. Just to make sure, change the `TRAINING_STATES` variable to your new variable.
 
 ``` Python
 TRAINING_STATES = NEW_VEGA_STATES
 ```
 
-8. With this set, check the training tutorials to see how to train yoour model!}
+9. With this set, check the training tutorials to see how to train your model!
 
 ---
 ## PPO
 
 > Currently this is the only method to train the model, in the future there will be added more ways or other algorithms.
 
-Fort PPO there are only four training scripts:
+>  Note. <code>transfer_optuna.py</code> is currently under development
+
+For PPO there are only four training scripts:
 
 <ul>
   <li><code>train_production_PPO_v2.py</code></li>
@@ -218,7 +218,7 @@ Fort PPO there are only four training scripts:
   <li><code>transfer_optuna.py</code></li>  
 </ul>
 
-> Note. <code>transfer_optuna.py</code> is currently under development
+
 
 #### `train_production_PPO_v2.py`
 
@@ -226,7 +226,7 @@ You can find this script inside [`src/training`](src/training) folder.
 
 This script initializes a model, creates it from the imported code `env_tools`, which initializes a gymnasium class containing the SF (Street Fighter) env. The  code also uses the hyperparameters set in `config.py`.
 
-An important thing to know is that the code has the states hardcoded for the manual curriculumn, but you can change it at any time:
+It is worth understanding that the code has the states hardcoded for the manual curriculum, but you can change it at any time:
 
 ```Python
 # In this part
@@ -237,13 +237,13 @@ config.TRAINING_STATES = config.NEW_VEGA_STATES # Alternatively you can delete t
                                                 # and automatically will select the states from config.TRAINING_STATES
 ```
 
-This script create a N amount of RL instances declared with `config.N_ENVS`.
+This script creates N parallel RL instances declared with `config.N_ENVS`.
 
 An important thing to understand about PPO are its **Hyperparameters** and other model configurations. When the model is initialized:
 
 ``` Python
 model = PPO(
-        policy="MlpPolicy", # 
+        policy="MlpPolicy", # Standard fully-connected policy network
         env=env,    # Here it uses the already instantiated SF envs
         learning_rate=phase["lr"],    # Hyperparameter
         n_steps=config.N_STEPS,    # Hyperparameter
