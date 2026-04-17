@@ -156,7 +156,7 @@ Shrink the BizHawk window to its minimum possible size on your desktop. Fewer pi
 
 These settings are applied automatically by the Lua training script; manual configuration is only needed when running BizHawk outside of training mode.
 
-
+---
 # Training a Model
 
 Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed following these steps [Changing the trained character](#changing-the-trained-character).
@@ -295,6 +295,35 @@ You will be able to find this script inside [`src/training`](src/training) folde
 
 This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
 
+
+---
+# Testing a Model
+
+Once you have a trained Model, you can test it with the following:
+
+<ul>
+  <li>
+    <code>test_agent_v2.py</code>
+  </li>
+  <li>
+    <code>test_ai_vs_ai_v2.py</code>
+  </li>
+</ul>
+
+## `test_agent_v2.py`
+
+You can find this script in the [`testing`](src/testing) folder. 
+
+Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
+Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
+
+
+## `test_ai_vs_ai_v2.py`
+
+You can find this script in the [`testing`](src/testing) folder. 
+
+This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
+Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
 
 
 
