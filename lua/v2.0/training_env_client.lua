@@ -7,6 +7,7 @@ console.log("Starting Lock-Step Telemetry Script...")
 client.setwindowsize(1)         -- Reduce emulator window to save GPU resources. We won't be rendering anything, so this is purely for performance.
 client.invisibleemulation(true) -- Takes away any visual rendering overhead, which can significantly boost performance when running headless. client.invisibleemulation(false)
 emu.displayvsync(false)         -- Disables V-Sync to allow the emulator to run as fast as possible without being capped by the monitor's refresh rate.
+-- client.speedmode(200) -- current speed is %200, change the argument for other configurations
 emu.limitframerate(false)       -- Remove any built-in frame rate limits to let the emulator run at maximum speed, which is crucial for faster RL training iterations.
 client.displaymessages(false)   -- Disables on-screen text rendering to save CPU cycles
 client.SetSoundOn(false)        -- Disables audio processing, which can be a significant CPU drain.
