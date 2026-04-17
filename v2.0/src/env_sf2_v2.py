@@ -19,7 +19,7 @@ TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32
 class StreetFighterEnvV2(BizHawkBaseEnv):
     """Street Fighter II RL Environment with One-Hot Encoded Action IDs."""
     
-    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, player=1):
+    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=True, player=1):
         assigned_port = config.PORT + rank
 
         super().__init__(
@@ -28,7 +28,8 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             lua_path=lua_path,
             host=config.HOST,
             port=assigned_port,
-            trainable=trainable
+            trainable=trainable,
+            debug_mode=debug_mode
         )
         
         self.player = player  
@@ -87,6 +88,13 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             self.send_command(full_command)
             # 2. Receive State via Parent Method
             data = self.receive_payload()
+
+
+
+            self.debug_print(
+                f"Command Sent: '{full_command}' | Raw Payload: '{data}'"
+            )
+
         except RuntimeError as e:
             # Socket is dead. Retunt a terminal state to SB3 calls reset().
             # Do NOT let this propagate - it kills the SubpocVecEnv

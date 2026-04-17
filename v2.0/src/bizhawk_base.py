@@ -6,8 +6,9 @@ import time
 class BizHawkBaseEnv(gym.Env):
     """Universal Base Environment for BizHawk socket communication."""
     
-    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, trainable=True):
+    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, trainable=True, debug_mode=False):
         super().__init__()
+        # Initialization parameters
         self.bizhawk_path = bizhawk_path
         self.rom_path = rom_path
         self.lua_path = lua_path
@@ -15,6 +16,7 @@ class BizHawkBaseEnv(gym.Env):
         self.port = port
         self.trainable = trainable
         
+        # Internal state
         self.server_socket = None
         self.conn = None
         self.emulator_process = None # Track the subprocess
@@ -22,7 +24,20 @@ class BizHawkBaseEnv(gym.Env):
         # NEW: The TCP Holding Tank
         self.stream_buffer = ""
         
+        # Debugging
+        self.debug_mode = debug_mode
+        self.step_count = 0
+        self.step_debug_interval = 100  # Print debug info every N steps
+
+        # When initialized, start the emulator and establish the socket connection
         self._start_emulator_bridge()
+
+    # For debugging: A simple method to print the current step count and received payload
+    def debug_print(self, payload):
+        if self.debug_mode:
+            if self.step_count % self.step_debug_interval == 0:  # Print every N steps to avoid flooding the console
+                print(f"[Step {self.step_count}] {payload}")
+            self.step_count += 1
 
     def _start_emulator_bridge(self):
         """Binds the socket and launches the emulator."""
@@ -72,6 +87,8 @@ class BizHawkBaseEnv(gym.Env):
         try:
             formatted_reply = f"{len(command)} {command}"
             self.conn.sendall(formatted_reply.encode('utf-8'))
+
+    
         except (ConnectionResetError, BrokenPipeError) as e:
             print(f"[WARN] send_command failed in interactive mode: {e}")
             if self.trainable:
@@ -84,14 +101,14 @@ class BizHawkBaseEnv(gym.Env):
     def receive_payload(self) -> str:
         """Blocks and waits for a complete, mathematically perfect payload."""
         try:
-            # 1. Keep receiving bytes until we see a newline
+            # Keep receiving bytes until we see a newline
             while '\n' not in self.stream_buffer:
                 chunk = self.conn.recv(4096).decode('utf-8')
                 if not chunk:
                     return ""
                 self.stream_buffer += chunk
             
-            # 2. Slice the buffer precisely at the first newline.
+            # Slice the buffer precisely at the first newline.
             line, self.stream_buffer = self.stream_buffer.split('\n', 1)
             
             return line
