@@ -216,7 +216,7 @@ You can find this script inside [`src/training`](src/training) folder.
 
 This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#train_production_ppo_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `resume_production_v2.py`
 
