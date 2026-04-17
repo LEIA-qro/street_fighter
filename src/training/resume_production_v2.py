@@ -4,11 +4,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-# from typing import Callable 
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
-# from stable_baselines3.common.callbacks import BaseCallback
 
 import config
 from selective_norm import SelectiveVecNormalize
@@ -85,19 +83,15 @@ def resume_training(model_path, vec_path,
             save_interval=config.SAVE_FREQ_STEPS
         )
         
-        # In resume_production_v2.py — after restoring phase_bests:
         callback._phase_bests = phase_state.get("phase_bests", {})
         callback._threshold_save_fired = phase_state.get("threshold_save_fired", set())
-        callback.last_save_step        = phase_state.get("last_save_step", 0)   # ADD
-        callback.last_eval_step        = phase_state.get("last_eval_step", 0)   # ADD
+        callback.last_save_step        = phase_state.get("last_save_step", 0)  
+        callback.last_eval_step        = phase_state.get("last_eval_step", 0)   
         if start_phase is not None and start_phase != phase_state.get("current_phase", 0):
             print(f"[Resume] start_phase override detected. "
                 f"Clearing phase {start_phase} bests for fresh tracking.")
             callback._phase_bests.pop(start_phase, None)  # Remove stale threshold for this phase
-        # ← ADD THIS: Force-broadcast the correct states to all subprocess envs
-        # The callback's __init__ sets self.current_phase but never calls env_method.
-        # Fix 1 handles the initial spawn, but this handles any edge case where
-        # env workers miss the config mutation (e.g., different Python interpreter state).
+       
         if restored_phase > 0:
             try:
                 env.env_method("set_training_states", config.CURRICULUM_PHASES[restored_phase])
@@ -149,9 +143,6 @@ if __name__ == "__main__":
             break
         else:
             restart_count += 1
-             # phase_state never updated — always None
-            # This is fine because load_state() reads curriculum_state.json
-            # BUT only if ManualCurriculumCallback._save_phase_state() was called before the crash
             print(f"\n--- AUTO-RESTART #{restart_count} ---")
             current_model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
             current_vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
