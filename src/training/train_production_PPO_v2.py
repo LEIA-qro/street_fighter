@@ -22,7 +22,7 @@ directories = config.get_directory()
 def train_production_PPO():
     print("[Training] Initializing Curriculum Production Training...")
 
-    # Phase 0 starts here — config.TRAINING_STATES must equal CURRICULUM_PHASES[0]
+    # Change this for other states or curriculum phases
     config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
 
     n_envs = config.N_ENVS
