@@ -5,12 +5,11 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 import optuna
-import json  # <-- ADD: for saving best params to disk
-# import subprocess 
+import json  
+
    
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv
-# from stable_baselines3.common.evaluation import evaluate_policy
 
 
 import config
@@ -86,7 +85,6 @@ def objective(trial):
             n_epochs=10,
             gamma=0.99,
             target_kl=0.03, 
-            # THE FIX: Removed the [] from around the dict()
             policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])), # THE MASSIVE BRAIN
             verbose=0, 
             tensorboard_log=directories["logs"],
@@ -98,7 +96,6 @@ def objective(trial):
             tb_log_name=f"{config.MODEL_NAME}_Optuna_V2_Trial_{trial.number}"
         )
         
-        # --- THE FIX: EXTRACT INTERNAL MEMORY INSTEAD OF EVALUATING ---
         print("Extracting trial performance...")
         ep_info_buffer = list(model.ep_info_buffer)
         
@@ -110,8 +107,6 @@ def objective(trial):
         print(f"Trial {trial.number} → Mean Reward (last {len(last_n)} eps): {mean_reward:.4f}")
 
 
-        # --- MOVED SAVING LOGIC INSIDE THE TRY BLOCK ---
-        # Save best model (atomically — model and normalizer from the same trial)
         best_reward = -float('inf')
         if os.path.exists(BEST_REWARD_PATH):
             with open(BEST_REWARD_PATH, "r") as f:
@@ -125,7 +120,7 @@ def objective(trial):
             env.save(os.path.join(directories["optuna"], "best_vec_normalize_v2.pkl"))
             with open(BEST_REWARD_PATH, "w") as f:
                 f.write(str(mean_reward))
-            # FIX: Save best params every time a new best is found, not just at the end
+            # Save best params every time a new best is found, not just at the end
             _print_and_save_best(trial.study)
 
         return mean_reward
@@ -155,6 +150,6 @@ if __name__ == "__main__":
         print("\nOptuna Optimization forcefully interrupted by user.")
   
     finally:
-        # FIX: Always print and save best results, even on crash/interrupt
+        # Always print and save best results, even on crash/interrupt
         print("\n[Optuna] Optimization session ending. Generating final report...")
         _print_and_save_best(study)
