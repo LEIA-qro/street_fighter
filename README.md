@@ -224,7 +224,7 @@ You can find this script inside [`src/training`](src/training) folder.
 
 This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#resume_production_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `train_optuna.py`
 
@@ -232,7 +232,7 @@ You can find this script inside [`src/training`](src/training) folder.
 
 One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way, slowing down the convergence , and in some cases, making it impossible to converge if the hyperparameter are not well tuned.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#train_optunapy) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `transfer_optuna.py`
 
@@ -242,7 +242,7 @@ You will be able to find this script inside [`src/training`](src/training) folde
 
 This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#transfer_optunapy) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 ---
 ## Checking How good is the model
