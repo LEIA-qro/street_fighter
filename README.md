@@ -255,31 +255,19 @@ You can check all of them running in the Terminal of the project:
 tensorboard --logdir=logs\
 ```
 
-### `ep_len_mean` and `ep_rew_mean`
+### The most important metrics
 
-`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 150 seconds, since a second is 40 frames and we are using a FRAME SKIPING of 4 (Check the [documentation](doc)), it means that 1500 * 4 / 40 = 150
+`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 150 seconds, since a second is 40 frames and we are using a FRAME SKIPING of 4, it means that 1500 * 4 / 40 = 150
 
 `ep_rew_mean`: Episode reward mean, this indicates what the reward average of the episodes is, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
 
 If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the model is succesfully beating every oponent. But if the `ep_len_mean` is low and the `ep_rew_mean` is also very low, this means the model is getting his ass kicked.
 
-### Other Metrics
+**Callback Metricks**: Here we have the metric of `win_rate`, which as the name suggests, means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
 
-`train/policy_gradient_loss`: measures how much the policy is being pushed to change each update. You want this to trend gradually downward and stay small. If it's spiking erratically, the agent is receiving inconsistent gradient signals, which usually means the reward function has too much variance or your learning rate is too high.
 
-`train/value_loss`: how wrong the critic (value function) is when predicting expected return. Early training: high and dropping. If it plateaus at a high value, the critic can't accurately predict reward from the 554-dim obs, which starves the policy of good advantage estimates. Watch this alongside `ep_rew_mean`.
+Check the remaining metrics in [documentation](doc#metrics).
 
-`train/entropy_loss`: measures action diversity. High entropy means the agent is still exploring broadly; low entropy means it's committing to specific moves. If this collapses to near zero early in training, the agent has latched onto a narrow strategy (like spamming one button) and stopped exploring. The `ent_coef` in config directly controls this.
-
-`train/approx_kl`: the KL divergence between the old and new policy per update. The config sets `target_kl=0.03`. If this consistently exceeds that threshold, SB3 will cut the update short, meaning the `n_epochs=10` is never fully used. A persistently high KL suggests the learning rate is too aggressive for the current phase.
-
-`train/clip_fraction`: the fraction of gradient steps where the PPO clipping mechanism activated. Healthy range is roughly 0.05–0.20. Values above 0.30 mean the policy is trying to change too fast and PPO is constantly clamping it, wasting compute. Values near zero mean the policy is barely updating.
-
-`train/explained_variance`: how much of the return variance the value function actually explains. Ranges from -∞ to 1.0; values below 0 mean the critic is worse than a constant baseline. You want this above 0.8 during stable training. Starting with a low explained variance is normal; if it's still low after a long time, the network architecture may need attention.
-
-### Callback Metricks
-
-Here we have the metric of `win_rate`, which as the name suggests, means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
 
 ### Testing AI Models
 
