@@ -323,11 +323,13 @@ There are different ways to create a custom model:
   </li>
 
   <li>
-    Change the <strong>Observation Space</strong> or the <strong>data passed to the model</strong>. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. [Note] Be carefull when editing the Lua script.
+    Change the <strong>Observation Space</strong> or the <strong>data passed to the model</strong>. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. 
   </li>
 
+> [Note] Be carefull when editing the Lua script.
+
   <li>
-    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The <a href=doc>documentation</a> for full guide.
+    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The <a href=doc#changing-the-trained-character>documentation</a> for full guide.
   </li>
 </ul>
 
