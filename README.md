@@ -301,7 +301,7 @@ You can find this script in the [`testing`](src/testing) folder.
 Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
 Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#test_agent_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 #### `test_ai_vs_ai_v2.py`
 
@@ -310,7 +310,7 @@ You can find this script in the [`testing`](src/testing) folder.
 This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
 Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
 
-Check the documentation ([`doc`](doc) folder) for further explanation on how the code works and how to configure it according to your needs.
+Check the documentation ([`doc`](doc#test_ai_vs_ai_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
 
 ---
 ## Creating a custom Model
