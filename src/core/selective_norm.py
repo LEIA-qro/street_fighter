@@ -1,7 +1,7 @@
 # selective_norm.py
 import pickle
 import numpy as np
-import config
+import core.config as config
 from stable_baselines3.common.vec_env import VecEnvWrapper
 
 class SelectiveVecNormalize(VecEnvWrapper):

@@ -1,5 +1,5 @@
 # src/scripts/train.py
-import argparse, importlib
+import os, argparse, importlib
 from pathlib import Path
 import sys; sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -17,7 +17,8 @@ def main():
     module  = importlib.import_module(f"agents.{args.algo}")
     agent   = module.build_agent()          # factory function in agents/ppo/__init__.py
     env_fn  = lambda rank: SFv2_make_env(rank, version=args.env)
-    save_dir = config.get_directory()["production"] / args.algo
+    save_dir = os.path.join(config.get_directory()["production"], args.algo)
+    os.makedirs(save_dir, exist_ok=True)
 
     agent.train(env_fn, save_dir, args.steps)
 

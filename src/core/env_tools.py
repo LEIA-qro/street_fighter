@@ -1,11 +1,11 @@
 import os, time, multiprocessing, gc, torch
 from stable_baselines3.common.monitor import Monitor
 
-from env_sf2_v2 import StreetFighterEnvV2
-import config
+from envs.sf2_v2 import StreetFighterEnvV2
+import core.config as config
 
 
-def SFv2_make_env(rank):
+def SFv2_make_env(rank, **kwargs):
     def _init():
         env = StreetFighterEnvV2(rank=rank)
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")

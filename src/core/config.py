@@ -77,7 +77,8 @@ def get_directory():
         "roms": ROMS_DIR,
         "states": STATES_DIR,
         "lua": LUA_DIR,
-        "logs": LOG_DIR
+        "logs": LOG_DIR,
+        "production": os.path.join(PROJECT_ROOT, "models", "production")
     }
     for name, path in directories.items():
         if not os.path.exists(path):
@@ -106,11 +107,11 @@ ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
 OBS_DIM = 10 # Old obs from v1, does not consider cathegorical data -- DO NOT CHANGE
 
 NUM_FRAMES = 4 # Frame Stacking = 4
-STARTING_TOTAL_TIMESTEPS = 3_000_000 # For train production or train sinlge PPO
+STARTING_TOTAL_TIMESTEPS = 1000 # For train production or train sinlge PPO
 RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 
 SAVE_FREQ_STEPS = 1_000_000
-N_ENVS = 10 # Number of parallel BizHawk instances for Optuna trials
+N_ENVS = 1 # Number of parallel BizHawk instances for Optuna trials
 
 
 
@@ -218,3 +219,7 @@ CURRICULUM_PHASES = [
 ]
 
 TRAINING_STATES = CURRICULUM_PHASES[0] # Global variable to be updated by the callback and read by the env
+
+# Curriculum advancement gate
+WIN_RATE_THRESHOLD = 0.75
+WIN_RATE_WINDOW = 250

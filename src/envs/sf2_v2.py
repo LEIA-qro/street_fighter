@@ -5,8 +5,8 @@ import numpy as np
 from gymnasium import spaces
 from collections import deque
 
-import config
-from bizhawk_base import BizHawkBaseEnv
+import core.config as config
+from core.bizhawk_base import BizHawkBaseEnv
 
 CONTINUOUS_DIM = config.OBS_DIM  # HP(2), X(2), Y(2), Proj_X(2), Vel_X(2) ← was 8
 ACT_CATEGORIES = 256 # 

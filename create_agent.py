@@ -1,11 +1,13 @@
 import os
+
+content = """import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
-from manual_curriculum_callback import ManualCurriculumCallback
+from src.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 
@@ -62,15 +64,15 @@ class PPOAgent(BaseAgent):
             
             model.save(os.path.join(save_dir, config.MODEL_NAME + "_FINAL"))
             env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_FINAL.pkl"))
-            print("\nProduction Training Complete!")
+            print("\\nProduction Training Complete!")
             
         except KeyboardInterrupt:
-            print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
+            print("\\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
             if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_EMERGENCY"))
             if env is not None: env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
 
         except Exception as e:
-            print(f"\n[CRITICAL ERROR] Training crashed: {e}")
+            print(f"\\n[CRITICAL ERROR] Training crashed: {e}")
             if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_CRASH_SAVE"))
             if env is not None: env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
 
@@ -88,3 +90,8 @@ class PPOAgent(BaseAgent):
 
     def test(self):
         pass
+"""
+
+with open("src/agents/ppo/agent.py", "w") as f:
+    f.write(content)
+print("agent.py created successfully!")
