@@ -34,7 +34,7 @@ import numpy as np
 from collections import deque
 from stable_baselines3.common.callbacks import BaseCallback
 
-import config
+import src.core.config as config
 
 
 class ManualCurriculumCallback(BaseCallback):
