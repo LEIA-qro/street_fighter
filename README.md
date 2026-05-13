@@ -19,7 +19,7 @@ This allows to have an absolute control over every variable of the training.
 
 ### How Does it works?
 
-(1) Python launches BizHawk → (2) Lua reads RAM → (3) TCP sends game state → (4) Python computes action → (5) Lua injects inputs.
+(1) Python launches BizHawk -> (2) Lua reads RAM -> (3) TCP sends game state -> (4) Python computes action -> (5) Lua injects inputs.
 
 To check more about the functionality of the project check the [documentation](doc#high-level-summary).
 

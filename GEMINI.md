@@ -52,6 +52,7 @@ Primary Goals:
 
 1. Directory Structure Adherence
  * street_fighter/ must remain inside BizHawk-2.8-win-x64/.
+ * **Editing Constraint:** Only edit files within the `street_fighter/` directory. Access to the parent directory is granted strictly for executing the emulator and related programs, not for modifications.
  * roms/: Read-only. Never modify.
  * states/: BizHawk .State files.
  * lua/v2.0/: Contains headless (training_env_client.lua) and interactive (match_test_env_client.lua) loops.

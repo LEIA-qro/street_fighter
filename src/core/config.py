@@ -78,7 +78,9 @@ def get_directory():
         "states": STATES_DIR,
         "lua": LUA_DIR,
         "logs": LOG_DIR,
-        "production": os.path.join(PROJECT_ROOT, "models", "production")
+        "production": os.path.join(PROJECT_ROOT, "models", "production"),
+        "tuning": os.path.join(PROJECT_ROOT, "models", "tuning"),
+        "tuning_logs": os.path.join(PROJECT_ROOT, "logs", "tuning")
     }
     for name, path in directories.items():
         if not os.path.exists(path):
@@ -98,7 +100,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "test_1" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "test_212" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
@@ -111,8 +113,9 @@ STARTING_TOTAL_TIMESTEPS = 1000 # For train production or train sinlge PPO
 RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 
 SAVE_FREQ_STEPS = 1_000_000
-N_ENVS = 1 # Number of parallel BizHawk instances for Optuna trials
 
+# Number of parallel BizHawk instances for Optuna trials
+N_ENVS = 10
 
 
 # ===========================================================

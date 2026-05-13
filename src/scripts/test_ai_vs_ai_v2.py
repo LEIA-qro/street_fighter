@@ -85,51 +85,56 @@ class _PerspectiveParser:
         return obs
     
 def test_ai_vs_ai():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--load_zip_p1", type=str, required=True)
+    parser.add_argument("--load_pkl_p1", type=str, required=True)
+    parser.add_argument("--load_zip_p2", type=str, required=True)
+    parser.add_argument("--load_pkl_p2", type=str, required=True)
+    args = parser.parse_args()
+
     print("Initializing AI vs AI Evaluation Mode...") 
 
     print("Booting Master Socket...")
-    # ── 1. Boot ONE master socket env (no DummyVecEnv — raw socket only) ──
+    # ── 1. Boot ONE master socket env ──
     master_env = StreetFighterEnvV2(
         lua_path=config.MATCH_TEST_ENV_CLIENT_LUA_PATH,
         trainable=False,
         rank=0,
-        player=1  # Default; overridden per-frame by _PerspectiveParser
+        player=1  
     )
     
     # ── 2. Build perspective-isolated parsers ──
     parser_p1 = _PerspectiveParser(master_env, player=1)
     parser_p2 = _PerspectiveParser(master_env, player=2)
 
-    # ── 3. Per-agent frame buffers (correct n_frames=4, dim=554) ──
+    # ── 3. Per-agent frame buffers ──
     buf_p1 = _FrameBuffer(n_frames=config.NUM_FRAMES, obs_dim=TOTAL_OBS_DIM)
     buf_p2 = _FrameBuffer(n_frames=config.NUM_FRAMES, obs_dim=TOTAL_OBS_DIM)
 
-    # ── 4. Load normalizers with the correct class ──
-    # SelectiveVecNormalize.load requires a venv for obs_space; use a
-    # DummyVecEnv wrapping a fresh env shell (immediately closed after load).
-    dummy = DummyVecEnv([_MockV2Env])  # No BizHawk, no socket, instant
+    # ── 4. Load normalizers ──
+    dummy = DummyVecEnv([_MockV2Env])  
     vec_norm_p1 = SelectiveVecNormalize.load(
-        os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P1), dummy
+        os.path.join(config.PROJECT_ROOT, args.load_pkl_p1), dummy
     )
     vec_norm_p1.training = False
 
     vec_norm_p2 = SelectiveVecNormalize.load(
-        os.path.join(directories["project_root"], config.TESTING_PKL_FILE_P2), dummy
+        os.path.join(config.PROJECT_ROOT, args.load_pkl_p2), dummy
     )
     vec_norm_p2.training = False
 
      # ── 5. Load models ──
     print(f"\nLoading Neural Networks...")
     model_p1 = PPO.load(
-        os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P1),
+        os.path.join(config.PROJECT_ROOT, args.load_zip_p1),
         device="cuda"
     )
-    print("Player 1 loaded from:", config.TESTING_ZIP_FILE_P1)
+    print("Player 1 loaded from:", args.load_zip_p1)
     model_p2 = PPO.load(
-        os.path.join(directories["project_root"], config.TESTING_ZIP_FILE_P2),
+        os.path.join(config.PROJECT_ROOT, args.load_zip_p2),
         device="cuda"
     )
-    print("Player 2 loaded from:", config.TESTING_ZIP_FILE_P2)
+    print("Player 2 loaded from:", args.load_zip_p2)
 
     
     print(f"\n{('='*50)}")
@@ -146,7 +151,7 @@ def test_ai_vs_ai():
 
     try:
         while True:
-            # Stack observations → (2216,) each
+            # Stack observations -> (2216,) each
             stacked_p1 = buf_p1.push(obs_p1_raw)  # Updated by previous iteration
             stacked_p2 = buf_p2.push(obs_p2_raw)
 

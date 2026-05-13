@@ -67,8 +67,8 @@ class BizHawkBaseEnv(gym.Env):
         if not self.trainable:
             print("\n[INTERACTIVE MODE] BizHawk launched.")
             print("1. Navigate the game menus manually.")
-            print("2. When the match is ready, open the BizHawk Lua Console. Tools → Lua Console")
-            print(f"3. Run the script: {self.lua_path}. Script → Open Script → Select {self.lua_path}")
+            print("2. When the match is ready, open the BizHawk Lua Console. Tools -> Lua Console")
+            print(f"3. Run the script: {self.lua_path}. Script -> Open Script -> Select {self.lua_path}")
             print(f"\n[Connection] Waiting for your Lua connection...")
             
         self.conn, addr = self.server_socket.accept()

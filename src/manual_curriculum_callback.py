@@ -113,7 +113,7 @@ class ManualCurriculumCallback(BaseCallback):
         self.reward_buffer.clear()
  
         # 5. Per-phase bests reset automatically because the new phase_idx
-        #    has no entry in _phase_bests yet → _get_phase_best returns -inf.
+        #    has no entry in _phase_bests yet -> _get_phase_best returns -inf.
  
         # 6. Write a permanent phase-entry checkpoint
         tag = f"phase{self.current_phase + 1}_entry"
@@ -177,7 +177,7 @@ class ManualCurriculumCallback(BaseCallback):
             pg["lr"] = lr
  
         if self.verbose:
-            print(f"[ManualCurriculum] Hyperparams applied → "
+            print(f"[ManualCurriculum] Hyperparams applied -> "
                   f"LR={lr:.2e} | ent_coef={ent:.4f} | clip={clip:.3f}")
 
     # ------------------------------------------------------------------
@@ -200,7 +200,7 @@ class ManualCurriculumCallback(BaseCallback):
         with open(path, "w") as f:
             json.dump(state, f, indent=2)
         if self.verbose:
-            print(f"[Curriculum] State saved → Phase {self.current_phase + 1} "
+            print(f"[Curriculum] State saved -> Phase {self.current_phase + 1} "
                   f"at {self.num_timesteps:,} steps")
 
     def _on_training_start(self) -> None:
@@ -231,7 +231,7 @@ class ManualCurriculumCallback(BaseCallback):
             }
             raw["threshold_save_fired"] = set(raw.get("threshold_save_fired", []))
 
-            print(f"[ManualCurriculum] Restored → Phase {raw['current_phase'] + 1} "
+            print(f"[ManualCurriculum] Restored -> Phase {raw['current_phase'] + 1} "
                   f"| {raw['num_timesteps']:,} steps")
             return raw
  

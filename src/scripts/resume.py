@@ -95,7 +95,7 @@ def resume_training(model_path, vec_path,
         if restored_phase > 0:
             try:
                 env.env_method("set_training_states", config.CURRICULUM_PHASES[restored_phase])
-                print(f"[Resume] States broadcast to all {config.N_ENVS} workers → Phase {restored_phase + 1}")
+                print(f"[Resume] States broadcast to all {config.N_ENVS} workers -> Phase {restored_phase + 1}")
             except Exception as e:
                 print(f"[Resume][WARN] Could not broadcast states to workers: {e}")
                 

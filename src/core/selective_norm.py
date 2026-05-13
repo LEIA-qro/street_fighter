@@ -84,7 +84,7 @@ class SelectiveVecNormalize(VecEnvWrapper):
         }
         with open(path, "wb") as f:
             pickle.dump(stats, f)
-        print(f"[SelectiveVecNormalize] Stats saved → {path}")
+        print(f"[SelectiveVecNormalize] Stats saved -> {path}")
 
     def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
         """Explicitly delegate env_method calls down to the vectorized environment."""

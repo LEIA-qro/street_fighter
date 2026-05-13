@@ -28,7 +28,7 @@ OPTUNA_PHASE1_LR         = LR          # Placeholder — update after first Optu
 OPTUNA_PHASE1_ENT_COEF   = ENT_COEF
 OPTUNA_PHASE1_CLIP_RANGE = CLIP_RANGE
 
-# Transfer Optuna results (Phase 3→4) — update after second Optuna run
+# Transfer Optuna results (Phase 3->4) — update after second Optuna run
 TRANSFER_LR         = 2e-5    # Placeholder
 TRANSFER_ENT_COEF   = 0.015
 TRANSFER_CLIP_RANGE = 0.15
