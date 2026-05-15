@@ -116,7 +116,7 @@ class ManualCurriculumCallback(BaseCallback):
         #    has no entry in _phase_bests yet -> _get_phase_best returns -inf.
  
         # 6. Write a permanent phase-entry checkpoint
-        tag = f"phase{self.current_phase + 1}_entry"
+        tag = f"phase{self.current_phase}_entry"
         self.model.save(
             os.path.join(self.save_path, f"{config.MODEL_NAME}_{tag}"))
         self.training_env.save(
@@ -127,7 +127,7 @@ class ManualCurriculumCallback(BaseCallback):
  
         if self.verbose:
             print(f"\n{'='*60}")
-            print(f"[ManualCurriculum] *** MOVED TO PHASE {self.current_phase + 1} ***")
+            print(f"[ManualCurriculum] *** MOVED TO PHASE {self.current_phase} ***")
             print(f"  States : {new_states}")
             print(f"  Steps  : {self.num_timesteps:,}")
             print(f"{'='*60}\n")
@@ -200,7 +200,7 @@ class ManualCurriculumCallback(BaseCallback):
         with open(path, "w") as f:
             json.dump(state, f, indent=2)
         if self.verbose:
-            print(f"[Curriculum] State saved -> Phase {self.current_phase + 1} "
+            print(f"[Curriculum] State saved -> Phase {self.current_phase} "
                   f"at {self.num_timesteps:,} steps")
 
     def _on_training_start(self) -> None:
@@ -231,7 +231,7 @@ class ManualCurriculumCallback(BaseCallback):
             }
             raw["threshold_save_fired"] = set(raw.get("threshold_save_fired", []))
 
-            print(f"[ManualCurriculum] Restored -> Phase {raw['current_phase'] + 1} "
+            print(f"[ManualCurriculum] Restored -> Phase {raw['current_phase']} "
                   f"| {raw['num_timesteps']:,} steps")
             return raw
  
@@ -255,8 +255,8 @@ class ManualCurriculumCallback(BaseCallback):
         self.training_env.save(vec_path)
         self._save_phase_state()  # ADD THIS
         if self.verbose:
-            print(f"[Best-Reward ✓] {self.num_timesteps:,} steps | "
-                  f"Phase {self.current_phase + 1} | "
+            print(f"[Best-Reward *] {self.num_timesteps:,} steps | "
+                  f"Phase {self.current_phase} | "
                   f"New best: {self._get_phase_best('reward'):.2f}")
 
     def _save_best_winrate(self):
@@ -266,8 +266,8 @@ class ManualCurriculumCallback(BaseCallback):
         self.training_env.save(vec_path)
         self._save_phase_state()  # ADD THIS
         if self.verbose:
-            print(f"[Best-WinRate ✓] {self.num_timesteps:,} steps | "
-                  f"Phase {self.current_phase + 1} | "
+            print(f"[Best-WinRate *] {self.num_timesteps:,} steps | "
+                  f"Phase {self.current_phase} | "
                   f"New best: {self._win_rate():.1%}")
 
     def _save_periodic_checkpoint(self):
@@ -298,7 +298,7 @@ class ManualCurriculumCallback(BaseCallback):
 
         if self.verbose:
             print(f"\n[Checkpoint] {self.num_timesteps:,} steps | "
-                  f"Phase {self.current_phase + 1} | "
+                  f"Phase {self.current_phase} | "
                   f"Win Rate: {self._win_rate():.1%} | "
                   f"Mean Reward: {self._mean_reward():.2f}")
 
@@ -308,7 +308,7 @@ class ManualCurriculumCallback(BaseCallback):
         Does NOT advance the phase — that remains your manual decision.
         Creates a uniquely named artifact so it's never overwritten.
         """
-        tag = f"phase{self.current_phase + 1}_WR{int(win_rate * 100)}pct_{self.num_timesteps}steps"
+        tag = f"phase{self.current_phase}_WR{int(win_rate * 100)}pct_{self.num_timesteps}steps"
         model_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_{tag}")
         vec_path   = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_{tag}.pkl")
         
@@ -321,7 +321,7 @@ class ManualCurriculumCallback(BaseCallback):
 
         if self.verbose:
             print(f"\n{'*'*60}")
-            print(f"[THRESHOLD MILESTONE] Phase {self.current_phase + 1} cleared!")
+            print(f"[THRESHOLD MILESTONE] Phase {self.current_phase} cleared!")
             print(f"  Win Rate : {win_rate:.1%} >= {config.WIN_RATE_THRESHOLD:.1%}")
             print(f"  Steps    : {self.num_timesteps:,}")
             print(f"  Saved    : {model_path}.zip")
@@ -337,7 +337,7 @@ class ManualCurriculumCallback(BaseCallback):
         Useful for monitoring from a REPL or interactive session.
         """
         print(f"\n{'─'*55}")
-        print(f"  Phase        : {self.current_phase + 1} / {len(config.CURRICULUM_PHASES)}")
+        print(f"  Phase        : {self.current_phase} / {len(config.CURRICULUM_PHASES) - 1}")
         print(f"  Timesteps    : {self.num_timesteps:,}")
         print(f"  Win Rate     : {self._win_rate():.1%}  "
               f"(buffer: {len(self.win_buffer)}/{config.WIN_RATE_WINDOW})")

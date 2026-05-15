@@ -38,7 +38,7 @@ def resume_training(model_path, vec_path,
 
     # Point training states to the restored phase (not config default)
     config.TRAINING_STATES = config.CURRICULUM_PHASES[restored_phase]
-    print(f"[Resume] Restoring to Phase {restored_phase + 1} "
+    print(f"[Resume] Restoring to Phase {restored_phase} "
           f"with states: {config.TRAINING_STATES}")
     
     # 1. Boot Parallel Emulators
@@ -95,7 +95,7 @@ def resume_training(model_path, vec_path,
         if restored_phase > 0:
             try:
                 env.env_method("set_training_states", config.CURRICULUM_PHASES[restored_phase])
-                print(f"[Resume] States broadcast to all {config.N_ENVS} workers -> Phase {restored_phase + 1}")
+                print(f"[Resume] States broadcast to all {config.N_ENVS} workers -> Phase {restored_phase}")
             except Exception as e:
                 print(f"[Resume][WARN] Could not broadcast states to workers: {e}")
                 

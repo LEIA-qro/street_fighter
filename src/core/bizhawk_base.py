@@ -27,7 +27,7 @@ class BizHawkBaseEnv(gym.Env):
         # Debugging
         self.debug_mode = debug_mode
         self.step_count = 0
-        self.step_debug_interval = 100  # Print debug info every N steps
+        self.step_debug_interval = 10000  # Print debug info every N steps
 
         # When initialized, start the emulator and establish the socket connection
         self._start_emulator_bridge()

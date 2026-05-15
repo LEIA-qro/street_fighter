@@ -1,5 +1,5 @@
 import os
-from stable_baselines3 import PPO
+from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from core import config
@@ -7,11 +7,11 @@ from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
-from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
+from agents.sac.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE
 
-class PPOAgent(BaseAgent):
+class SACAgent(BaseAgent):
     def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase=0, lr=0.0, ent_coef=0.0, clip_range=0.0):
-        print(f"[Training] Initializing Curriculum Production Training in {save_dir}...")
+        print(f"[Training] Initializing SAC Curriculum Production Training in {save_dir}...")
         
         if load_zip and load_zip != "None":
             print(f"[Training] Loading model from: {load_zip}")
@@ -21,22 +21,36 @@ class PPOAgent(BaseAgent):
         config.TRAINING_STATES = config.CURRICULUM_PHASES[start_phase]
         n_envs = config.N_ENVS
         
-        # Base phase params
         phase_params = PHASE_HYPERPARAMS[start_phase].copy()
         
-        # Apply Overrides from Dashboard if provided (> 0.0)
         active_lr = lr if lr > 0.0 else phase_params["lr"]
-        active_ent = ent_coef if ent_coef > 0.0 else phase_params["ent_coef"]
-        active_clip = clip_range if clip_range > 0.0 else phase_params["clip"]
+        active_ent = ent_coef if ent_coef > 0.0 else "auto"
+        active_tau = phase_params["tau"]
         
         env = None
         model = None
         directories = config.get_directory()
         
         try:
-            env = SubprocVecEnv([env_fn(i) for i in range(n_envs)])
+            from gymnasium import ActionWrapper, spaces
+            import numpy as np
+
+            class ContinuousToMultiBinaryWrapper(ActionWrapper):
+                def __init__(self, env):
+                    super().__init__(env)
+                    self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(env.action_space.shape[0],), dtype=np.float32)
+
+                def action(self, action):
+                    return (action > 0.0).astype(np.int8)
+
+            def make_sac_env(rank):
+                original_init = env_fn(rank)
+                def _init():
+                    return ContinuousToMultiBinaryWrapper(original_init())
+                return _init
+
+            env = SubprocVecEnv([make_sac_env(i) for i in range(n_envs)])
             
-            # Broadcast the target phase states to all workers (fixes multiprocessing inheritance bug)
             if start_phase > 0:
                 try:
                     env.env_method("set_training_states", config.CURRICULUM_PHASES[start_phase])
@@ -53,25 +67,23 @@ class PPOAgent(BaseAgent):
                                              n_frames=config.NUM_FRAMES)
 
             if load_zip and load_zip != "None":
-                model = PPO.load(
+                model = SAC.load(
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
                     device="cuda",
-                    custom_objects={"learning_rate": active_lr, "clip_range": active_clip, "ent_coef": active_ent}
+                    custom_objects={"learning_rate": active_lr, "tau": active_tau, "ent_coef": active_ent}
                 )
             else:
-                model = PPO(
+                model = SAC(
                     policy="MlpPolicy",
                     env=env,
                     learning_rate=active_lr,
-                    n_steps=N_STEPS,
+                    buffer_size=BUFFER_SIZE,
                     batch_size=BATCH_SIZE,
+                    tau=active_tau,
                     ent_coef=active_ent,
-                    clip_range=active_clip,
-                    n_epochs=10,
                     gamma=0.99,
-                    target_kl=0.03,
-                    policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
+                    policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], qf=[512, 512, 256])),
                     verbose=1,
                     tensorboard_log=directories["logs"],
                     device="cuda"
@@ -115,12 +127,12 @@ class PPOAgent(BaseAgent):
     def resume(self):
         pass
 
-    def tune(self, env_fn, n_trials, study_name="ppo_sf2_tuning", load_zip=None, load_pkl=None, start_phase=0, timesteps=50000):
+    def tune(self, env_fn, n_trials, study_name="sac_sf2_tuning", load_zip=None, load_pkl=None, start_phase=0, timesteps=50000):
         import optuna
-        from agents.ppo.optuna_study import objective
+        from agents.sac.optuna_study import objective
         
         directories = config.get_directory()
-        db_path = os.path.abspath(os.path.join(directories["tuning"], "ppo_study.db"))
+        db_path = os.path.abspath(os.path.join(directories["tuning"], "sac_study.db"))
         storage_url = f"sqlite:///{db_path}"
         
         print(f"[Tuning] Starting Optuna Study: {study_name}")

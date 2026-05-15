@@ -133,20 +133,25 @@ def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, tria
 def get_best_tuning_params(study_name):
     # Execute a subprocess using the VENV python to guarantee optuna is found
     db_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", "ppo_study.db").replace("\\", "/")
-    script = f"""import optuna
+    json_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", f"best_params_{study_name}.json").replace("\\", "/")
+    script = f"""import optuna, json
 try:
     study = optuna.load_study(study_name='{study_name}', storage='sqlite:///{db_path}')
     print(f'Best Trial: {{study.best_trial.number}}')
     print(f'Value: {{study.best_value}}')
     print(f'Params: {{study.best_params}}')
+    with open('{json_path}', 'w') as f:
+        json.dump(study.best_params, f, indent=4)
 except Exception as e:
     print(f'Error: {{e}}')"""
     
     try:
         result = subprocess.check_output([VENV_PYTHON, "-c", script], text=True, stderr=subprocess.STDOUT)
-        return result
+        if os.path.exists(json_path):
+            return result, json_path
+        return result, None
     except Exception as e:
-        return f"Subprocess execution error: {e}"
+        return f"Subprocess execution error: {e}", None
 
 def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr, ent_coef, clip_range):
     update_config_var("MODEL_NAME", model_name)
@@ -204,7 +209,7 @@ def save_all_config(n_envs, win_rate, steps, port):
 
 zips_init, pkls_init = get_model_files()
 
-with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(primary_hue="blue")) as demo:
+with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(primary_hue="blue"), css="#terminal textarea { font-family: monospace; }") as demo:
     gr.Markdown("# 🕹️ Street Fighter II RL Control Center")
     
     with gr.Tabs():
@@ -225,8 +230,17 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                         # Section A: Production
                         with gr.Tab("🚀 Production Training"):
                             model_name_input = gr.Textbox(label="New Model Name", value=config.MODEL_NAME)
-                            train_zip_drop = gr.Dropdown(label="Base Model (.zip)", choices=zips_init, value="None")
-                            train_pkl_drop = gr.Dropdown(label="Base Norm (.pkl)", choices=pkls_init, value="None")
+                            
+                            with gr.Row():
+                                train_zip_drop = gr.Dropdown(label="Base Model (.zip)", choices=zips_init, value="None")
+                                train_pkl_drop = gr.Dropdown(label="Base Norm (.pkl)", choices=pkls_init, value="None")
+                            
+                            with gr.Accordion("Upload External Models", open=False):
+                                gr.Markdown("*(Upload files here to add them to the dropdowns above)*")
+                                with gr.Row():
+                                    ext_zip_upload = gr.File(label="Upload Model (.zip)", file_types=[".zip"])
+                                    ext_pkl_upload = gr.File(label="Upload Normalization (.pkl)", file_types=[".pkl"])
+                                upload_status = gr.Markdown("")
                             with gr.Row():
                                 train_phase_drop = gr.Dropdown(label="Start Phase", choices=[0, 1, 2, 3], value=0)
                                 train_steps = gr.Number(label="Total Timesteps", value=1000000, precision=0)
@@ -236,6 +250,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                                 train_lr = gr.Number(label="Learning Rate Override", value=0.0)
                                 train_ent = gr.Number(label="Entropy Coef Override", value=0.0)
                                 train_clip = gr.Number(label="Clip Range Override", value=0.0)
+                                
+                                upload_json = gr.File(label="Upload Hyperparameters JSON", file_types=[".json"])
+                                readonly_params = gr.JSON(label="Fixed / Read-Only Hyperparameters")
                             
                             start_train_btn = gr.Button("▶ Start Training", variant="primary")
                         
@@ -254,11 +271,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                                 start_tune_btn = gr.Button("🚀 Start Tuning", variant="primary")
                                 get_results_btn = gr.Button("🔍 Fetch Best Results")
                             best_params_output = gr.Textbox(label="Best Hyperparameters", interactive=False)
+                            download_json = gr.File(label="Download Best Hyperparameters", interactive=False)
 
                     gr.Markdown("---")
                     with gr.Row():
                         stop_btn = gr.Button("🛑 Stop All Processes", variant="stop")
                         refresh_files_btn = gr.Button("🔄 Refresh Dropdown Models")
+                        copy_btn = gr.Button("📋 Copy Console Output")
 
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
@@ -269,12 +288,60 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                 z, p = get_model_files()
                 return gr.Dropdown(choices=z), gr.Dropdown(choices=p), gr.Dropdown(choices=z), gr.Dropdown(choices=p)
 
-            start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip], outputs=[unified_logs])
+            def load_hyperparams_from_json(file_path):
+                if file_path is None:
+                    return 0.0, 0.0, 0.0, {}
+                import json
+                try:
+                    with open(file_path.name if hasattr(file_path, "name") else file_path, "r") as f:
+                        data = json.load(f)
+                    
+                    lr = data.pop("lr", 0.0)
+                    ent = data.pop("ent_coef", 0.0)
+                    clip = data.pop("clip_range", 0.0)
+                    
+                    return lr, ent, clip, data
+                except Exception as e:
+                    return 0.0, 0.0, 0.0, {"error": f"Failed to parse JSON: {e}"}
+
+            def handle_external_upload(file_obj):
+                if file_obj is None:
+                    return ""
+                try:
+                    import shutil
+                    file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
+                    filename = os.path.basename(file_path)
+                    
+                    # Target directory is models/production/ppo
+                    target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", "ppo")
+                    os.makedirs(target_dir, exist_ok=True)
+                    
+                    dest_path = os.path.join(target_dir, filename)
+                    shutil.copy2(file_path, dest_path)
+                    return f"**Success:** Added `{filename}` to available models."
+                except Exception as e:
+                    return f"**Error:** Failed to upload file: {e}"
+
+            ext_zip_upload.upload(handle_external_upload, inputs=[ext_zip_upload], outputs=[upload_status]).then(
+                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            )
+            ext_pkl_upload.upload(handle_external_upload, inputs=[ext_pkl_upload], outputs=[upload_status]).then(
+                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            )
+
+            upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
+
+            start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip], outputs=[unified_logs]).then(
+                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            )
             
-            start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs])
-            get_results_btn.click(get_best_tuning_params, inputs=[study_name_input], outputs=[best_params_output])
+            start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs]).then(
+                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            )
+            get_results_btn.click(get_best_tuning_params, inputs=[study_name_input], outputs=[best_params_output, download_json])
             
             stop_btn.click(stop_active_process, outputs=[unified_logs])
+            copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); return text; }")
             refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop])
             tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
