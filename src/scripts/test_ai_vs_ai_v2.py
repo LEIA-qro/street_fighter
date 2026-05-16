@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, argparse
 from collections import deque
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -6,14 +6,14 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 import numpy as np
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC, DQN
 from stable_baselines3.common.vec_env import DummyVecEnv
 import gymnasium as gym
 from gymnasium import spaces
 
-import config
-from env_sf2_v2 import StreetFighterEnvV2, TOTAL_OBS_DIM
-from selective_norm import SelectiveVecNormalize
+from core import config
+from envs.sf2_v2 import StreetFighterEnvV2, TOTAL_OBS_DIM
+from core.selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
 
@@ -83,11 +83,30 @@ class _PerspectiveParser:
         self.prev_p2_x = self.env.prev_p2_x
 
         return obs
-    
+
+def get_model_class(algo_name):
+    if algo_name.lower() == "sac":
+        return SAC
+    elif algo_name.lower() == "dqn":
+        return DQN
+    return PPO
+
+def process_action(act, algo):
+    if algo.lower() == "sac":
+        bin_act = (act[0] > 0.0).astype(np.int8)
+        return "".join(str(b) for b in bin_act)
+    elif algo.lower() == "dqn":
+        val = act[0] if isinstance(act, np.ndarray) else act
+        return format(val, f'0{config.ACTION_DIM}b')
+    else:
+        return "".join(str(int(b)) for b in act[0])
+
 def test_ai_vs_ai():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--load_zip_p1", type=str, required=True)
     parser.add_argument("--load_pkl_p1", type=str, required=True)
+    parser.add_argument("--algo_p2", type=str, default="ppo")
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
     args = parser.parse_args()
@@ -125,16 +144,43 @@ def test_ai_vs_ai():
 
      # ── 5. Load models ──
     print(f"\nLoading Neural Networks...")
-    model_p1 = PPO.load(
-        os.path.join(config.PROJECT_ROOT, args.load_zip_p1),
-        device="cuda"
-    )
-    print("Player 1 loaded from:", args.load_zip_p1)
-    model_p2 = PPO.load(
-        os.path.join(config.PROJECT_ROOT, args.load_zip_p2),
-        device="cuda"
-    )
-    print("Player 2 loaded from:", args.load_zip_p2)
+    
+    def load_model_safely(algo, path, player_name):
+        ModelClass = get_model_class(algo)
+        custom_objs = {}
+        if algo.lower() in ["dqn", "sac"]:
+            custom_objs["buffer_size"] = 1  # Memory optimization: don't load the full replay buffer
+            
+        try:
+            model = ModelClass.load(
+                os.path.join(config.PROJECT_ROOT, path),
+                device="cuda",
+                custom_objects=custom_objs
+            )
+            print(f"{player_name} ({algo.upper()}) loaded from: {path}")
+            return model
+        except (AttributeError, TypeError, ValueError) as e:
+            err_msg = str(e)
+            # Detect common SB3 mismatch indicators
+            is_mismatch = any(keyword in err_msg for keyword in [
+                "unexpected keyword argument", 
+                "object has no attribute",
+                "missing 1 required positional argument"
+            ])
+            
+            if is_mismatch:
+                print(f"\n[CRITICAL ERROR] Failed to load {player_name} model.")
+                print(f"Algorithm '{algo.upper()}' is incompatible with the provided file: {path}")
+                print(f"Details: {err_msg}")
+            else:
+                print(f"\n[ERROR] Unexpected error loading {player_name}: {err_msg}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"\n[ERROR] Unexpected error loading {player_name}: {e}")
+            sys.exit(1)
+
+    model_p1 = load_model_safely(args.algo_p1, args.load_zip_p1, "Player 1")
+    model_p2 = load_model_safely(args.algo_p2, args.load_zip_p2, "Player 2")
 
     
     print(f"\n{('='*50)}")
@@ -163,12 +209,12 @@ def test_ai_vs_ai():
             act_p1, _ = model_p1.predict(norm_p1, deterministic=False)
             act_p2, _ = model_p2.predict(norm_p2, deterministic=False)
 
+            # Process action depending on algo
+            cmd_p1 = process_action(act_p1, args.algo_p1)
+            cmd_p2 = process_action(act_p2, args.algo_p2)
+
             # Build 20-bit command string
-            cmd = (
-                "".join(str(int(b)) for b in act_p1[0]) +
-                "".join(str(int(b)) for b in act_p2[0]) +
-                "\n"
-            )
+            cmd = cmd_p1 + cmd_p2 + "\n"
             master_env.send_command(cmd)
 
             # Receive next state and parse both perspectives

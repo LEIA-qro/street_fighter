@@ -105,7 +105,7 @@ class SelectiveVecNormalize(VecEnvWrapper):
         wrapper.running_mean = stats["running_mean"]
         wrapper.running_var  = stats["running_var"]
         wrapper.count        = stats["count"]
-        print(f"[SelectiveVecNormalize] Stats loaded ← {path}")
+        print(f"[SelectiveVecNormalize] Stats loaded <- {path}")
         return wrapper
     
 

@@ -114,43 +114,51 @@ while true do
         emu.frameadvance() 
     else
         -- Normal Step: Inject Inputs via 20-Bit Protocol
-        local input = {}
+        local p1_input = {}
+        local p2_input = {}
+        local p1_controlled = false
+        local p2_controlled = false
 
         -- If the string has at least 10 characters, parse Player 1
         if string.len(response) >= 10 then
-            if string.sub(response, 1, 1) == "1" then input["P1 Up"] = true end
-            if string.sub(response, 2, 2) == "1" then input["P1 Down"] = true end
-            if string.sub(response, 3, 3) == "1" then input["P1 Left"] = true end
-            if string.sub(response, 4, 4) == "1" then input["P1 Right"] = true end
-            if string.sub(response, 5, 5) == "1" then input["P1 A"] = true end
-            if string.sub(response, 6, 6) == "1" then input["P1 B"] = true end
-            if string.sub(response, 7, 7) == "1" then input["P1 C"] = true end
-            if string.sub(response, 8, 8) == "1" then input["P1 X"] = true end
-            if string.sub(response, 9, 9) == "1" then input["P1 Y"] = true end
-            if string.sub(response, 10, 10) == "1" then input["P1 Z"] = true end
+            local p1_cmd = string.sub(response, 1, 10)
+            if p1_cmd ~= ".........." then
+                p1_controlled = true
+                if string.sub(p1_cmd, 1, 1) == "1" then p1_input["Up"] = true end
+                if string.sub(p1_cmd, 2, 2) == "1" then p1_input["Down"] = true end
+                if string.sub(p1_cmd, 3, 3) == "1" then p1_input["Left"] = true end
+                if string.sub(p1_cmd, 4, 4) == "1" then p1_input["Right"] = true end
+                if string.sub(p1_cmd, 5, 5) == "1" then p1_input["A"] = true end
+                if string.sub(p1_cmd, 6, 6) == "1" then p1_input["B"] = true end
+                if string.sub(p1_cmd, 7, 7) == "1" then p1_input["C"] = true end
+                if string.sub(p1_cmd, 8, 8) == "1" then p1_input["X"] = true end
+                if string.sub(p1_cmd, 9, 9) == "1" then p1_input["Y"] = true end
+                if string.sub(p1_cmd, 10, 10) == "1" then p1_input["Z"] = true end
+            end
         end
 
         -- If the string has 20 characters, parse Player 2
         if string.len(response) >= 20 then
-            if string.sub(response, 11, 11) == "1" then input["P2 Up"] = true end
-            if string.sub(response, 12, 12) == "1" then input["P2 Down"] = true end
-            if string.sub(response, 13, 13) == "1" then input["P2 Left"] = true end
-            if string.sub(response, 14, 14) == "1" then input["P2 Right"] = true end
-            if string.sub(response, 15, 15) == "1" then input["P2 A"] = true end
-            if string.sub(response, 16, 16) == "1" then input["P2 B"] = true end
-            if string.sub(response, 17, 17) == "1" then input["P2 C"] = true end
-            if string.sub(response, 18, 18) == "1" then input["P2 X"] = true end
-            if string.sub(response, 19, 19) == "1" then input["P2 Y"] = true end
-            if string.sub(response, 20, 20) == "1" then input["P2 Z"] = true end
+            local p2_cmd = string.sub(response, 11, 20)
+            if p2_cmd ~= ".........." then
+                p2_controlled = true
+                if string.sub(p2_cmd, 1, 1) == "1" then p2_input["Up"] = true end
+                if string.sub(p2_cmd, 2, 2) == "1" then p2_input["Down"] = true end
+                if string.sub(p2_cmd, 3, 3) == "1" then p2_input["Left"] = true end
+                if string.sub(p2_cmd, 4, 4) == "1" then p2_input["Right"] = true end
+                if string.sub(p2_cmd, 5, 5) == "1" then p2_input["A"] = true end
+                if string.sub(p2_cmd, 6, 6) == "1" then p2_input["B"] = true end
+                if string.sub(p2_cmd, 7, 7) == "1" then p2_input["C"] = true end
+                if string.sub(p2_cmd, 8, 8) == "1" then p2_input["X"] = true end
+                if string.sub(p2_cmd, 9, 9) == "1" then p2_input["Y"] = true end
+                if string.sub(p2_cmd, 10, 10) == "1" then p2_input["Z"] = true end
+            end
         end
-        
-        -- We sleep the Start and Mode buttons to avoid the agent accidentally pausing or opening the menu
-        -- if string.sub(response, 11, 11) == "1" then input["P1 Start"] = true end
-        -- if string.sub(response, 12, 12) == "1" then input["P1 Mode"] = true end
         
         -- ACTION REPEAT: Hold the input and advance multiple frames
         for i = 1, FRAME_SKIP do
-            joypad.set(input)
+            if p1_controlled then joypad.set(p1_input, 1) end
+            if p2_controlled then joypad.set(p2_input, 2) end
             emu.frameadvance()
         end
     end

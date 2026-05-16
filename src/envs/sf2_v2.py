@@ -83,8 +83,9 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         try:
             # 1. Send Action via Parent Method
             action_string = "".join(str(int(b)) for b in action)
+            ignore_string = "." * config.ACTION_DIM
 
-            full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
+            full_command = (action_string + ignore_string + "\n") if self.player == 1 else (ignore_string + action_string + "\n")
             self.send_command(full_command)
             # 2. Receive State via Parent Method
             data = self.receive_payload()

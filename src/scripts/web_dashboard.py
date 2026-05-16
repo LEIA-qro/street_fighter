@@ -30,18 +30,58 @@ state = GlobalState()
 
 # --- Utility Functions ---
 
-def get_model_files():
-    """Scans models directory for zip and pkl files."""
+def refresh_dropdowns():
+    z, p = get_model_files()
+    return gr.Dropdown(choices=z, value="None"), gr.Dropdown(choices=p, value="None"), gr.Dropdown(choices=z, value="None"), gr.Dropdown(choices=p, value="None")
+
+def load_hyperparams_from_json(file_path):
+    if file_path is None:
+        return 0.0, 0.0, 0.0, {}
+    import json
+    try:
+        with open(file_path.name if hasattr(file_path, "name") else file_path, "r") as f:
+            data = json.load(f)
+        
+        lr = data.pop("lr", 0.0)
+        ent = data.pop("ent_coef", 0.0)
+        clip = data.pop("clip_range", 0.0)
+        
+        return lr, ent, clip, data
+    except Exception as e:
+        return 0.0, 0.0, 0.0, {"error": f"Failed to parse JSON: {e}"}
+
+def get_model_files(algo=None):
+    """Scans models directory for zip and pkl files, optionally filtering by algorithm."""
     models_dir = os.path.join(config.PROJECT_ROOT, "models")
     if not os.path.exists(models_dir):
         return ["None"], ["None"]
     
-    zip_files = glob.glob(os.path.join(models_dir, "**/*.zip"), recursive=True)
-    pkl_files = glob.glob(os.path.join(models_dir, "**/*.pkl"), recursive=True)
+    # If algorithm is specified, narrow the search scope
+    if algo:
+        search_dirs = [
+            os.path.join(models_dir, "production", algo),
+            os.path.join(models_dir, "tuning", algo)
+        ]
+        # Also include root models directory if we want a global fallback
+        search_dirs.append(models_dir)
+        
+        zip_files = []
+        pkl_files = []
+        for d in search_dirs:
+            if os.path.exists(d):
+                # Look for files matching the algo in name or directory
+                all_zips = glob.glob(os.path.join(d, "**/*.zip"), recursive=True)
+                all_pkls = glob.glob(os.path.join(d, "**/*.pkl"), recursive=True)
+                
+                zip_files.extend([f for f in all_zips if algo.lower() in f.lower()])
+                pkl_files.extend([f for f in all_pkls if algo.lower() in f.lower()])
+    else:
+        zip_files = glob.glob(os.path.join(models_dir, "**/*.zip"), recursive=True)
+        pkl_files = glob.glob(os.path.join(models_dir, "**/*.pkl"), recursive=True)
     
-    # Return relative paths with forward slashes
-    zips = sorted([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in zip_files])
-    pkls = sorted([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in pkl_files])
+    # Remove duplicates and return relative paths with forward slashes
+    zips = sorted(list(set([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in zip_files])))
+    pkls = sorted(list(set([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in pkl_files])))
     
     return ["None"] + zips, ["None"] + pkls
 
@@ -120,6 +160,10 @@ def update_config_var(key, value):
 # --- Dashboard Tab Handlers ---
 
 def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials):
+    # Store in models/tuning/{algo}/
+    tuning_dir = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo)
+    os.makedirs(tuning_dir, exist_ok=True)
+    
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "tune.py"), 
            "--algo", algo, "--env", env, "--study_name", study_name, 
            "--trials", str(trials), "--phase", str(phase), "--timesteps", str(timesteps)]
@@ -130,10 +174,10 @@ def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, tria
     for log in stream_logs(cmd):
         yield log
 
-def get_best_tuning_params(study_name):
-    # Execute a subprocess using the VENV python to guarantee optuna is found
-    db_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", "ppo_study.db").replace("\\", "/")
-    json_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", f"best_params_{study_name}.json").replace("\\", "/")
+def get_best_tuning_params(algo, study_name):
+    # Resolve storage path based on algorithm
+    db_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo, "study.db").replace("\\", "/")
+    json_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo, f"best_params_{study_name}.json").replace("\\", "/")
     script = f"""import optuna, json
 try:
     study = optuna.load_study(study_name='{study_name}', storage='sqlite:///{db_path}')
@@ -175,15 +219,26 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(mode, p1_zip, p1_pkl, p2_zip, p2_pkl):
-    if mode == "AI vs AI":
+def run_matchup(p1_algo, p1_zip, p1_pkl, p2_algo, p2_zip, p2_pkl):
+    ai_algos = ["ppo", "sac", "dqn"]
+    p1_is_ai = p1_algo in ai_algos
+    p2_is_ai = p2_algo in ai_algos
+
+    if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
-               "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl,
-               "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl]
-    else:
-        player = 1 if mode == "AI vs CPU (P1)" else 2
+               "--algo_p1", p1_algo, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl,
+               "--algo_p2", p2_algo, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl]
+    elif p1_is_ai:
+        # P1 is AI, P2 is Player or CPU
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--load_zip", p1_zip, "--load_pkl", p1_pkl, "--player", str(player)]
+               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, "--player", "1"]
+    elif p2_is_ai:
+        # P2 is AI, P1 is Player
+        cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
+               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, "--player", "2"]
+    else:
+        yield "Invalid Matchup: At least one player must be an AI model (PPO, SAC, or DQN)."
+        return
         
     for log in stream_logs(cmd):
         yield log
@@ -235,12 +290,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                                 train_zip_drop = gr.Dropdown(label="Base Model (.zip)", choices=zips_init, value="None")
                                 train_pkl_drop = gr.Dropdown(label="Base Norm (.pkl)", choices=pkls_init, value="None")
                             
-                            with gr.Accordion("Upload External Models", open=False):
-                                gr.Markdown("*(Upload files here to add them to the dropdowns above)*")
-                                with gr.Row():
-                                    ext_zip_upload = gr.File(label="Upload Model (.zip)", file_types=[".zip"])
-                                    ext_pkl_upload = gr.File(label="Upload Normalization (.pkl)", file_types=[".pkl"])
-                                upload_status = gr.Markdown("")
+                            with gr.Row():
+                                ext_zip_upload = gr.File(label="Upload Model (.zip)", file_types=[".zip"])
+                                ext_pkl_upload = gr.File(label="Upload Normalization (.pkl)", file_types=[".pkl"])
+                            upload_status = gr.Markdown("")
+                            
                             with gr.Row():
                                 train_phase_drop = gr.Dropdown(label="Start Phase", choices=[0, 1, 2, 3], value=0)
                                 train_steps = gr.Number(label="Total Timesteps", value=1000000, precision=0)
@@ -258,9 +312,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                         
                         # Section B: Optuna
                         with gr.Tab("🧪 Optuna Tuning"):
-                            study_name_input = gr.Textbox(label="Study Name (Change to start a fresh search)", value="ppo_sf2_tuning")
-                            tune_zip_drop = gr.Dropdown(label="Base Model (.zip) [Optional]", choices=zips_init, value="None")
-                            tune_pkl_drop = gr.Dropdown(label="Base Norm (.pkl) [Optional]", choices=pkls_init, value="None")
+                            study_name_input = gr.Textbox(label="Study Name", value="ppo_sf2_tuning")
+                            with gr.Row():
+                                tune_zip_drop = gr.Dropdown(label="Base Model (.zip) [Optional]", choices=zips_init, value="None")
+                                tune_pkl_drop = gr.Dropdown(label="Base Norm (.pkl) [Optional]", choices=pkls_init, value="None")
                             
                             with gr.Row():
                                 tune_phase_drop = gr.Dropdown(label="Start Phase", choices=[0, 1, 2, 3], value=0)
@@ -277,56 +332,45 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     with gr.Row():
                         stop_btn = gr.Button("🛑 Stop All Processes", variant="stop")
                         refresh_files_btn = gr.Button("🔄 Refresh Dropdown Models")
-                        copy_btn = gr.Button("📋 Copy Console Output")
 
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
-                    unified_logs = gr.Textbox(label="Console Output", lines=35, max_lines=45, interactive=False, elem_id="terminal")
+                    unified_logs = gr.Textbox(label="Console Output", show_copy_button=True, lines=35, max_lines=45, interactive=False, elem_id="terminal")
             
-            # Interactions
-            def refresh_dropdowns():
-                z, p = get_model_files()
-                return gr.Dropdown(choices=z), gr.Dropdown(choices=p), gr.Dropdown(choices=z), gr.Dropdown(choices=p)
+            # Algorithm change logic
+            def update_ui_on_algo(algo):
+                # Update zips and pkls
+                zips, pkls = get_model_files(algo)
+                
+                return (
+                    gr.update(choices=zips, value="None"), 
+                    gr.update(choices=pkls, value="None"),
+                    gr.update(choices=zips, value="None"), 
+                    gr.update(choices=pkls, value="None"),
+                    gr.update(value=f"{algo}_sf2_tuning")
+                )
+            
+            algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input])
 
-            def load_hyperparams_from_json(file_path):
-                if file_path is None:
-                    return 0.0, 0.0, 0.0, {}
-                import json
-                try:
-                    with open(file_path.name if hasattr(file_path, "name") else file_path, "r") as f:
-                        data = json.load(f)
-                    
-                    lr = data.pop("lr", 0.0)
-                    ent = data.pop("ent_coef", 0.0)
-                    clip = data.pop("clip_range", 0.0)
-                    
-                    return lr, ent, clip, data
-                except Exception as e:
-                    return 0.0, 0.0, 0.0, {"error": f"Failed to parse JSON: {e}"}
-
-            def handle_external_upload(file_obj):
-                if file_obj is None:
-                    return ""
+            # Upload handler
+            def handle_upload(file_obj, algo):
+                if file_obj is None: return "Please select a file."
                 try:
                     import shutil
                     file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
                     filename = os.path.basename(file_path)
-                    
-                    # Target directory is models/production/ppo
-                    target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", "ppo")
+                    target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", algo)
                     os.makedirs(target_dir, exist_ok=True)
-                    
-                    dest_path = os.path.join(target_dir, filename)
-                    shutil.copy2(file_path, dest_path)
-                    return f"**Success:** Added `{filename}` to available models."
-                except Exception as e:
-                    return f"**Error:** Failed to upload file: {e}"
+                    shutil.copy2(file_path, os.path.join(target_dir, filename))
+                    return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
+                except Exception as e: return f"**Error:** {e}"
 
-            ext_zip_upload.upload(handle_external_upload, inputs=[ext_zip_upload], outputs=[upload_status]).then(
-                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            # Link uploaders
+            ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel], outputs=[upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
             )
-            ext_pkl_upload.upload(handle_external_upload, inputs=[ext_pkl_upload], outputs=[upload_status]).then(
-                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
+            ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel], outputs=[upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
             )
 
             upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
@@ -338,10 +382,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
             start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs]).then(
                 refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
             )
-            get_results_btn.click(get_best_tuning_params, inputs=[study_name_input], outputs=[best_params_output, download_json])
+            get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
             
             stop_btn.click(stop_active_process, outputs=[unified_logs])
-            copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); return text; }")
             refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop])
             tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
@@ -349,22 +392,37 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
         with gr.Tab("🎮 Model Testing & Matchups"):
             with gr.Row():
                 with gr.Column():
-                    match_mode = gr.Radio(["AI vs CPU (P1)", "AI vs Player (P2 AI)", "AI vs AI"], label="Match Mode", value="AI vs AI")
-                    
                     gr.Markdown("### Player 1 (Ryu)")
+                    p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
                     p1_zip = gr.Dropdown(label="P1 Model (.zip)", choices=zips_init, value="None")
                     p1_pkl = gr.Dropdown(label="P1 Normalization (.pkl)", choices=pkls_init, value="None")
                     
                     gr.Markdown("### Player 2 (Opponent)")
+                    p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
                     p2_zip = gr.Dropdown(label="P2 Model (.zip)", choices=zips_init, value="None")
                     p2_pkl = gr.Dropdown(label="P2 Normalization (.pkl)", choices=pkls_init, value="None")
                     
-                    launch_match_btn = gr.Button("⚔️ Launch Match", variant="primary")
+                    with gr.Row():
+                        launch_match_btn = gr.Button("⚔️ Launch Match", variant="primary")
+                        stop_match_btn = gr.Button("🛑 Terminate Match", variant="stop")
                 
                 with gr.Column():
-                    match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False)
+                    match_logs = gr.Textbox(label="Match Console", show_copy_button=True, lines=25, max_lines=35, interactive=False, elem_id="terminal")
             
-            launch_match_btn.click(run_matchup, inputs=[match_mode, p1_zip, p1_pkl, p2_zip, p2_pkl], outputs=[match_logs])
+            # Interactive visibility toggles
+            def toggle_p1_viz(algo):
+                vis = algo in ["ppo", "sac", "dqn"]
+                return gr.update(visible=vis), gr.update(visible=vis)
+            
+            def toggle_p2_viz(algo):
+                vis = algo in ["ppo", "sac", "dqn"]
+                return gr.update(visible=vis), gr.update(visible=vis)
+
+            p1_algo.change(toggle_p1_viz, inputs=[p1_algo], outputs=[p1_zip, p1_pkl])
+            p2_algo.change(toggle_p2_viz, inputs=[p2_algo], outputs=[p2_zip, p2_pkl])
+
+            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p2_algo, p2_zip, p2_pkl], outputs=[match_logs])
+            stop_match_btn.click(stop_active_process, outputs=[match_logs])
 
         # --- TAB 3: CONFIG ---
         with gr.Tab("⚙️ Core Config Editor"):
