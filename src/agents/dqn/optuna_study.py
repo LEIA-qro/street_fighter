@@ -8,9 +8,6 @@ from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 
 def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning_timesteps=50000):
-    # Ensure start_phase is an integer for list indexing
-    start_phase = int(start_phase)
-
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.95, 0.9999, log=True)
     exploration_fraction = trial.suggest_float("exploration_fraction", 0.05, 0.2)
