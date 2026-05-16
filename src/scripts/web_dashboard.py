@@ -32,7 +32,9 @@ state = GlobalState()
 
 def refresh_dropdowns():
     z, p = get_model_files()
-    return gr.Dropdown(choices=z, value="None"), gr.Dropdown(choices=p, value="None"), gr.Dropdown(choices=z, value="None"), gr.Dropdown(choices=p, value="None")
+    upd_z = gr.update(choices=z, value="None")
+    upd_p = gr.update(choices=p, value="None")
+    return upd_z, upd_p, upd_z, upd_p, upd_z, upd_p, upd_z, upd_p
 
 def load_hyperparams_from_json(file_path):
     if file_path is None:
@@ -260,6 +262,18 @@ def save_all_config(n_envs, win_rate, steps, port):
         return "✅ Configuration saved successfully!"
     return "❌ Error: Some variables could not be found in config.py"
 
+def handle_upload(file_obj, algo):
+    if file_obj is None: return "Please select a file."
+    try:
+        import shutil
+        file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
+        filename = os.path.basename(file_path)
+        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", algo)
+        os.makedirs(target_dir, exist_ok=True)
+        shutil.copy2(file_path, os.path.join(target_dir, filename))
+        return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
+    except Exception as e: return f"**Error:** {e}"
+
 # --- UI Construction ---
 
 zips_init, pkls_init = get_model_files()
@@ -336,57 +350,6 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
                     unified_logs = gr.Textbox(label="Console Output", show_copy_button=True, lines=35, max_lines=45, interactive=False, elem_id="terminal")
-            
-            # Algorithm change logic
-            def update_ui_on_algo(algo):
-                # Update zips and pkls
-                zips, pkls = get_model_files(algo)
-                
-                return (
-                    gr.update(choices=zips, value="None"), 
-                    gr.update(choices=pkls, value="None"),
-                    gr.update(choices=zips, value="None"), 
-                    gr.update(choices=pkls, value="None"),
-                    gr.update(value=f"{algo}_sf2_tuning")
-                )
-            
-            algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input])
-
-            # Upload handler
-            def handle_upload(file_obj, algo):
-                if file_obj is None: return "Please select a file."
-                try:
-                    import shutil
-                    file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
-                    filename = os.path.basename(file_path)
-                    target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", algo)
-                    os.makedirs(target_dir, exist_ok=True)
-                    shutil.copy2(file_path, os.path.join(target_dir, filename))
-                    return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
-                except Exception as e: return f"**Error:** {e}"
-
-            # Link uploaders
-            ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel], outputs=[upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
-            )
-            ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel], outputs=[upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
-            )
-
-            upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
-
-            start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip], outputs=[unified_logs]).then(
-                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
-            )
-            
-            start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs]).then(
-                refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop]
-            )
-            get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
-            
-            stop_btn.click(stop_active_process, outputs=[unified_logs])
-            refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop])
-            tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
         # --- TAB 2: MATCHUPS ---
         with gr.Tab("🎮 Model Testing & Matchups"):
@@ -394,32 +357,64 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                 with gr.Column():
                     gr.Markdown("### Player 1 (Ryu)")
                     p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
-                    p1_zip = gr.Dropdown(label="P1 Model (.zip)", choices=zips_init, value="None")
-                    p1_pkl = gr.Dropdown(label="P1 Normalization (.pkl)", choices=pkls_init, value="None")
+                    
+                    with gr.Column(visible=True) as p1_model_group:
+                        with gr.Row():
+                            p1_zip = gr.Dropdown(label="P1 Model (.zip)", choices=zips_init, value="None")
+                            p1_pkl = gr.Dropdown(label="P1 Normalization (.pkl)", choices=pkls_init, value="None")
+                        with gr.Row():
+                            p1_zip_upload = gr.File(label="Upload P1 Model (.zip)", file_types=[".zip"])
+                            p1_pkl_upload = gr.File(label="Upload P1 Normalization (.pkl)", file_types=[".pkl"])
                     
                     gr.Markdown("### Player 2 (Opponent)")
                     p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
-                    p2_zip = gr.Dropdown(label="P2 Model (.zip)", choices=zips_init, value="None")
-                    p2_pkl = gr.Dropdown(label="P2 Normalization (.pkl)", choices=pkls_init, value="None")
+                    
+                    with gr.Column(visible=True) as p2_model_group:
+                        with gr.Row():
+                            p2_zip = gr.Dropdown(label="P2 Model (.zip)", choices=zips_init, value="None")
+                            p2_pkl = gr.Dropdown(label="P2 Normalization (.pkl)", choices=pkls_init, value="None")
+                        with gr.Row():
+                            p2_zip_upload = gr.File(label="Upload P2 Model (.zip)", file_types=[".zip"])
+                            p2_pkl_upload = gr.File(label="Upload P2 Normalization (.pkl)", file_types=[".pkl"])
                     
                     with gr.Row():
                         launch_match_btn = gr.Button("⚔️ Launch Match", variant="primary")
                         stop_match_btn = gr.Button("🛑 Terminate Match", variant="stop")
+                    
+                    match_upload_status = gr.Markdown("")
                 
                 with gr.Column():
                     match_logs = gr.Textbox(label="Match Console", show_copy_button=True, lines=25, max_lines=35, interactive=False, elem_id="terminal")
             
-            # Interactive visibility toggles
-            def toggle_p1_viz(algo):
-                vis = algo in ["ppo", "sac", "dqn"]
-                return gr.update(visible=vis), gr.update(visible=vis)
-            
-            def toggle_p2_viz(algo):
-                vis = algo in ["ppo", "sac", "dqn"]
-                return gr.update(visible=vis), gr.update(visible=vis)
+            # Interactive visibility and filtering toggles
+            def update_match_ui(algo):
+                is_ai = algo in ["ppo", "sac", "dqn"]
+                if not is_ai:
+                    return gr.update(visible=False), gr.update(), gr.update()
+                
+                z, p = get_model_files(algo)
+                return (
+                    gr.update(visible=True),
+                    gr.update(choices=z, value="None"),
+                    gr.update(choices=p, value="None")
+                )
 
-            p1_algo.change(toggle_p1_viz, inputs=[p1_algo], outputs=[p1_zip, p1_pkl])
-            p2_algo.change(toggle_p2_viz, inputs=[p2_algo], outputs=[p2_zip, p2_pkl])
+            p1_algo.change(update_match_ui, inputs=[p1_algo], outputs=[p1_model_group, p1_zip, p1_pkl])
+            p2_algo.change(update_match_ui, inputs=[p2_algo], outputs=[p2_model_group, p2_zip, p2_pkl])
+
+            # Link matchup uploaders
+            p1_zip_upload.upload(handle_upload, inputs=[p1_zip_upload, p1_algo], outputs=[match_upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
+            )
+            p1_pkl_upload.upload(handle_upload, inputs=[p1_pkl_upload, p1_algo], outputs=[match_upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
+            )
+            p2_zip_upload.upload(handle_upload, inputs=[p2_zip_upload, p2_algo], outputs=[match_upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
+            )
+            p2_pkl_upload.upload(handle_upload, inputs=[p2_pkl_upload, p2_algo], outputs=[match_upload_status]).then(
+                lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
+            )
 
             launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p2_algo, p2_zip, p2_pkl], outputs=[match_logs])
             stop_match_btn.click(stop_active_process, outputs=[match_logs])
@@ -437,6 +432,47 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     cfg_status = gr.Markdown("")
             
             save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port], outputs=[cfg_status])
+
+    # --- GLOBAL EVENT HANDLERS ---
+    
+    # Algorithm change logic (Training Tab)
+    def update_ui_on_algo(algo):
+        # Update zips and pkls
+        zips, pkls = get_model_files(algo)
+        
+        return (
+            gr.update(choices=zips, value="None"), 
+            gr.update(choices=pkls, value="None"),
+            gr.update(choices=zips, value="None"), 
+            gr.update(choices=pkls, value="None"),
+            gr.update(value=f"{algo}_sf2_tuning")
+        )
+    
+    algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input])
+
+    # Link uploaders (Training Tab)
+    ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel], outputs=[upload_status]).then(
+        lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
+    )
+    ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel], outputs=[upload_status]).then(
+        lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
+    )
+
+    upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
+
+    # Global Process Handlers
+    start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip], outputs=[unified_logs]).then(
+        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
+    )
+    
+    start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs]).then(
+        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
+    )
+    get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
+    
+    stop_btn.click(stop_active_process, outputs=[unified_logs])
+    refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
+    tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
 if __name__ == "__main__":
     demo.queue().launch(server_name="0.0.0.0", server_port=7860)

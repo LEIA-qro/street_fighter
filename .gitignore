@@ -8,6 +8,7 @@ src/core/__pycache__/
 src/envs/__pycache__/
 src\agents\dqn\__pycache__/
 src\agents\sac\__pycache__/
+src\scripts\__pycache__
 
 /logs
 /models
