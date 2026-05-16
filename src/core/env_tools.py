@@ -6,8 +6,11 @@ import core.config as config
 
 
 def SFv2_make_env(rank, **kwargs):
+    version = kwargs.get("version", "v2")
+    player = kwargs.get("player", 1)
+    
     def _init():
-        env = StreetFighterEnvV2(rank=rank)
+        env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")
         os.makedirs(log_dir, exist_ok=True)
         return Monitor(env, filename=os.path.join(log_dir, "monitor.csv"))

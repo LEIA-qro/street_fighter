@@ -19,7 +19,7 @@ TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32
 class StreetFighterEnvV2(BizHawkBaseEnv):
     """Street Fighter II RL Environment with One-Hot Encoded Action IDs."""
     
-    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=True, player=1):
+    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=True, player=1, verbose=True):
         assigned_port = config.PORT + rank
 
         super().__init__(
@@ -29,7 +29,8 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             host=config.HOST,
             port=assigned_port,
             trainable=trainable,
-            debug_mode=debug_mode
+            debug_mode=debug_mode,
+            verbose=verbose
         )
         
         self.player = player  

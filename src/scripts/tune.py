@@ -11,6 +11,7 @@ from core import config
 from core.env_tools import SFv2_make_env
 
 def main():
+    config.generate_lua_config()
     parser = argparse.ArgumentParser(description="Street Fighter II RL Hyperparameter Tuning via Optuna")
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"], help="RL algorithm to tune")
     parser.add_argument("--env", default="v2", choices=["v1", "v2"], help="Environment version")
@@ -20,7 +21,7 @@ def main():
     # Advanced Tuning Settings
     parser.add_argument("--load_zip", type=str, default=None)
     parser.add_argument("--load_pkl", type=str, default=None)
-    parser.add_argument("--phase", type=int, default=0)
+    parser.add_argument("--phase", type=str, default="0")
     parser.add_argument("--timesteps", type=int, default=50000, help="Timesteps per trial")
     args = parser.parse_args()
 

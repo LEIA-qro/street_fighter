@@ -8,7 +8,7 @@ src/core/__pycache__/
 src/envs/__pycache__/
 src\agents\dqn\__pycache__/
 src\agents\sac\__pycache__/
-src\scripts\__pycache__
+src\scripts\__pycache__/
 
 /logs
 /models
@@ -27,4 +27,9 @@ lua/test2.lua
 gha-creds-*.json
 
 handoff.md
+GEMINI.md
 
+/src/agents/dqn/__pycache__
+/src/agents/sac/__pycache__
+/src/scripts/__pycache__
+/src/agents/sac/__pycache__

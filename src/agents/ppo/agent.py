@@ -10,7 +10,7 @@ from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 
 class PPOAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase=0, lr=0.0, ent_coef=0.0, clip_range=0.0):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0):
         print(f"[Training] Initializing Curriculum Production Training in {save_dir}...")
         
         if load_zip and load_zip != "None":
@@ -18,11 +18,28 @@ class PPOAgent(BaseAgent):
         if load_pkl and load_pkl != "None":
             print(f"[Training] Loading normalization from: {load_pkl}")
             
-        config.TRAINING_STATES = config.CURRICULUM_PHASES[start_phase]
+        # Handle different phase types
+        if start_phase == "RYU_ONLY":
+            config.TRAINING_STATES = config.RYU_ONLY_STATES
+            active_phase_idx = 0
+            print("[Training] Using RYU_ONLY states.")
+        elif start_phase == "CUSTOM":
+            config.TRAINING_STATES = config.CUSTOM_STATES if config.CUSTOM_STATES else config.AVAILABLE_STATES
+            active_phase_idx = 0
+            print(f"[Training] Using CUSTOM states ({len(config.TRAINING_STATES)} found).")
+        else:
+            try:
+                active_phase_idx = int(start_phase)
+                config.TRAINING_STATES = config.CURRICULUM_PHASES[active_phase_idx]
+            except (ValueError, IndexError):
+                print(f"[Training][WARN] Invalid phase {start_phase}. Defaulting to Phase 0.")
+                active_phase_idx = 0
+                config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
+
         n_envs = config.N_ENVS
         
         # Base phase params
-        phase_params = PHASE_HYPERPARAMS[start_phase].copy()
+        phase_params = PHASE_HYPERPARAMS[active_phase_idx].copy()
         
         # Apply Overrides from Dashboard if provided (> 0.0)
         active_lr = lr if lr > 0.0 else phase_params["lr"]
@@ -37,12 +54,11 @@ class PPOAgent(BaseAgent):
             env = SubprocVecEnv([env_fn(i) for i in range(n_envs)])
             
             # Broadcast the target phase states to all workers (fixes multiprocessing inheritance bug)
-            if start_phase > 0:
-                try:
-                    env.env_method("set_training_states", config.CURRICULUM_PHASES[start_phase])
-                    print(f"[Training] States broadcast to all {n_envs} workers -> Phase {start_phase}")
-                except Exception as e:
-                    print(f"[Training][WARN] Could not broadcast states to workers: {e}")
+            try:
+                env.env_method("set_training_states", config.TRAINING_STATES)
+                print(f"[Training] States broadcast to all {n_envs} workers.")
+            except Exception as e:
+                print(f"[Training][WARN] Could not broadcast states to workers: {e}")
                     
             if load_pkl and load_pkl != "None":
                 env = SelectiveVecNormalize.load(os.path.join(config.PROJECT_ROOT, load_pkl), env)
@@ -79,7 +95,7 @@ class PPOAgent(BaseAgent):
 
             callback = ManualCurriculumCallback(
                 save_path=save_dir,
-                start_phase=start_phase,
+                start_phase=active_phase_idx,
                 eval_interval=500,
                 save_interval=config.SAVE_FREQ_STEPS
             )
@@ -93,18 +109,20 @@ class PPOAgent(BaseAgent):
             )
             
             model.save(os.path.join(save_dir, config.MODEL_NAME + "_FINAL"))
-            env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_FINAL.pkl"))
+            if hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_FINAL.pkl"))
             print("\nProduction Training Complete!")
             
         except KeyboardInterrupt:
             print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
             if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_EMERGENCY"))
-            if env is not None: env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
+            if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
 
         except Exception as e:
             print(f"\n[CRITICAL ERROR] Training crashed: {e}")
             if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_CRASH_SAVE"))
-            if env is not None: env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
+            if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
+            if 'callback' in locals(): callback._save_phase_state()
+            raise e
 
         finally:
             failsafe_env(
@@ -115,7 +133,7 @@ class PPOAgent(BaseAgent):
     def resume(self):
         pass
 
-    def tune(self, env_fn, n_trials, study_name="ppo_sf2_tuning", load_zip=None, load_pkl=None, start_phase=0, timesteps=50000):
+    def tune(self, env_fn, n_trials, study_name="ppo_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000):
         import optuna
         from agents.ppo.optuna_study import objective
         

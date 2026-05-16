@@ -262,6 +262,23 @@ def save_all_config(n_envs, win_rate, steps, port):
         return "✅ Configuration saved successfully!"
     return "❌ Error: Some variables could not be found in config.py"
 
+def update_config_list(key, new_values):
+    """Updates a list variable in config.py."""
+    config_path = os.path.join(config.SRC_DIR, "core", "config.py")
+    with open(config_path, "r") as f:
+        content = f.read()
+
+    # Format list: ["a", "b", "c"]
+    formatted_list = "[" + ", ".join([f'"{v}"' for v in new_values]) + "]"
+    
+    pattern = rf"^({key}\s*=\s*)(.*?)(\s*(?:#.*)?)$"
+    if re.search(pattern, content, flags=re.MULTILINE):
+        content = re.sub(pattern, rf"\1{formatted_list}\3", content, flags=re.MULTILINE)
+        with open(config_path, "w") as f:
+            f.write(content)
+        return True
+    return False
+
 def handle_upload(file_obj, algo):
     if file_obj is None: return "Please select a file."
     try:
@@ -310,7 +327,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                             upload_status = gr.Markdown("")
                             
                             with gr.Row():
-                                train_phase_drop = gr.Dropdown(label="Start Phase", choices=[0, 1, 2, 3], value=0)
+                                train_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
                                 train_steps = gr.Number(label="Total Timesteps", value=1000000, precision=0)
                             
                             with gr.Accordion("Advanced Hyperparameters (Overrides Config)", open=False):
@@ -332,7 +349,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                                 tune_pkl_drop = gr.Dropdown(label="Base Norm (.pkl) [Optional]", choices=pkls_init, value="None")
                             
                             with gr.Row():
-                                tune_phase_drop = gr.Dropdown(label="Start Phase", choices=[0, 1, 2, 3], value=0)
+                                tune_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
                                 tune_steps = gr.Number(label="Timesteps per Trial", value=50000, precision=0)
                             trials_input = gr.Number(label="Number of Trials", value=10, precision=0)
                             
@@ -430,6 +447,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     
                     save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
                     cfg_status = gr.Markdown("")
+
+                with gr.Column():
+                    gr.Markdown("### 📂 State Management")
+                    state_upload = gr.File(label="Upload Custom Savestates (.State)", file_types=[".State"], file_count="multiple")
+                    state_upload_status = gr.Markdown("")
             
             save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port], outputs=[cfg_status])
 
@@ -445,10 +467,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
             gr.update(choices=pkls, value="None"),
             gr.update(choices=zips, value="None"), 
             gr.update(choices=pkls, value="None"),
-            gr.update(value=f"{algo}_sf2_tuning")
+            gr.update(value=f"{algo}_sf2_tuning"),
+            gr.update(value=f"{algo}_sf2_production")
         )
     
-    algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input])
+    algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input, model_name_input])
 
     # Link uploaders (Training Tab)
     ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel], outputs=[upload_status]).then(
@@ -473,6 +496,26 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
     stop_btn.click(stop_active_process, outputs=[unified_logs])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
+
+    def handle_state_upload(file_objs):
+        if not file_objs: return "No files selected."
+        import shutil
+        saved_names = []
+        for f in file_objs:
+            name = os.path.basename(f.name)
+            target = os.path.join(config.STATES_DIR, name)
+            shutil.copy2(f.name, target)
+            saved_names.append(name)
+        
+        # Update config.py
+        current_custom = list(config.CUSTOM_STATES)
+        new_custom = list(set(current_custom + saved_names))
+        if update_config_list("CUSTOM_STATES", new_custom):
+            importlib.reload(config)
+            return f"✅ Uploaded {len(saved_names)} states and updated CUSTOM_STATES registry."
+        return "❌ Error updating config.py CUSTOM_STATES list."
+
+    state_upload.upload(handle_state_upload, inputs=[state_upload], outputs=[state_upload_status])
 
 if __name__ == "__main__":
     demo.queue().launch(server_name="0.0.0.0", server_port=7860)

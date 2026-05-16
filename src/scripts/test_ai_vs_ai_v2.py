@@ -102,6 +102,7 @@ def process_action(act, algo):
         return "".join(str(int(b)) for b in act[0])
 
 def test_ai_vs_ai():
+    config.generate_lua_config()
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--load_zip_p1", type=str, required=True)

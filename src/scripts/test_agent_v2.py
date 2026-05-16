@@ -20,6 +20,7 @@ def get_model_class(algo_name):
     return PPO
 
 def test_agent():
+    config.generate_lua_config()
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="ppo")
     parser.add_argument("--load_zip", type=str, required=True)

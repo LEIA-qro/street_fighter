@@ -6,7 +6,7 @@ import time
 class BizHawkBaseEnv(gym.Env):
     """Universal Base Environment for BizHawk socket communication."""
     
-    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, trainable=True, debug_mode=False):
+    def __init__(self, bizhawk_path, rom_path, lua_path, host, port, trainable=True, debug_mode=False, verbose=True):
         super().__init__()
         # Initialization parameters
         self.bizhawk_path = bizhawk_path
@@ -15,6 +15,7 @@ class BizHawkBaseEnv(gym.Env):
         self.host = host
         self.port = port
         self.trainable = trainable
+        self.verbose = verbose
         
         # Internal state
         self.server_socket = None
@@ -45,9 +46,9 @@ class BizHawkBaseEnv(gym.Env):
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(1)
-        print(f"Python ML Server actively listening on {self.host}:{self.port}...")
+        if self.verbose: print(f"Python ML Server actively listening on {self.host}:{self.port}...")
         
-        print("Launching BizHawk as a subprocess...")
+        if self.verbose: print("Launching BizHawk as a subprocess...")
 
         # Base arguments
         launch_args = [
@@ -59,7 +60,7 @@ class BizHawkBaseEnv(gym.Env):
 
         # Only auto-inject the Lua script if we are training
         if self.trainable and self.lua_path:
-            print(f"Auto-loading training Lua script: {self.lua_path}")
+            if self.verbose: print(f"Auto-loading training Lua script: {self.lua_path}")
             launch_args.append(f"--lua={self.lua_path}")
             
         self.emulator_process = subprocess.Popen(launch_args)
@@ -79,7 +80,7 @@ class BizHawkBaseEnv(gym.Env):
         else:
             self.conn.settimeout(None) # Wait forever while human navigates menus
             
-        print(f"[Connection] Connection established with BizHawk at {addr}")
+        if self.verbose: print(f"[Connection] Connection established with BizHawk at {addr}")
             
 
     def send_command(self, command: str):
@@ -90,12 +91,12 @@ class BizHawkBaseEnv(gym.Env):
 
     
         except (ConnectionResetError, BrokenPipeError) as e:
-            print(f"[WARN] send_command failed in interactive mode: {e}")
+            if self.verbose: print(f"[WARN] send_command failed in interactive mode: {e}")
             if self.trainable:
                 raise RuntimeError(f"Socket broken during training: {e}")
             # Non-trainable (interactive) mode: log and continue
             else:
-                print(f"\n[Connection] Waiting for your Lua connection...")
+                if self.verbose: print(f"\n[Connection] Waiting for your Lua connection...")
 
 
     def receive_payload(self) -> str:
@@ -114,7 +115,7 @@ class BizHawkBaseEnv(gym.Env):
             return line
             
         except socket.timeout:
-            print("\n[FAILSAFE] Python timed out waiting for BizHawk. Forcing crash...")
+            if self.verbose: print("\n[FAILSAFE] Python timed out waiting for BizHawk. Forcing crash...")
             raise RuntimeError("BizHawk Socket Timeout")
             
         except (ConnectionResetError, ConnectionAbortedError):
@@ -122,7 +123,7 @@ class BizHawkBaseEnv(gym.Env):
 
     def close(self):
         """Clean teardown of network and subprocess."""
-        print("Closing Environment: Initiating graceful teardown...")
+        if self.verbose: print("Closing Environment: Initiating graceful teardown...")
         
         # 1. Send the Poison Pill to Lua
         if self.conn:
@@ -138,9 +139,9 @@ class BizHawkBaseEnv(gym.Env):
             try:
                 # Wait up to 3 seconds for BizHawk to close itself via client.exit()
                 self.emulator_process.wait(timeout=3)
-                print("BizHawk closed successfully.")
+                if self.verbose: print("BizHawk closed successfully.")
             except subprocess.TimeoutExpired:
                 # If it froze, execute a ruthless OS-level termination
-                print("BizHawk did not close in time. Terminating process...")
+                if self.verbose: print("BizHawk did not close in time. Terminating process...")
                 self.emulator_process.terminate()
         

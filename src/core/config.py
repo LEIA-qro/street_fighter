@@ -60,10 +60,6 @@ return config
         
     print(f"Generated Lua config at: {lua_config_path}")
 
-# Call the function before launching BizHawk
-generate_lua_config()
-
-
 
 # ===========================================================
 #                       Directories Creation
@@ -100,7 +96,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "sac_test_1" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "dqn_sf2_test_312" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
@@ -223,3 +219,5 @@ TRAINING_STATES = CURRICULUM_PHASES[0] # Global variable to be updated by the ca
 # Curriculum advancement gate
 WIN_RATE_THRESHOLD = 0.75
 WIN_RATE_WINDOW = 250
+
+CUSTOM_STATES = ["Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave7.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave9.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave4.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave3.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave5.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave0.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave1.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave8.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave6.State"]
