@@ -1,4 +1,5 @@
 import os
+import time
 from stable_baselines3 import DQN
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
@@ -109,6 +110,7 @@ class DQNAgent(BaseAgent):
 
             callback = ManualCurriculumCallback(
                 save_path=save_dir,
+                phase_hyperparams=PHASE_HYPERPARAMS,
                 start_phase=active_phase_idx,
                 eval_interval=500,
                 save_interval=config.SAVE_FREQ_STEPS
@@ -133,16 +135,15 @@ class DQNAgent(BaseAgent):
 
         except Exception as e:
             print(f"\n[CRITICAL ERROR] Training crashed: {e}")
-            if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_CRASH_SAVE"))
+            if model is not None: 
+                model.save(os.path.join(save_dir, config.MODEL_NAME + "_CRASH_SAVE"))
+                time.sleep(2) # Buffer for OS to finish disk write
             if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
             if 'callback' in locals(): callback._save_phase_state()
             raise e
 
         finally:
-            failsafe_env(
-                env=env if 'env' in dir() else None,
-                model=model if 'model' in dir() else None
-            )
+            failsafe_env(env=env, model=model)
 
     def resume(self):
         pass
@@ -151,8 +152,20 @@ class DQNAgent(BaseAgent):
         import optuna
         from agents.dqn.optuna_study import objective
         
+        # Determine if we should treat start_phase as an index or a special keyword
+        if start_phase not in ["RYU_ONLY", "CUSTOM"]:
+            try:
+                active_phase = int(start_phase)
+            except (ValueError, TypeError):
+                print(f"[Tuning][WARN] Non-integer start_phase '{start_phase}' detected. Falling back to Phase 0.")
+                active_phase = 0
+        else:
+            active_phase = start_phase
+
         directories = config.get_directory()
-        db_path = os.path.abspath(os.path.join(directories["tuning"], "dqn_study.db"))
+        tuning_dir = os.path.join(directories["tuning"], "dqn")
+        os.makedirs(tuning_dir, exist_ok=True)
+        db_path = os.path.abspath(os.path.join(tuning_dir, "study.db"))
         storage_url = f"sqlite:///{db_path}"
         
         print(f"[Tuning] Starting Optuna Study: {study_name}")
@@ -165,7 +178,7 @@ class DQNAgent(BaseAgent):
             load_if_exists=True
         )
         
-        study.optimize(lambda trial: objective(trial, env_fn, load_zip, load_pkl, start_phase, timesteps), n_trials=n_trials)
+        study.optimize(lambda trial: objective(trial, env_fn, load_zip, load_pkl, active_phase, timesteps), n_trials=n_trials)
         
         print("\n[Tuning] Complete!")
         print(f"Best Trial: {study.best_trial.number}")

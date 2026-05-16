@@ -127,9 +127,13 @@ class BizHawkBaseEnv(gym.Env):
         
         # 1. Send the Poison Pill to Lua
         if self.conn:
-            self.send_command("EXIT\n")
-            time.sleep(0.5) # Give Lua a fraction of a second to process the command
-            self.conn.close()
+            try:
+                self.send_command("EXIT\n")
+                time.sleep(0.5) # Give Lua a fraction of a second to process the command
+            except (ConnectionResetError, BrokenPipeError):
+                pass
+            finally:
+                self.conn.close()
             
         if self.server_socket:
             self.server_socket.close()
@@ -144,4 +148,10 @@ class BizHawkBaseEnv(gym.Env):
                 # If it froze, execute a ruthless OS-level termination
                 if self.verbose: print("BizHawk did not close in time. Terminating process...")
                 self.emulator_process.terminate()
+                try:
+                    self.emulator_process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    if self.verbose: print("Process still alive after terminate(). Forcing kill...")
+                    self.emulator_process.kill()
+                    self.emulator_process.wait()
         

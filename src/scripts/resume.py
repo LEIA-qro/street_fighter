@@ -8,13 +8,15 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecNormalize
 from stable_baselines3.common.monitor import Monitor
 
-import config
-from selective_norm import SelectiveVecNormalize
+from core import config
+from core.selective_norm import SelectiveVecNormalize
 from manual_curriculum_callback import ManualCurriculumCallback 
-from env_tools import failsafe_env, SFv2_make_env
+from core.env_tools import failsafe_env, SFv2_make_env
 
 directories = config.get_directory()
 
+
+from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 
 def resume_training(model_path, vec_path,
                     callback_class=None,
@@ -34,7 +36,7 @@ def resume_training(model_path, vec_path,
     # --- RESTORE CURRICULUM STATE ---
     phase_state = ManualCurriculumCallback.load_state(directories["production"])
     restored_phase = start_phase if start_phase is not None else phase_state["current_phase"]
-    phase_params   = config.PHASE_HYPERPARAMS[restored_phase]
+    phase_params   = PHASE_HYPERPARAMS[restored_phase]
 
     # Point training states to the restored phase (not config default)
     config.TRAINING_STATES = config.CURRICULUM_PHASES[restored_phase]
@@ -78,6 +80,7 @@ def resume_training(model_path, vec_path,
         # model.n_epochs = 10      
         callback = callback_class(
             save_path=directories["production"],
+            phase_hyperparams=PHASE_HYPERPARAMS,
             start_phase=restored_phase,   # <-- The fix
             eval_interval=500,
             save_interval=config.SAVE_FREQ_STEPS

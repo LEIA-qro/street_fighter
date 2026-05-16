@@ -40,11 +40,12 @@ import core.config as config
 class ManualCurriculumCallback(BaseCallback):
     MAX_CHECKPOINTS_TO_KEEP = 3
 
-    def __init__(self, save_path: str, verbose: int = 1, start_phase: int = 0, 
+    def __init__(self, save_path: str, phase_hyperparams: dict, verbose: int = 1, start_phase: int = 0, 
                  eval_interval: int = 500, save_interval: int = None):
         
         super().__init__(verbose)
         self.save_path = save_path
+        self.phase_hyperparams = phase_hyperparams
         self.current_phase = start_phase
         self.eval_interval = eval_interval
         self.save_interval = save_interval if save_interval is not None else config.SAVE_FREQ_STEPS
@@ -164,21 +165,32 @@ class ManualCurriculumCallback(BaseCallback):
  
     def _apply_phase_hyperparams(self, phase_idx: int):
         """Push LR / ent_coef / clip_range from config into the live model."""
-        params = config.PHASE_HYPERPARAMS[phase_idx]
-        lr    = params["lr"]
-        ent   = params["ent_coef"]
-        clip  = params["clip"]
- 
-        self.model.learning_rate = lambda _: lr
-        self.model.clip_range    = lambda _: clip
-        self.model.ent_coef      = ent
- 
-        for pg in self.model.policy.optimizer.param_groups:
-            pg["lr"] = lr
+        params = self.phase_hyperparams[phase_idx]
+        
+        # 1. Learning Rate (Universal across SB3)
+        if "lr" in params:
+            lr = params["lr"]
+            self.model.learning_rate = lambda _: lr
+            for pg in self.model.policy.optimizer.param_groups:
+                pg["lr"] = lr
+
+        # 2. Entropy Coefficient (PPO/SAC)
+        if "ent_coef" in params and hasattr(self.model, "ent_coef"):
+            self.model.ent_coef = params["ent_coef"]
+
+        # 3. Clip Range (PPO)
+        if "clip" in params and hasattr(self.model, "clip_range"):
+            clip = params["clip"]
+            self.model.clip_range = lambda _: clip
+
+        # 4. Tau (SAC)
+        if "tau" in params and hasattr(self.model, "tau"):
+            self.model.tau = params["tau"]
  
         if self.verbose:
-            print(f"[ManualCurriculum] Hyperparams applied -> "
-                  f"LR={lr:.2e} | ent_coef={ent:.4f} | clip={clip:.3f}")
+            log_parts = [f"{k}={v:.2e}" if isinstance(v, (float, np.float32, np.float64)) else f"{k}={v}" 
+                        for k, v in params.items()]
+            print(f"[ManualCurriculum] Hyperparams applied -> {' | '.join(log_parts)}")
 
     # ------------------------------------------------------------------
     # Phase state persistence

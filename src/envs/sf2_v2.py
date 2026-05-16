@@ -120,11 +120,10 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         if damage_dealt > damage_clamp: damage_dealt = 0
         if damage_taken > damage_clamp: damage_taken = 0
 
-        # Footsie Spacing Reward 
+        # Footsie Spacing Reward
         # P1_X is usually at index 2, P2_X at index 3 in your cont_obs
         rel_dist = abs(observation[2] - observation[3])
-        dist_reward = 0.005 if 70 <= rel_dist <= 150 else 0.0
-
+        dist_reward = 0.05 if 70 <= rel_dist <= 150 else 0.0
         # THE GRANDMASTER REWARD FUNCTION
         # +1.0x for Damage Dealt (Aggression)
         # -0.25x for Damage Taken (Self-Preservation / Blocking)
@@ -156,11 +155,26 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         super().reset(seed=seed)
         
         try:
-            # Random Domain Selection
+            # SANITY CHECK: Ensure we have states to pick from. 
+            # If empty (due to sync failure), fallback to Phase 0.
+            if not self.active_training_states:
+                print(f"[Rank {self.port - config.PORT}][WARN] active_training_states is empty! Falling back to CURRICULUM_PHASES[0].")
+                self.active_training_states = config.CURRICULUM_PHASES[0]
+
             # Phase selection
             chosen_state_file = random.choice(self.active_training_states)
-            full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
+            full_state_path = os.path.normpath(os.path.join(config.STATES_DIR, chosen_state_file))
             
+            if not os.path.exists(full_state_path):
+                print(f"[Rank {self.port - config.PORT}][ERROR] State file missing: {full_state_path}")
+                # Fallback to the first available state in the directory if possible
+                all_states = [f for f in os.listdir(config.STATES_DIR) if f.endswith(".State")]
+                if all_states:
+                    chosen_state_file = all_states[0]
+                    full_state_path = os.path.normpath(os.path.join(config.STATES_DIR, chosen_state_file))
+                else:
+                    raise FileNotFoundError(f"No .State files found in {config.STATES_DIR}")
+
             # Send Reset via Parent Method
             if self.trainable:
                 self.send_command(f"RESET {full_state_path}\n")

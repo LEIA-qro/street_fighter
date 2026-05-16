@@ -8,6 +8,9 @@ from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 
 def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning_timesteps=50000):
+    # Ensure start_phase is an integer for list indexing
+    start_phase = int(start_phase)
+
     # --- Expanded Hyperparameter Search Space ---
     lr = trial.suggest_float("lr", 1e-5, 7e-4, log=True)
     ent_coef = trial.suggest_float("ent_coef", 1e-8, 0.05, log=True)
@@ -29,8 +32,15 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         net_arch = None
     
     n_envs = config.N_ENVS
-    config.TRAINING_STATES = config.CURRICULUM_PHASES[start_phase]
-    
+
+    # Bug Fix: Correctly apply RYU_ONLY and CUSTOM phases during Optuna tuning
+    if start_phase == "RYU_ONLY":
+        config.TRAINING_STATES = config.RYU_ONLY_STATES
+    elif start_phase == "CUSTOM":
+        config.TRAINING_STATES = config.CUSTOM_STATES if config.CUSTOM_STATES else config.AVAILABLE_STATES
+    else:
+        config.TRAINING_STATES = config.CURRICULUM_PHASES[int(start_phase)]
+
     # Setup Paths
     directories = config.get_directory()
     trial_log_dir = os.path.join(directories["tuning_logs"], f"trial_{trial.number}")
@@ -38,17 +48,18 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
 
     env = None
     model = None
-    
+
     try:
         # 1. Initialize Parallel Environments
         env = SubprocVecEnv([env_fn(i) for i in range(n_envs)])
-        
+
         # Broadcast the target phase states to all workers (fixes multiprocessing inheritance bug)
-        if start_phase > 0:
-            try:
-                env.env_method("set_training_states", config.CURRICULUM_PHASES[start_phase])
-            except Exception as e:
-                print(f"[Optuna][WARN] Could not broadcast states to workers: {e}")
+        try:
+            env.env_method("set_training_states", config.TRAINING_STATES)
+            print(f"[Optuna Trial {trial.number}] States broadcast to all {n_envs} workers.")
+        except Exception as e:
+            print(f"[Optuna Trial {trial.number}][WARN] Could not broadcast states: {e}")
+
 
         if load_pkl and load_pkl != "None":
             env = SelectiveVecNormalize.load(os.path.join(config.PROJECT_ROOT, load_pkl), env)

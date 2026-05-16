@@ -8,6 +8,7 @@ import importlib
 import glob
 import webbrowser
 import time
+import signal
 from pathlib import Path
 
 # Add src directory to path
@@ -98,24 +99,29 @@ def stream_logs(cmd):
     yield full_output
 
     try:
-        # Use shell=True for better Windows command resolution
+        # 1. Use CREATE_NEW_PROCESS_GROUP to allow sending CTRL_C_EVENT on Windows
+        # 2. shell=False is required to send signals directly to the process
         state.active_process = subprocess.Popen(
             cmd, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT, 
             text=True, 
             bufsize=1, 
-            shell=True
+            shell=False,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
         )
         
-        for line in state.active_process.stdout:
+        # Local reference to prevent NoneType race condition during stop
+        proc = state.active_process
+        
+        for line in proc.stdout:
             if state.stop_event.is_set():
                 break
             full_output += line
             yield full_output
             
-        state.active_process.wait()
-        full_output += f"\n{'-'*50}\nProcess finished with exit code {state.active_process.returncode}"
+        proc.wait()
+        full_output += f"\n{'-'*50}\nProcess finished with exit code {proc.returncode}"
         yield full_output
     except Exception as e:
         yield full_output + f"\n[ERROR] {str(e)}"
@@ -123,15 +129,28 @@ def stream_logs(cmd):
         state.active_process = None
 
 def stop_active_process():
-    """Forcefully stops any running script."""
+    """Gracefully stops the active process by sending CTRL_C, allowing a model save."""
     if state.active_process:
+        proc = state.active_process
         state.stop_event.set()
         try:
-            subprocess.run(f"taskkill /F /T /PID {state.active_process.pid}", shell=True)
-        except:
-            pass
+            # 1. Send CTRL_C_EVENT to the process group
+            # This triggers KeyboardInterrupt in Python, causing the EMERGENCY save
+            print(f"[Dashboard] Sending Graceful Stop (CTRL_C) to PID {proc.pid}...")
+            os.kill(proc.pid, signal.CTRL_C_EVENT)
+            
+            # 2. Wait for the agent to finish its EMERGENCY save logic (now has a 2s buffer)
+            time.sleep(5) 
+            
+            # 3. Final Tree-Kill Failsafe: Ensure BizHawk and Lua are definitely dead
+            print(f"[Dashboard] Finalizing cleanup for PID {proc.pid} and children...")
+            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+            
+        except Exception as e:
+            print(f"[Dashboard] Error during stop: {e}")
+        
         state.active_process = None
-        return "Process stopped."
+        return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
     
     from core.env_tools import failsafe_env
     threading.Thread(target=failsafe_env).start()
@@ -153,7 +172,9 @@ def update_config_var(key, value):
 
     pattern = rf"^({key}\s*=\s*)(.*?)(\s*(?:#.*)?)$"
     if re.search(pattern, content, flags=re.MULTILINE):
-        content = re.sub(pattern, rf"\1{formatted_value}\3", content, flags=re.MULTILINE)
+        # Escape backslashes for the replacement string to prevent regex backreference corruption (Bug 7)
+        safe_value = formatted_value.replace("\\", "\\\\")
+        content = re.sub(pattern, rf"\1{safe_value}\3", content, flags=re.MULTILINE)
         with open(config_path, "w") as f:
             f.write(content)
         return True
@@ -178,8 +199,11 @@ def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, tria
 
 def get_best_tuning_params(algo, study_name):
     # Resolve storage path based on algorithm
-    db_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo, "study.db").replace("\\", "/")
-    json_path = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo, f"best_params_{study_name}.json").replace("\\", "/")
+    tuning_dir = os.path.join(config.get_directory()["tuning"], algo)
+    os.makedirs(tuning_dir, exist_ok=True)
+    db_path = os.path.abspath(os.path.join(tuning_dir, "study.db")).replace("\\", "/")
+    json_path = os.path.abspath(os.path.join(tuning_dir, f"best_params_{study_name}.json")).replace("\\", "/")
+    
     script = f"""import optuna, json
 try:
     study = optuna.load_study(study_name='{study_name}', storage='sqlite:///{db_path}')
@@ -363,6 +387,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     with gr.Row():
                         stop_btn = gr.Button("🛑 Stop All Processes", variant="stop")
                         refresh_files_btn = gr.Button("🔄 Refresh Dropdown Models")
+                    stop_status = gr.Markdown("")
 
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
@@ -493,7 +518,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
     )
     get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
     
-    stop_btn.click(stop_active_process, outputs=[unified_logs])
+    stop_btn.click(stop_active_process, outputs=[stop_status])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
