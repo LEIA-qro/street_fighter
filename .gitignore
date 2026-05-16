@@ -22,3 +22,6 @@ lua/test2.lua
 
 .gemini/
 gha-creds-*.json
+
+handoff.md
+
