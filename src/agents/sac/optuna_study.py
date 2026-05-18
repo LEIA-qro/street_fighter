@@ -1,5 +1,6 @@
 import os
 import optuna
+import traceback
 from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -7,7 +8,7 @@ from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 
-def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning_timesteps=50000):
+def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning_timesteps=50000, device="cuda"):
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     tau = trial.suggest_float("tau", 0.001, 0.05)
     gamma = trial.suggest_float("gamma", 0.95, 0.9999, log=True)
@@ -76,14 +77,14 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
             model = SAC.load(
                 os.path.join(config.PROJECT_ROOT, load_zip),
                 env=env,
-                device="cuda",
+                device=device,
                 custom_objects={
                     "learning_rate": lr,
                     "tau": tau,
                     "gamma": gamma
                 }
             )
-        else:
+            else:
             model = SAC(
                 "MlpPolicy",
                 env,
@@ -96,7 +97,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 policy_kwargs=dict(net_arch=net_arch),
                 verbose=0,
                 tensorboard_log=trial_log_dir,
-                device="cuda"
+                device=device
             )
 
         print(f"[Optuna] Trial {trial.number} started: lr={lr:.6f}, phase={start_phase}, timesteps={tuning_timesteps}")
@@ -109,11 +110,20 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         
         return mean_reward
 
+    except optuna.exceptions.TrialPruned:
+        raise
     except Exception as e:
         print(f"[Optuna] Trial {trial.number} failed with error: {e}")
-        return -99999.0
+        traceback.print_exc()
+        raise e
 
     finally:
         if env is not None:
-            env.close()
-        failsafe_env()
+            try:
+                env.close()
+            except Exception:
+                pass
+        try:
+            failsafe_env()
+        except Exception:
+            pass

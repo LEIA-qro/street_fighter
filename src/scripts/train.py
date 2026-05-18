@@ -7,6 +7,14 @@ from core.env_tools import SFv2_make_env, failsafe_env
 
 def main():
     config.generate_lua_config()
+
+    # GPU Verification
+    import torch
+    if torch.cuda.is_available():
+        print(f"[Hardware] Using GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[Hardware] WARNING: No GPU detected. Running on CPU.")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"])
     parser.add_argument("--env",  default="v2",  choices=["v1", "v2"])
@@ -14,12 +22,22 @@ def main():
     parser.add_argument("--load_zip", type=str, default=None)
     parser.add_argument("--load_pkl", type=str, default=None)
     parser.add_argument("--phase", type=str, default="0")
+    parser.add_argument("--device", type=str, default="auto")
 
     # Advanced Hyperparameter Overrides
     parser.add_argument("--lr", type=float, default=0.0)
     parser.add_argument("--ent_coef", type=float, default=0.0)
     parser.add_argument("--clip_range", type=float, default=0.0)
     args = parser.parse_args()
+
+    # Device Auto-Logic
+    device = args.device
+    if device == "auto":
+        device = "cpu" if args.algo.lower() == "ppo" else "cuda"
+    
+    # Suppress SB3 GPU Warnings for MlpPolicy
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="stable_baselines3")
 
     # Dynamic dispatch
     module  = importlib.import_module(f"agents.{args.algo}")
@@ -46,7 +64,7 @@ def main():
             if remaining_steps <= 0:
                 break
 
-            print(f"\n[RETRY LOOP] Attempt {retry_count + 1} | Goal: {total_target_steps} | Done: {steps_completed} | Remaining: {remaining_steps}")
+            print(f"\n[RETRY LOOP] Attempt {retry_count + 1} | Goal: {total_target_steps} | Done: {steps_completed} | Remaining: {remaining_steps} | Device: {device}")
 
             # Check for existing crash saves if not the first attempt or if explicitly resuming
             if retry_count > 0:
@@ -68,7 +86,8 @@ def main():
                 start_phase=current_phase, 
                 lr=args.lr, 
                 ent_coef=args.ent_coef, 
-                clip_range=args.clip_range
+                clip_range=args.clip_range,
+                device=device
             )
 
             # If we reached here, training finished normally

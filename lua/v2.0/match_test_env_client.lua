@@ -74,13 +74,14 @@ while true do
     -- Using read_u8 because Character IDs are standard 8-bit integers
     local p1_char_id = mainmemory.read_u8(0x81DA)
     local p2_char_id = mainmemory.read_u8(0x845A)
+    local rel_dist = mainmemory.read_u8(0x834C)
 
-    -- Format Payload (Now 10 dimensions) & Send
-    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
+    -- Format Payload (Now 13 dimensions) & Send
+    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
         p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
         p1_action_id, p2_action_id, 
         active_p1_proj_x, active_p2_proj_x,
-        p1_char_id, p2_char_id)
+        p1_char_id, p2_char_id, rel_dist)
     
     comm.socketServerSend(payload)
     

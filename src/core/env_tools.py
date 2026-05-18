@@ -1,15 +1,22 @@
-import os, time, multiprocessing, gc, torch
-from stable_baselines3.common.monitor import Monitor
+import os, time, multiprocessing, gc
 
-from envs.sf2_v2 import StreetFighterEnvV2
 import core.config as config
 
-
 def SFv2_make_env(rank, **kwargs):
+    from stable_baselines3.common.monitor import Monitor
+    from envs.sf2_v2 import StreetFighterEnvV2
+    
     version = kwargs.get("version", "v2")
     player = kwargs.get("player", 1)
     
     def _init():
+        # STAGGERED BOOT: Delay starting the emulator based on rank
+        # Prevents 10 instances from hammering the CPU/Disk simultaneously
+        if rank > 0:
+            delay = rank * 3.5 # Spread 10 boots over ~31 seconds
+            print(f"[Rank {rank}] Staggering boot: waiting {delay:.1f}s...")
+            time.sleep(delay)
+
         env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")
         os.makedirs(log_dir, exist_ok=True)
@@ -17,20 +24,17 @@ def SFv2_make_env(rank, **kwargs):
     return _init
 
 def failsafe_env(env=None, model=None):
-
     if env is not None:
         try:
             env.close()
             del env
-        except UnboundLocalError:
-            pass
         except Exception:
             pass
 
     if model is not None:
         try:
             del model
-        except UnboundLocalError:
+        except Exception:
             pass
 
     print("[ENV]Executing Failsafe: Purging zombie instances and VRAM...")
@@ -49,8 +53,12 @@ def failsafe_env(env=None, model=None):
     
     # 3. The VRAM Purge
     gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
         
     time.sleep(3)
     print("[ENV] Failsafe complete. All zombie processes terminated and VRAM cleared.")

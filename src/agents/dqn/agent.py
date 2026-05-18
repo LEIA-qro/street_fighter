@@ -11,8 +11,9 @@ from agents.base_agent import BaseAgent
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
 
 class DQNAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda"):
         print(f"[Training] Initializing DQN Curriculum Production Training in {save_dir}...")
+        print(f"[Training] Compute Device: {device}")
         
         if load_zip and load_zip != "None":
             print(f"[Training] Loading model from: {load_zip}")
@@ -88,7 +89,7 @@ class DQNAgent(BaseAgent):
                 model = DQN.load(
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
-                    device="cuda",
+                    device=device,
                     custom_objects={"learning_rate": active_lr, "exploration_fraction": active_expl_frac}
                 )
             else:
@@ -105,7 +106,7 @@ class DQNAgent(BaseAgent):
                     policy_kwargs=dict(net_arch=[512, 512, 256]),
                     verbose=1,
                     tensorboard_log=directories["logs"],
-                    device="cuda"
+                    device=device
                 )
 
             callback = ManualCurriculumCallback(
@@ -148,7 +149,7 @@ class DQNAgent(BaseAgent):
     def resume(self):
         pass
 
-    def tune(self, env_fn, n_trials, study_name="dqn_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000):
+    def tune(self, env_fn, n_trials, study_name="dqn_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000, device="cuda"):
         import optuna
         from agents.dqn.optuna_study import objective
         
@@ -170,6 +171,7 @@ class DQNAgent(BaseAgent):
         
         print(f"[Tuning] Starting Optuna Study: {study_name}")
         print(f"[Tuning] Storage: {storage_url}")
+        print(f"[Tuning] Compute Device: {device}")
 
         study = optuna.create_study(
             study_name=study_name,
@@ -178,7 +180,17 @@ class DQNAgent(BaseAgent):
             load_if_exists=True
         )
         
-        study.optimize(lambda trial: objective(trial, env_fn, load_zip, load_pkl, active_phase, timesteps), n_trials=n_trials)
+        study.optimize(
+            lambda trial: objective(trial, env_fn, load_zip, load_pkl, active_phase, timesteps, device=device), 
+            n_trials=n_trials,
+            catch=(Exception,)
+        )
+        
+        print("\n[Tuning] Complete!")
+        print(f"Best Trial: {study.best_trial.number}")
+        print(f"Best Value: {study.best_value}")
+        print(f"Best Params: {study.best_params}")
+
         
         print("\n[Tuning] Complete!")
         print(f"Best Trial: {study.best_trial.number}")

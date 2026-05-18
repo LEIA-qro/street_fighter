@@ -107,12 +107,29 @@ def test_ai_vs_ai():
     parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--load_zip_p1", type=str, required=True)
     parser.add_argument("--load_pkl_p1", type=str, required=True)
+    parser.add_argument("--device_p1", type=str, default="auto")
+    
     parser.add_argument("--algo_p2", type=str, default="ppo")
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
+    parser.add_argument("--device_p2", type=str, default="auto")
     args = parser.parse_args()
 
+    # Device Auto-Logic
+    device_p1 = args.device_p1
+    if device_p1 == "auto":
+        device_p1 = "cpu" if args.algo_p1.lower() == "ppo" else "cuda"
+        
+    device_p2 = args.device_p2
+    if device_p2 == "auto":
+        device_p2 = "cpu" if args.algo_p2.lower() == "ppo" else "cuda"
+    
+    # Suppress SB3 GPU Warnings for MlpPolicy
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="stable_baselines3")
+
     print("Initializing AI vs AI Evaluation Mode...") 
+    print(f"P1 Device: {device_p1} | P2 Device: {device_p2}")
 
     print("Booting Master Socket...")
     # ── 1. Boot ONE master socket env ──
@@ -146,7 +163,7 @@ def test_ai_vs_ai():
      # ── 5. Load models ──
     print(f"\nLoading Neural Networks...")
     
-    def load_model_safely(algo, path, player_name):
+    def load_model_safely(algo, path, player_name, device):
         ModelClass = get_model_class(algo)
         custom_objs = {}
         if algo.lower() in ["dqn", "sac"]:
@@ -155,7 +172,7 @@ def test_ai_vs_ai():
         try:
             model = ModelClass.load(
                 os.path.join(config.PROJECT_ROOT, path),
-                device="cuda",
+                device=device,
                 custom_objects=custom_objs
             )
             print(f"{player_name} ({algo.upper()}) loaded from: {path}")
@@ -180,8 +197,8 @@ def test_ai_vs_ai():
             print(f"\n[ERROR] Unexpected error loading {player_name}: {e}")
             sys.exit(1)
 
-    model_p1 = load_model_safely(args.algo_p1, args.load_zip_p1, "Player 1")
-    model_p2 = load_model_safely(args.algo_p2, args.load_zip_p2, "Player 2")
+    model_p1 = load_model_safely(args.algo_p1, args.load_zip_p1, "Player 1", device_p1)
+    model_p2 = load_model_safely(args.algo_p2, args.load_zip_p2, "Player 2", device_p2)
 
     
     print(f"\n{('='*50)}")

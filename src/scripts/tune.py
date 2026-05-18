@@ -12,6 +12,14 @@ from core.env_tools import SFv2_make_env
 
 def main():
     config.generate_lua_config()
+
+    # GPU Verification
+    import torch
+    if torch.cuda.is_available():
+        print(f"[Hardware] Tuning on GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[Hardware] WARNING: No GPU detected for tuning. Running on CPU.")
+
     parser = argparse.ArgumentParser(description="Street Fighter II RL Hyperparameter Tuning via Optuna")
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"], help="RL algorithm to tune")
     parser.add_argument("--env", default="v2", choices=["v1", "v2"], help="Environment version")
@@ -23,12 +31,23 @@ def main():
     parser.add_argument("--load_pkl", type=str, default=None)
     parser.add_argument("--phase", type=str, default="0")
     parser.add_argument("--timesteps", type=int, default=50000, help="Timesteps per trial")
+    parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
+
+    # Device Auto-Logic
+    device = args.device
+    if device == "auto":
+        device = "cpu" if args.algo.lower() == "ppo" else "cuda"
+    
+    # Suppress SB3 GPU Warnings for MlpPolicy
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="stable_baselines3")
 
     print(f"[CLI] Initializing Hyperparameter Tuning for {args.algo.upper()}...")
     print(f"[CLI] Environment: SF2 {args.env.upper()}")
     print(f"[CLI] Target Trials: {args.trials}")
     print(f"[CLI] Study Name: {args.study_name}")
+    print(f"[CLI] Compute Device: {device}")
 
     # Dynamic dispatch — loads the build_agent() factory from agents/{algo}/__init__.py
     try:
@@ -39,7 +58,16 @@ def main():
         env_fn = lambda rank: SFv2_make_env(rank)
         
         # Run the tuning process
-        agent.tune(env_fn, args.trials, study_name=args.study_name, load_zip=args.load_zip, load_pkl=args.load_pkl, start_phase=args.phase, timesteps=args.timesteps)
+        agent.tune(
+            env_fn, 
+            args.trials, 
+            study_name=args.study_name, 
+            load_zip=args.load_zip, 
+            load_pkl=args.load_pkl, 
+            start_phase=args.phase, 
+            timesteps=args.timesteps,
+            device=device
+        )
         
     except ImportError as e:
         print(f"[ERROR] Could not load agent module for {args.algo}: {e}")

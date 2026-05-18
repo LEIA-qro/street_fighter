@@ -96,13 +96,13 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "sac_sf2_test_2123" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "dqn_sf2_production_ryu1" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
 # Model Arquitectural config
 ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
-OBS_DIM = 10 # Old obs from v1, does not consider cathegorical data -- DO NOT CHANGE
+OBS_DIM = 11 # Includes new universal relative distance (0x834C)
 
 NUM_FRAMES = 4 # Frame Stacking = 4
 STARTING_TOTAL_TIMESTEPS = 1000 # For train production or train sinlge PPO

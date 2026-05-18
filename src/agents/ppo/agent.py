@@ -11,8 +11,9 @@ from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 
 class PPOAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cpu"):
         print(f"[Training] Initializing Curriculum Production Training in {save_dir}...")
+        print(f"[Training] Compute Device: {device}")
         
         if load_zip and load_zip != "None":
             print(f"[Training] Loading model from: {load_zip}")
@@ -73,7 +74,7 @@ class PPOAgent(BaseAgent):
                 model = PPO.load(
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
-                    device="cuda",
+                    device=device,
                     custom_objects={"learning_rate": active_lr, "clip_range": active_clip, "ent_coef": active_ent}
                 )
             else:
@@ -91,7 +92,7 @@ class PPOAgent(BaseAgent):
                     policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
                     verbose=1,
                     tensorboard_log=directories["logs"],
-                    device="cuda"
+                    device=device
                 )
 
             callback = ManualCurriculumCallback(
@@ -134,7 +135,7 @@ class PPOAgent(BaseAgent):
     def resume(self):
         pass
 
-    def tune(self, env_fn, n_trials, study_name="ppo_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000):
+    def tune(self, env_fn, n_trials, study_name="ppo_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000, device="cpu"):
         import optuna
         from agents.ppo.optuna_study import objective
         
@@ -156,6 +157,7 @@ class PPOAgent(BaseAgent):
         
         print(f"[Tuning] Starting Optuna Study: {study_name}")
         print(f"[Tuning] Storage: {storage_url}")
+        print(f"[Tuning] Compute Device: {device}")
 
         study = optuna.create_study(
             study_name=study_name,
@@ -164,7 +166,11 @@ class PPOAgent(BaseAgent):
             load_if_exists=True
         )
         
-        study.optimize(lambda trial: objective(trial, env_fn, load_zip, load_pkl, active_phase, timesteps), n_trials=n_trials)
+        study.optimize(
+            lambda trial: objective(trial, env_fn, load_zip, load_pkl, active_phase, timesteps, device=device), 
+            n_trials=n_trials,
+            catch=(Exception,)
+        )
         
         print("\n[Tuning] Complete!")
         print(f"Best Trial: {study.best_trial.number}")

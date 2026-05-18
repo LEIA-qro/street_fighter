@@ -21,14 +21,33 @@ def get_model_class(algo_name):
 
 def test_agent():
     config.generate_lua_config()
+
+    # GPU Verification
+    import torch
+    if torch.cuda.is_available():
+        print(f"[Hardware] Testing on GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[Hardware] WARNING: No GPU detected for testing. Running on CPU.")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="ppo")
     parser.add_argument("--load_zip", type=str, required=True)
     parser.add_argument("--load_pkl", type=str, required=True)
     parser.add_argument("--player", type=int, default=1)
+    parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
 
+    # Device Auto-Logic
+    device = args.device
+    if device == "auto":
+        device = "cpu" if args.algo.lower() == "ppo" else "cuda"
+    
+    # Suppress SB3 GPU Warnings for MlpPolicy
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="stable_baselines3")
+
     print(f"Initializing Street Fighter Evaluation Mode for Player {args.player}...")
+    print(f"Compute Device: {device}")
     
     model_load_path = os.path.join(config.PROJECT_ROOT, args.load_zip)
     vec_load_path = os.path.join(config.PROJECT_ROOT, args.load_pkl)
@@ -54,7 +73,7 @@ def test_agent():
     # 3. Load the Grandmaster Brain
     print(f"Loading neural network weights from {args.load_zip}...")
     
-    def load_model_safely(algo, path):
+    def load_model_safely(algo, path, device):
         ModelClass = get_model_class(algo)
         custom_objs = {}
         if algo.lower() in ["dqn", "sac"]:
@@ -63,7 +82,7 @@ def test_agent():
         try:
             model = ModelClass.load(
                 path,
-                device="cuda",
+                device=device,
                 custom_objects=custom_objs
             )
             print(f"Model ({algo.upper()}) loaded successfully.")
@@ -87,7 +106,7 @@ def test_agent():
             print(f"\n[ERROR] Unexpected error loading model: {e}")
             sys.exit(1)
 
-    model = load_model_safely(args.algo, model_load_path)
+    model = load_model_safely(args.algo, model_load_path, device)
     
     print(f"\nFIGHT! (The {args.algo.upper()} AI engine is now running in the background)")
     obs = env.reset()

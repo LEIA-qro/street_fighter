@@ -182,14 +182,15 @@ def update_config_var(key, value):
 
 # --- Dashboard Tab Handlers ---
 
-def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials):
+def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials, device):
     # Store in models/tuning/{algo}/
     tuning_dir = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo)
     os.makedirs(tuning_dir, exist_ok=True)
     
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "tune.py"), 
            "--algo", algo, "--env", env, "--study_name", study_name, 
-           "--trials", str(trials), "--phase", str(phase), "--timesteps", str(timesteps)]
+           "--trials", str(trials), "--phase", str(phase), "--timesteps", str(timesteps),
+           "--device", device]
     
     if load_zip != "None": cmd += ["--load_zip", load_zip]
     if load_pkl != "None": cmd += ["--load_pkl", load_pkl]
@@ -223,11 +224,12 @@ except Exception as e:
     except Exception as e:
         return f"Subprocess execution error: {e}", None
 
-def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr, ent_coef, clip_range):
+def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr, ent_coef, clip_range, device):
     update_config_var("MODEL_NAME", model_name)
     
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train.py"), 
-           "--algo", algo, "--env", env, "--steps", str(timesteps), "--phase", str(phase)]
+           "--algo", algo, "--env", env, "--steps", str(timesteps), "--phase", str(phase),
+           "--device", device]
            
     if load_zip != "None": cmd += ["--load_zip", load_zip]
     if load_pkl != "None": cmd += ["--load_pkl", load_pkl]
@@ -245,23 +247,23 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_zip, p1_pkl, p2_algo, p2_zip, p2_pkl):
+def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device):
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
 
     if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
-               "--algo_p1", p1_algo, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl,
-               "--algo_p2", p2_algo, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl]
+               "--algo_p1", p1_algo, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl, "--device_p1", p1_device,
+               "--algo_p2", p2_algo, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl, "--device_p2", p2_device]
     elif p1_is_ai:
         # P1 is AI, P2 is Player or CPU
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, "--player", "1"]
+               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, "--player", "1", "--device", p1_device]
     elif p2_is_ai:
         # P2 is AI, P1 is Player
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, "--player", "2"]
+               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, "--player", "2", "--device", p2_device]
     else:
         yield "Invalid Matchup: At least one player must be an AI model (PPO, SAC, or DQN)."
         return
@@ -319,7 +321,7 @@ def handle_upload(file_obj, algo):
 
 zips_init, pkls_init = get_model_files()
 
-with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(primary_hue="blue"), css="#terminal textarea { font-family: monospace; }") as demo:
+with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     gr.Markdown("# 🕹️ Street Fighter II RL Control Center")
     
     with gr.Tabs():
@@ -353,6 +355,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                             with gr.Row():
                                 train_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
                                 train_steps = gr.Number(label="Total Timesteps", value=1000000, precision=0)
+                                train_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                             
                             with gr.Accordion("Advanced Hyperparameters (Overrides Config)", open=False):
                                 gr.Markdown("*(Set values > 0.0 to override defaults)*")
@@ -375,6 +378,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                             with gr.Row():
                                 tune_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
                                 tune_steps = gr.Number(label="Timesteps per Trial", value=50000, precision=0)
+                                tune_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                             trials_input = gr.Number(label="Number of Trials", value=10, precision=0)
                             
                             with gr.Row():
@@ -391,7 +395,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
 
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
-                    unified_logs = gr.Textbox(label="Console Output", show_copy_button=True, lines=35, max_lines=45, interactive=False, elem_id="terminal")
+                    unified_logs = gr.Textbox(label="Console Output", lines=35, max_lines=45, interactive=False, elem_id="terminal")
+                    copy_btn = gr.Button("📋 Copy Logs", size="sm")
 
         # --- TAB 2: MATCHUPS ---
         with gr.Tab("🎮 Model Testing & Matchups"):
@@ -399,6 +404,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                 with gr.Column():
                     gr.Markdown("### Player 1 (Ryu)")
                     p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
+                    p1_device = gr.Dropdown(label="P1 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p1_model_group:
                         with gr.Row():
@@ -410,6 +416,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     
                     gr.Markdown("### Player 2 (Opponent)")
                     p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
+                    p2_device = gr.Dropdown(label="P2 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p2_model_group:
                         with gr.Row():
@@ -426,7 +433,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                     match_upload_status = gr.Markdown("")
                 
                 with gr.Column():
-                    match_logs = gr.Textbox(label="Match Console", show_copy_button=True, lines=25, max_lines=35, interactive=False, elem_id="terminal")
+                    match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False, elem_id="terminal")
+                    copy_match_btn = gr.Button("📋 Copy Match Logs", size="sm")
             
             # Interactive visibility and filtering toggles
             def update_match_ui(algo):
@@ -458,7 +466,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
                 lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
             )
 
-            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p2_algo, p2_zip, p2_pkl], outputs=[match_logs])
+            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device], outputs=[match_logs])
             stop_match_btn.click(stop_active_process, outputs=[match_logs])
 
         # --- TAB 3: CONFIG ---
@@ -509,15 +517,18 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
     upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
 
     # Global Process Handlers
-    start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip], outputs=[unified_logs]).then(
+    start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip, train_device], outputs=[unified_logs]).then(
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     
-    start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input], outputs=[unified_logs]).then(
+    start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input, tune_device], outputs=[unified_logs]).then(
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
     
+    copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Logs copied to clipboard!'); return []; }")
+    copy_match_btn.click(None, inputs=[match_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Match logs copied to clipboard!'); return []; }")
+
     stop_btn.click(stop_active_process, outputs=[stop_status])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
@@ -543,4 +554,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard", theme=gr.themes.Soft(prim
     state_upload.upload(handle_state_upload, inputs=[state_upload], outputs=[state_upload_status])
 
 if __name__ == "__main__":
-    demo.queue().launch(server_name="0.0.0.0", server_port=7860)
+    demo.queue().launch(
+        server_name="0.0.0.0", 
+        server_port=7860, 
+        theme=gr.themes.Soft(primary_hue="blue"), 
+        css="#terminal textarea { font-family: monospace; }"
+    )
