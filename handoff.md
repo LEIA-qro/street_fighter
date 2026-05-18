@@ -1,38 +1,34 @@
-# Project Handoff: Street Fighter II RL Pipeline
+# Project Handoff: Street Fighter II RL
 
-## 🎯 Goal
-Build a robust, end-to-end Reinforcement Learning pipeline for Street Fighter II (Sega Genesis) using a custom Python-BizHawk TCP bridge. The system is centrally managed by a Gradio web dashboard that orchestrates Optuna tuning, PPO, SAC, and DQN production training, and AI vs AI matchmaking.
+## 🎯 Current Goal
+The objective is to train a Ryu specialist capable of defeating all opponents on the hardest difficulty using a custom RL pipeline (PPO/SAC/DQN) built on a lock-step TCP bridge between Python and BizHawk (Lua). We are currently hardening the "v2.0" environment, which features a 555-dimensional hybrid observation space (continuous RAM + One-Hot Actions/Characters) and a manual curriculum.
 
-## 📈 Current State of the Code
-- **Algorithms:** PPO, SAC, and DQN are fully implemented and integrated.
-- **Compatibility:** SAC (Continuous) and DQN (Discrete) action spaces are now dynamically normalized to `MultiBinary(10)` via wrapping in training and inference logic.
-- **Model Management:** 
-    - Dropdowns are context-aware, filtering models based on the selected algorithm.
-    - Tuning storage is organized per-algorithm (`models/tuning/{algo}/`).
-    - Localized file uploaders are integrated into the Training and Matchup tabs for fast iteration.
-- **Matchup System:**
-    - Unified matchup selector: Removed manual "Match Mode" radio buttons.
-    - Added "Human Player" and "CPU" options to P1/P2 algorithm selectors.
-    - Dynamic routing: `run_matchup` automatically switches between `test_ai_vs_ai_v2.py` and `test_agent_v2.py`.
-    - Failsafe integration: Added "Terminate Match" button in the Matchups tab.
-- **Stability:** Robust safeguards added to `test_ai_vs_ai_v2.py` and `test_agent_v2.py` to prevent crashes on algorithm-model mismatches and memory issues (via `buffer_size=1` for inference).
+## 📊 Current State of the Code
+- **Hardware Integration:** Stable. Staggered booting is implemented to prevent CPU/IO bottlenecks during parallel initialization of 10+ emulators.
+- **Environment (v2.0):** 
+    - Observations include universal relative distance (RAM 0x834C) to fix character-specific hitbox discrepancies.
+    - Velocity clipping widened to `[-100, 100]` to capture high-speed movement without signal saturation.
+    - Self-healing `reset()` logic implemented to automatically respawn crashed emulator ranks without killing the whole training session.
+- **Web Dashboard:** Updated to Gradio 6.0 standards. Features a dedicated "Copy Logs" button (JS-based) and a Compute Device selector (`auto`, `cpu`, `cuda`).
+- **Optuna Tuning:** Bulletproofed. Crashed trials are now marked as `FAIL` (preserving params but ignoring them in the math) rather than being penalized with bad scores.
+- **Performance:** `auto` device logic implemented (PPO on CPU for speed, SAC/DQN on CUDA for heavy sampling).
 
-## 📂 Files Actively Edited
-- `src/scripts/web_dashboard.py`: Refactored UI logic, dynamic filtering, and button handling.
-- `src/scripts/test_ai_vs_ai_v2.py`: Upgraded with robust loading/normalization logic.
-- `src/scripts/test_agent_v2.py`: Upgraded with robust loading/normalization logic.
-- `src/core/selective_norm.py`: Fixed Unicode encoding issues on Windows.
-- `src/envs/sf2_v2.py`: Added input "ignore" protocol to support Human/CPU control.
-- `lua/v2.0/match_test_env_client.lua`: Integrated player-specific input handling.
+## 🛠 Active Files
+- `src/envs/sf2_v2.py`: Core RL environment and reward logic.
+- `src/core/env_tools.py`: Boot orchestration and staggered initialization.
+- `src/core/bizhawk_base.py`: Low-level TCP socket bridge.
+- `src/scripts/web_dashboard.py`: Gradio control center.
+- `lua/v2.0/training_env_client.lua`: Headless training loop.
+- `src/agents/*/agent.py`: Algorithm implementations and parameter propagation.
 
-## 🛑 What Was Tried That Failed (and How It Was Fixed)
-1. **Unicode Crash:** Windows console crashed when printing unicode arrows. *Fixed by using ASCII arrows.*
-2. **Dashboard Syntax Errors:** Repeated syntax/naming errors during UI refactoring. *Fixed by standardizing component IDs and fixing launch syntax.*
-3. **Algorithm Mismatches:** DQN models loaded as PPO crashed with cryptic `TypeError`s. *Fixed by implementing `load_model_safely` with mismatch detection.*
-4. **Memory Warning:** DQN/SAC loading giant replay buffers during testing. *Fixed by setting `buffer_size=1` during inference.*
-5. **Human Control Block:** Lua script blocked Human/CPU input when AI was in control. *Fixed by implementing `ignore` string protocol.*
+## ❌ What Failed / Was Fixed
+- **Penalizing Crashed Trials:** Returning `-99999.0` for crashed Optuna trials was poisoning the sampler. Fixed by raising exceptions and using Optuna's native `FAIL` state.
+- **Parallel Boot Deadlock:** Launching 10 emulators at once caused `[WinError 10054]` resets. Fixed by increasing Lua timeouts to 600s and staggering Python-side boots (3.5s delay per rank).
+- **Gradio 6.0 Warnings:** `theme`/`css` moved from constructor to `launch()`, and `show_copy_button` was removed. Fixed via refactoring and custom JS button.
+- **Incorrect RAM Width:** Universal distance was initially read as `u16_be`, which picked up garbage from adjacent bytes. Fixed by switching to `u8`.
 
 ## ⏭ Next Steps
-1. **Curriculum Refinement:** Validate if reward shaping logic holds up across all curriculum phases as opponents become harder.
-2. **Dashboard Performance:** If the dashboard dropdown refresh becomes slow as more models are added, implement an asynchronous file indexing cache.
-3. **End-to-End Verification:** Conduct full, uninterrupted training/tuning runs for all algorithms to ensure long-term stability.
+1. **Validation Run:** Start a fresh training session using the `auto` device setting via the dashboard to verify the PPO-on-CPU performance speedup.
+2. **Fresh Models:** Since the observation dimension changed from 554 to 555, all existing `.zip` models are incompatible. A new "Phase 0" baseline needs to be trained.
+3. **Reward Tuning:** Monitor the new exponentially decaying footsie reward (`FOOTSIE_DECAY_RATE`). Ensure it effectively prevents "camping" without discouraging safe spacing.
+4. **Interactive Testing:** Use the "AI vs AI" tab to verify the perspective-isolated parsers correctly handle the new 13-item payload for both players.
