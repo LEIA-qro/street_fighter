@@ -3,6 +3,8 @@ import socket
 import subprocess
 import time
 
+import core.config as config
+
 class BizHawkBaseEnv(gym.Env):
     """Universal Base Environment for BizHawk socket communication."""
     
@@ -58,9 +60,9 @@ class BizHawkBaseEnv(gym.Env):
             f"--socket_port={self.port}"
         ]
 
-        # Only auto-inject the Lua script if we are training
-        if self.trainable and self.lua_path:
-            if self.verbose: print(f"Auto-loading training Lua script: {self.lua_path}")
+        # Always auto-inject the Lua script if provided (it will wait for dashboard trigger if in test mode)
+        if self.lua_path:
+            if self.verbose: print(f"Auto-loading Lua script: {self.lua_path}")
             launch_args.append(f"--lua={self.lua_path}")
             
         self.emulator_process = subprocess.Popen(launch_args)
@@ -68,8 +70,7 @@ class BizHawkBaseEnv(gym.Env):
         if not self.trainable:
             print("\n[INTERACTIVE MODE] BizHawk launched.")
             print("1. Navigate the game menus manually.")
-            print("2. When the match is ready, open the BizHawk Lua Console. Tools -> Lua Console")
-            print(f"3. Run the script: {self.lua_path}. Script -> Open Script -> Select {self.lua_path}")
+            print("2. Use the 'Toggle Agent' button in the Dashboard to start/pause the AI.")
             print(f"\n[Connection] Waiting for your Lua connection...")
             
         self.conn, addr = self.server_socket.accept()

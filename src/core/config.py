@@ -32,6 +32,12 @@ if not os.path.exists(BIZHAWK_PATH): raise FileNotFoundError(f"ERROR: BizHawk ex
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
 TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "training_env_client.lua")
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
+INPUT_DISPLAY_LUA_PATH = os.path.join(LUA_DIR, "Input_Display.lua")
+ENABLE_INPUT_DISPLAY = True
+
+# Player Labels for On-Screen Display
+P1_MODEL_NAME = "None"
+P2_MODEL_NAME = "None"
 
 
 
@@ -50,6 +56,9 @@ config.STATES_DIR = "{STATES_DIR.replace(chr(92), chr(92)*2)}"
 config.PROJECT_ROOT = "{PROJECT_ROOT.replace(chr(92), chr(92)*2)}"
 config.HOST = "{HOST}"
 config.PORT = {PORT}
+config.ENABLE_INPUT_DISPLAY = {str(ENABLE_INPUT_DISPLAY).lower()}
+config.P1_MODEL_NAME = "{P1_MODEL_NAME}"
+config.P2_MODEL_NAME = "{P2_MODEL_NAME}"
 
 return config
 """
@@ -199,7 +208,6 @@ RYU_ONLY_STATES_PHASE_4 = [
 ]
 
 RYU_ONLY_STATES = (
-    RYU_ONLY_STATES_PHASE_0 + 
     RYU_ONLY_STATES_PHASE_1 +
     RYU_ONLY_STATES_PHASE_2 +
     RYU_ONLY_STATES_PHASE_3 +

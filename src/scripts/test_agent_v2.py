@@ -20,8 +20,6 @@ def get_model_class(algo_name):
     return PPO
 
 def test_agent():
-    config.generate_lua_config()
-
     # GPU Verification
     import torch
     if torch.cuda.is_available():
@@ -34,8 +32,35 @@ def test_agent():
     parser.add_argument("--load_zip", type=str, required=True)
     parser.add_argument("--load_pkl", type=str, required=True)
     parser.add_argument("--player", type=int, default=1)
+    parser.add_argument("--opponent_type", type=str, choices=["human", "cpu"], default="human")
     parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
+
+    # Auto-detect algorithm override based on path to prevent mismatch errors
+    if args.load_zip != "None":
+        lower_path = args.load_zip.lower()
+        if "dqn" in lower_path and args.algo.lower() != "dqn":
+            print(f"\n[WARN] Auto-detected 'dqn' in path. Overriding algorithm '{args.algo.upper()}' to 'DQN'.")
+            args.algo = "dqn"
+        elif "sac" in lower_path and args.algo.lower() != "sac":
+            print(f"\n[WARN] Auto-detected 'sac' in path. Overriding algorithm '{args.algo.upper()}' to 'SAC'.")
+            args.algo = "sac"
+        elif "ppo" in lower_path and args.algo.lower() != "ppo":
+            print(f"\n[WARN] Auto-detected 'ppo' in path. Overriding algorithm '{args.algo.upper()}' to 'PPO'.")
+            args.algo = "ppo"
+
+    # Set Model Labels for Lua UI
+    model_name = os.path.basename(args.load_zip).replace(".zip", "")
+    opp_name = "Human" if args.opponent_type == "human" else "CPU"
+    
+    if args.player == 1:
+        config.P1_MODEL_NAME = f"AI: {model_name}"
+        config.P2_MODEL_NAME = opp_name
+    else:
+        config.P1_MODEL_NAME = opp_name
+        config.P2_MODEL_NAME = f"AI: {model_name}"
+
+    config.generate_lua_config()
 
     # Device Auto-Logic
     device = args.device

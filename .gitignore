@@ -15,6 +15,8 @@ src\scripts\__pycache__/
 /old_logs
 /Old
 
+.agent_state
+.start_trigger
 lua/v2.0/generated_config.lua
 lua/testing.lua
 lua/test2.lua

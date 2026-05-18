@@ -252,18 +252,28 @@ def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
 
+    if p1_is_ai or p2_is_ai:
+        # Initialize the agent state to PAUSE for interactive control
+        state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+        with open(state_file, "w") as f:
+            f.write("PAUSE")
+
     if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
                "--algo_p1", p1_algo, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl, "--device_p1", p1_device,
                "--algo_p2", p2_algo, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl, "--device_p2", p2_device]
     elif p1_is_ai:
         # P1 is AI, P2 is Player or CPU
+        opp_type = "cpu" if p2_algo == "CPU (Built-in AI)" else "human"
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, "--player", "1", "--device", p1_device]
+               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, 
+               "--player", "1", "--opponent_type", opp_type, "--device", p1_device]
     elif p2_is_ai:
         # P2 is AI, P1 is Player
+        opp_type = "cpu" if p1_algo == "CPU (Built-in AI)" else "human"
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, "--player", "2", "--device", p2_device]
+               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, 
+               "--player", "2", "--opponent_type", opp_type, "--device", p2_device]
     else:
         yield "Invalid Matchup: At least one player must be an AI model (PPO, SAC, or DQN)."
         return
@@ -271,12 +281,39 @@ def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_
     for log in stream_logs(cmd):
         yield log
 
-def save_all_config(n_envs, win_rate, steps, port):
+def toggle_agent_state():
+    state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+    current_state = "PAUSE"
+    if os.path.exists(state_file):
+        with open(state_file, "r") as f:
+            current_state = f.read().strip()
+    
+    new_state = "PLAY" if current_state == "PAUSE" else "PAUSE"
+    
+    try:
+        with open(state_file, "w") as f:
+            f.write(new_state)
+        return f"Agent State: **{new_state}**"
+    except Exception as e:
+        return f"❌ Error toggling state: {e}"
+
+def stop_match_process():
+    log_msg = stop_active_process()
+    state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+    try:
+        with open(state_file, "w") as f:
+            f.write("PAUSE")
+    except Exception:
+        pass
+    return log_msg, "Agent State: **PAUSED** (Default)"
+
+def save_all_config(n_envs, win_rate, steps, port, input_display):
     updates = {
         "N_ENVS": n_envs,
         "WIN_RATE_THRESHOLD": win_rate,
         "STARTING_TOTAL_TIMESTEPS": steps,
-        "PORT": port
+        "PORT": port,
+        "ENABLE_INPUT_DISPLAY": input_display
     }
     success = True
     for k, v in updates.items():
@@ -319,7 +356,7 @@ def handle_upload(file_obj, algo):
 
 # --- UI Construction ---
 
-zips_init, pkls_init = get_model_files()
+zips_init, pkls_init = get_model_files("ppo")
 
 with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     gr.Markdown("# 🕹️ Street Fighter II RL Control Center")
@@ -430,6 +467,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         launch_match_btn = gr.Button("⚔️ Launch Match", variant="primary")
                         stop_match_btn = gr.Button("🛑 Terminate Match", variant="stop")
                     
+                    with gr.Row():
+                        toggle_agent_btn = gr.Button("⏯️ Toggle Agent (Play/Pause)", variant="secondary")
+                        agent_state_status = gr.Markdown("Agent State: **PAUSED** (Default)")
+                    
                     match_upload_status = gr.Markdown("")
                 
                 with gr.Column():
@@ -467,7 +508,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             )
 
             launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device], outputs=[match_logs])
-            stop_match_btn.click(stop_active_process, outputs=[match_logs])
+            stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
+            toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
 
         # --- TAB 3: CONFIG ---
         with gr.Tab("⚙️ Core Config Editor"):
@@ -477,6 +519,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     cfg_win_rate = gr.Slider(label="WIN_RATE_THRESHOLD (Phase Advance)", minimum=0.5, maximum=0.95, value=config.WIN_RATE_THRESHOLD, step=0.01)
                     cfg_steps = gr.Number(label="Default Training Steps", value=config.STARTING_TOTAL_TIMESTEPS, precision=0)
                     cfg_port = gr.Number(label="Base Socket Port", value=config.PORT, precision=0)
+                    cfg_input_display = gr.Checkbox(label="Enable Input Display in Match Tests", value=getattr(config, 'ENABLE_INPUT_DISPLAY', True))
                     
                     save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
                     cfg_status = gr.Markdown("")
@@ -486,7 +529,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     state_upload = gr.File(label="Upload Custom Savestates (.State)", file_types=[".State"], file_count="multiple")
                     state_upload_status = gr.Markdown("")
             
-            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port], outputs=[cfg_status])
+            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port, cfg_input_display], outputs=[cfg_status])
 
     # --- GLOBAL EVENT HANDLERS ---
     

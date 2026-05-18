@@ -102,7 +102,6 @@ def process_action(act, algo):
         return "".join(str(int(b)) for b in act[0])
 
 def test_ai_vs_ai():
-    config.generate_lua_config()
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--load_zip_p1", type=str, required=True)
@@ -114,6 +113,40 @@ def test_ai_vs_ai():
     parser.add_argument("--load_pkl_p2", type=str, required=True)
     parser.add_argument("--device_p2", type=str, default="auto")
     args = parser.parse_args()
+
+    # Auto-detect algorithm override for P1
+    if args.load_zip_p1 != "None":
+        lower_path_p1 = args.load_zip_p1.lower()
+        if "dqn" in lower_path_p1 and args.algo_p1.lower() != "dqn":
+            print(f"\n[WARN] Auto-detected 'dqn' in P1 path. Overriding algorithm '{args.algo_p1.upper()}' to 'DQN'.")
+            args.algo_p1 = "dqn"
+        elif "sac" in lower_path_p1 and args.algo_p1.lower() != "sac":
+            print(f"\n[WARN] Auto-detected 'sac' in P1 path. Overriding algorithm '{args.algo_p1.upper()}' to 'SAC'.")
+            args.algo_p1 = "sac"
+        elif "ppo" in lower_path_p1 and args.algo_p1.lower() != "ppo":
+            print(f"\n[WARN] Auto-detected 'ppo' in P1 path. Overriding algorithm '{args.algo_p1.upper()}' to 'PPO'.")
+            args.algo_p1 = "ppo"
+            
+    # Auto-detect algorithm override for P2
+    if args.load_zip_p2 != "None":
+        lower_path_p2 = args.load_zip_p2.lower()
+        if "dqn" in lower_path_p2 and args.algo_p2.lower() != "dqn":
+            print(f"\n[WARN] Auto-detected 'dqn' in P2 path. Overriding algorithm '{args.algo_p2.upper()}' to 'DQN'.")
+            args.algo_p2 = "dqn"
+        elif "sac" in lower_path_p2 and args.algo_p2.lower() != "sac":
+            print(f"\n[WARN] Auto-detected 'sac' in P2 path. Overriding algorithm '{args.algo_p2.upper()}' to 'SAC'.")
+            args.algo_p2 = "sac"
+        elif "ppo" in lower_path_p2 and args.algo_p2.lower() != "ppo":
+            print(f"\n[WARN] Auto-detected 'ppo' in P2 path. Overriding algorithm '{args.algo_p2.upper()}' to 'PPO'.")
+            args.algo_p2 = "ppo"
+
+    # Set Model Labels for Lua UI
+    p1_name = os.path.basename(args.load_zip_p1).replace(".zip", "")
+    p2_name = os.path.basename(args.load_zip_p2).replace(".zip", "")
+    config.P1_MODEL_NAME = f"AI: {p1_name}"
+    config.P2_MODEL_NAME = f"AI: {p2_name}"
+
+    config.generate_lua_config()
 
     # Device Auto-Logic
     device_p1 = args.device_p1
