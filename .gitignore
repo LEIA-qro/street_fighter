@@ -26,12 +26,10 @@ lua/test2.lua
 .gemini/
 gha-creds-*.json
 
-handoff.md
 GEMINI.md
 
 /src/agents/dqn/__pycache__
 /src/agents/sac/__pycache__
 /src/scripts/__pycache__
 /src/agents/sac/__pycache__
-handoff.md
 /src/agents/sac/__pycache__
