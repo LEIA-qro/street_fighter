@@ -132,6 +132,7 @@ class SACAgent(BaseAgent):
             print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
             if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_EMERGENCY"))
             if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
+            raise
 
         except Exception as e:
             print(f"\n[CRITICAL ERROR] Training crashed: {e}")
@@ -190,11 +191,29 @@ class SACAgent(BaseAgent):
         print(f"Best Value: {study.best_value}")
         print(f"Best Params: {study.best_params}")
 
+        # Save Best Model and VecNorm
+        import shutil
+        import json
         
-        print("\n[Tuning] Complete!")
-        print(f"Best Trial: {study.best_trial.number}")
-        print(f"Best Value: {study.best_value}")
-        print(f"Best Params: {study.best_params}")
+        best_trial_num = study.best_trial.number
+        best_model_path = os.path.join(tuning_dir, f"trial_{best_trial_num}_model.zip")
+        best_vec_path = os.path.join(tuning_dir, f"trial_{best_trial_num}_vecnormalize.pkl")
+        
+        final_model_path = os.path.join(tuning_dir, "best_model.zip")
+        final_vec_path = os.path.join(tuning_dir, "best_vecnormalize.pkl")
+        final_params_path = os.path.join(tuning_dir, "best_params.json")
+
+        if os.path.exists(best_model_path):
+            shutil.copy(best_model_path, final_model_path)
+            print(f"[Tuning] Saved best model to: {final_model_path}")
+        
+        if os.path.exists(best_vec_path):
+            shutil.copy(best_vec_path, final_vec_path)
+            print(f"[Tuning] Saved best vecnormalize to: {final_vec_path}")
+
+        with open(final_params_path, "w") as f:
+            json.dump(study.best_params, f, indent=4)
+            print(f"[Tuning] Saved best parameters to: {final_params_path}")
 
     def test(self):
         pass

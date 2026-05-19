@@ -34,7 +34,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         config.TRAINING_STATES = config.CURRICULUM_PHASES[int(start_phase)]
     
     directories = config.get_directory()
-    trial_log_dir = os.path.join(directories["tuning_logs"], f"trial_{trial.number}")
+    trial_log_dir = os.path.join(directories["tuning_logs"], "dqn", f"trial_{trial.number}")
     os.makedirs(trial_log_dir, exist_ok=True)
 
     env = None
@@ -105,12 +105,28 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
 
         mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
         
-        trial_model_path = os.path.join(directories["tuning"], f"trial_{trial.number}_model")
+        # 5. Save Trial Model and VecNorm
+        trial_dir = os.path.join(directories["tuning"], "dqn")
+        os.makedirs(trial_dir, exist_ok=True)
+        
+        trial_model_path = os.path.join(trial_dir, f"trial_{trial.number}_model")
         model.save(trial_model_path)
+        
+        if hasattr(env, "save"):
+            env.save(os.path.join(trial_dir, f"trial_{trial.number}_vecnormalize.pkl"))
         
         return mean_reward
 
     except optuna.exceptions.TrialPruned:
+        raise
+    except KeyboardInterrupt:
+        print(f"\n[Optuna] Trial {trial.number} forcefully interrupted by user. Saving EMERGENCY files...")
+        trial_dir = os.path.join(directories["tuning"], "dqn")
+        os.makedirs(trial_dir, exist_ok=True)
+        if model is not None:
+            model.save(os.path.join(trial_dir, f"trial_{trial.number}_EMERGENCY_model"))
+        if hasattr(env, "save"):
+            env.save(os.path.join(trial_dir, f"trial_{trial.number}_EMERGENCY_vecnormalize.pkl"))
         raise
     except Exception as e:
         print(f"[Optuna] Trial {trial.number} failed with error: {e}")

@@ -21,7 +21,8 @@ local python_config = require("generated_config")
 local STATES_DIR = python_config.STATES_DIR
 
 -- Change this flag to true if you want to visualize the emulator
-local activate_visualization = true
+local activate_visualization = python_config.ACTIVATE_VISUALIZATION
+if activate_visualization == nil then activate_visualization = true end
 
 -- Check if the server was initialized properly via the command line
 local port = comm.socketServerGetPort()

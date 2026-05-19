@@ -102,6 +102,10 @@ def process_action(act, algo):
         return "".join(str(int(b)) for b in act[0])
 
 def test_ai_vs_ai():
+    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
+    import torch
+    torch.set_num_threads(1)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--load_zip_p1", type=str, required=True)
@@ -112,6 +116,7 @@ def test_ai_vs_ai():
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
     parser.add_argument("--device_p2", type=str, default="auto")
+    parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
     args = parser.parse_args()
 
     # Auto-detect algorithm override for P1
@@ -151,11 +156,11 @@ def test_ai_vs_ai():
     # Device Auto-Logic
     device_p1 = args.device_p1
     if device_p1 == "auto":
-        device_p1 = "cpu" if args.algo_p1.lower() == "ppo" else "cuda"
+        device_p1 = "cuda" if torch.cuda.is_available() else "cpu"
         
     device_p2 = args.device_p2
     if device_p2 == "auto":
-        device_p2 = "cpu" if args.algo_p2.lower() == "ppo" else "cuda"
+        device_p2 = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Suppress SB3 GPU Warnings for MlpPolicy
     import warnings
@@ -246,6 +251,14 @@ def test_ai_vs_ai():
     buf_p1.reset(obs_p1_raw)
     buf_p2.reset(obs_p2_raw)
 
+    # Optional Profiling setup
+    profiler = None
+    if args.profile:
+        import cProfile, pstats
+        profiler = cProfile.Profile()
+        profiler.enable()
+        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
+
     try:
         while True:
             # Stack observations -> (2216,) each
@@ -281,6 +294,13 @@ def test_ai_vs_ai():
         print("\nAI vs AI session ended by user.")
 
     finally:
+        if profiler:
+            profiler.disable()
+            print("\n" + "="*60)
+            print("        PERFORMANCE PROFILE (CUMULATIVE TIME)")
+            print("="*60)
+            stats = pstats.Stats(profiler).sort_stats('cumulative')
+            stats.print_stats(20)
         master_env.close()
 
 if __name__ == "__main__":

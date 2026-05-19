@@ -22,6 +22,10 @@ def get_model_class(algo_name):
 def test_agent():
     # GPU Verification
     import torch
+    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
+    # This prevents it from hijacking all logical cores for inference.
+    torch.set_num_threads(1)
+
     if torch.cuda.is_available():
         print(f"[Hardware] Testing on GPU: {torch.cuda.get_device_name(0)}")
     else:
@@ -34,6 +38,7 @@ def test_agent():
     parser.add_argument("--player", type=int, default=1)
     parser.add_argument("--opponent_type", type=str, choices=["human", "cpu"], default="human")
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
     args = parser.parse_args()
 
     # Auto-detect algorithm override based on path to prevent mismatch errors
@@ -65,7 +70,7 @@ def test_agent():
     # Device Auto-Logic
     device = args.device
     if device == "auto":
-        device = "cpu" if args.algo.lower() == "ppo" else "cuda"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Suppress SB3 GPU Warnings for MlpPolicy
     import warnings
@@ -136,6 +141,14 @@ def test_agent():
     print(f"\nFIGHT! (The {args.algo.upper()} AI engine is now running in the background)")
     obs = env.reset()
     
+    # Optional Profiling setup
+    profiler = None
+    if args.profile:
+        import cProfile, pstats
+        profiler = cProfile.Profile()
+        profiler.enable()
+        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
+
     try:
         while True:
             action, _states = model.predict(obs, deterministic=False) 
@@ -157,6 +170,13 @@ def test_agent():
     except KeyboardInterrupt:
         print("\nInteractive session ended by user.")
     finally:
+        if profiler:
+            profiler.disable()
+            print("\n" + "="*60)
+            print("        PERFORMANCE PROFILE (CUMULATIVE TIME)")
+            print("="*60)
+            stats = pstats.Stats(profiler).sort_stats('cumulative')
+            stats.print_stats(20)
         env.close()
 
 if __name__ == "__main__":

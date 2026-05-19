@@ -1,34 +1,35 @@
-# Project Handoff: Street Fighter II RL
+# Project Handoff: Street Fighter II RL (Ryu Specialist)
 
-## 🎯 Current Goal
-The objective is to train a Ryu specialist capable of defeating all opponents on the hardest difficulty using a custom RL pipeline (PPO/SAC/DQN) built on a lock-step TCP bridge between Python and BizHawk (Lua). We are currently hardening the "v2.0" environment, which features a 555-dimensional hybrid observation space (continuous RAM + One-Hot Actions/Characters) and a manual curriculum.
+## 📝 Project Summary
+This project implements a production-grade Reinforcement Learning (RL) pipeline for Street Fighter II' - Special Champion Edition on the Sega Genesis. Using a custom lock-step TCP bridge between Python (Stable Baselines3) and BizHawk (Lua), we train a Ryu specialist through a manual curriculum. The architecture is algorithm-agnostic (supporting PPO, SAC, DQN) and optimized for hardware acceleration (CUDA) and reproducible hyperparameter tuning via Optuna.
 
-## 📊 Current State of the Code
-- **Hardware Integration:** Stable. Staggered booting is implemented to prevent CPU/IO bottlenecks during parallel initialization of 10+ emulators.
-- **Environment (v2.0):** 
-    - Observations include universal relative distance (RAM 0x834C) to fix character-specific hitbox discrepancies.
-    - Velocity clipping widened to `[-100, 100]` to capture high-speed movement without signal saturation.
-    - Self-healing `reset()` logic implemented to automatically respawn crashed emulator ranks without killing the whole training session.
-- **Web Dashboard:** Updated to Gradio 6.0 standards. Features a dedicated "Copy Logs" button (JS-based) and a Compute Device selector (`auto`, `cpu`, `cuda`).
-- **Optuna Tuning:** Bulletproofed. Crashed trials are now marked as `FAIL` (preserving params but ignoring them in the math) rather than being penalized with bad scores.
-- **Performance:** `auto` device logic implemented (PPO on CPU for speed, SAC/DQN on CUDA for heavy sampling).
+## 🎯 Goal
+Current focus: **Reliability, Performance, and Hyperparameter Optimization.**
+We are streamlining the transition from Optuna tuning to production training by ensuring tuning trials are isolated, normalization statistics (VecNorm) are preserved, and the system can be gracefully stopped without losing progress.
 
-## 🛠 Active Files
-- `src/envs/sf2_v2.py`: Core RL environment and reward logic.
-- `src/core/env_tools.py`: Boot orchestration and staggered initialization.
-- `src/core/bizhawk_base.py`: Low-level TCP socket bridge.
-- `src/scripts/web_dashboard.py`: Gradio control center.
-- `lua/v2.0/training_env_client.lua`: Headless training loop.
-- `src/agents/*/agent.py`: Algorithm implementations and parameter propagation.
+## 🚀 Current State
+The project is now hardware-optimized and tuning-resilient:
+1.  **Hardware Efficiency**: All agents (PPO, DQN, SAC) target the Dedicated GPU (CUDA) by default. Inference is throttled to 1 CPU thread to prevent spikes.
+2.  **Tuning Isolation**: Optuna trials are namespaced into subdirectories (e.g., `models/tuning/ppo/`).
+3.  **State Persistence**: `SelectiveVecNormalize` statistics are saved for every tuning trial and production checkpoint.
+4.  **Graceful Emergency Lifecycle**: The dashboard "Stop" command triggers an `_EMERGENCY` save for both models and VecNorm files, with a 15s buffer to ensure disk write completion.
+5.  **Clean UI**: Dashboard dropdowns are strictly filtered by algorithm to prevent loading incompatible models.
+6.  **Performance Profiling**: Integrated `cProfile` support in testing scripts to identify bottlenecks.
 
-## ❌ What Failed / Was Fixed
-- **Penalizing Crashed Trials:** Returning `-99999.0` for crashed Optuna trials was poisoning the sampler. Fixed by raising exceptions and using Optuna's native `FAIL` state.
-- **Parallel Boot Deadlock:** Launching 10 emulators at once caused `[WinError 10054]` resets. Fixed by increasing Lua timeouts to 600s and staggering Python-side boots (3.5s delay per rank).
-- **Gradio 6.0 Warnings:** `theme`/`css` moved from constructor to `launch()`, and `show_copy_button` was removed. Fixed via refactoring and custom JS button.
-- **Incorrect RAM Width:** Universal distance was initially read as `u16_be`, which picked up garbage from adjacent bytes. Fixed by switching to `u8`.
+## 📂 Files Actively Edited
+- `src/agents/{ppo,dqn,sac}/optuna_study.py`: Tuning isolation, VecNorm saving, and interrupt handling.
+- `src/agents/{ppo,dqn,sac}/agent.py`: Best-model export and re-raising interrupts for reliability.
+- `src/scripts/web_dashboard.py`: UI filtering, shutdown logic, and performance toggles.
+- `src/core/config.py`: Configuration persistence and Lua bridge management.
 
-## ⏭ Next Steps
-1. **Validation Run:** Start a fresh training session using the `auto` device setting via the dashboard to verify the PPO-on-CPU performance speedup.
-2. **Fresh Models:** Since the observation dimension changed from 554 to 555, all existing `.zip` models are incompatible. A new "Phase 0" baseline needs to be trained.
-3. **Reward Tuning:** Monitor the new exponentially decaying footsie reward (`FOOTSIE_DECAY_RATE`). Ensure it effectively prevents "camping" without discouraging safe spacing.
-4. **Interactive Testing:** Use the "AI vs AI" tab to verify the perspective-isolated parsers correctly handle the new 13-item payload for both players.
+## ❌ Failed Attempts (Archive)
+- **Regex Backreferences**: Previously used `\1` in config updates; switched to `\g<1>` to prevent numerical corruption (e.g., Group 110 errors).
+- **CPU Multi-threading**: Initial PPO CPU training caused 90%+ lag; resolved by forcing CUDA and `set_num_threads(1)`.
+- **Global Tuning Folder**: Trial 0 for PPO used to overwrite Trial 0 for DQN; fixed with subdirectory namespacing.
+- **Swallowing Interrupts**: Agent loops used to catch `KeyboardInterrupt` without re-raising; fixed to allow `train.py` retry loops to stop definitively.
+- **PowerShell Syntax**: Attempted `&&` for command chaining; switched to `;` for compatibility.
+
+## ⏭️ Next Steps
+1.  **Config Sync**: Manually update `PHASE_HYPERPARAMS` in `src/agents/{algo}/config.py` using values from the newly generated `best_params.json` files.
+2.  **Extended Tuning**: Run a high-trial tuning session (50+ trials) on Phase 3/4 to find optimal coefficients for late-game matchups.
+3.  **Validation**: Test the `best_model.zip` (exported after tuning) in a Matchup to confirm it outperforms the baseline.

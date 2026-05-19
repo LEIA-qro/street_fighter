@@ -34,6 +34,7 @@ TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "traini
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
 INPUT_DISPLAY_LUA_PATH = os.path.join(LUA_DIR, "Input_Display.lua")
 ENABLE_INPUT_DISPLAY = True
+ACTIVATE_VISUALIZATION = True
 
 # Player Labels for On-Screen Display
 P1_MODEL_NAME = "None"
@@ -57,6 +58,7 @@ config.PROJECT_ROOT = "{PROJECT_ROOT.replace(chr(92), chr(92)*2)}"
 config.HOST = "{HOST}"
 config.PORT = {PORT}
 config.ENABLE_INPUT_DISPLAY = {str(ENABLE_INPUT_DISPLAY).lower()}
+config.ACTIVATE_VISUALIZATION = {str(ACTIVATE_VISUALIZATION).lower()}
 config.P1_MODEL_NAME = "{P1_MODEL_NAME}"
 config.P2_MODEL_NAME = "{P2_MODEL_NAME}"
 
@@ -105,7 +107,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "dqn_sf2_production_ryu1" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "dqn_ryu_footsie3.1" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 

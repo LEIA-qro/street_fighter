@@ -37,7 +37,7 @@ def main():
     # Device Auto-Logic
     device = args.device
     if device == "auto":
-        device = "cpu" if args.algo.lower() == "ppo" else "cuda"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     
     # Suppress SB3 GPU Warnings for MlpPolicy
     import warnings

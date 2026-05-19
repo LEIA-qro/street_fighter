@@ -65,19 +65,14 @@ def get_model_files(algo=None):
             os.path.join(models_dir, "production", algo),
             os.path.join(models_dir, "tuning", algo)
         ]
-        # Also include root models directory if we want a global fallback
-        search_dirs.append(models_dir)
         
         zip_files = []
         pkl_files = []
         for d in search_dirs:
             if os.path.exists(d):
-                # Look for files matching the algo in name or directory
-                all_zips = glob.glob(os.path.join(d, "**/*.zip"), recursive=True)
-                all_pkls = glob.glob(os.path.join(d, "**/*.pkl"), recursive=True)
-                
-                zip_files.extend([f for f in all_zips if algo.lower() in f.lower()])
-                pkl_files.extend([f for f in all_pkls if algo.lower() in f.lower()])
+                # Look for files directly in the algorithm's dedicated directories
+                zip_files.extend(glob.glob(os.path.join(d, "**/*.zip"), recursive=True))
+                pkl_files.extend(glob.glob(os.path.join(d, "**/*.pkl"), recursive=True))
     else:
         zip_files = glob.glob(os.path.join(models_dir, "**/*.zip"), recursive=True)
         pkl_files = glob.glob(os.path.join(models_dir, "**/*.pkl"), recursive=True)
@@ -139,13 +134,19 @@ def stop_active_process():
             print(f"[Dashboard] Sending Graceful Stop (CTRL_C) to PID {proc.pid}...")
             os.kill(proc.pid, signal.CTRL_C_EVENT)
             
-            # 2. Wait for the agent to finish its EMERGENCY save logic (now has a 2s buffer)
-            time.sleep(5) 
+            # 2. Wait up to 15 seconds for the agent to finish its EMERGENCY save logic
+            for _ in range(15):
+                if proc.poll() is not None:
+                    break
+                time.sleep(1)
             
             # 3. Final Tree-Kill Failsafe: Ensure BizHawk and Lua are definitely dead
-            print(f"[Dashboard] Finalizing cleanup for PID {proc.pid} and children...")
-            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
-            
+            if proc.poll() is None:
+                print(f"[Dashboard] Process {proc.pid} timed out during stop. Force killing...")
+                subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+            else:
+                print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
+                
         except Exception as e:
             print(f"[Dashboard] Error during stop: {e}")
         
@@ -174,7 +175,7 @@ def update_config_var(key, value):
     if re.search(pattern, content, flags=re.MULTILINE):
         # Escape backslashes for the replacement string to prevent regex backreference corruption (Bug 7)
         safe_value = formatted_value.replace("\\", "\\\\")
-        content = re.sub(pattern, rf"\1{safe_value}\3", content, flags=re.MULTILINE)
+        content = re.sub(pattern, rf"\g<1>{safe_value}\g<3>", content, flags=re.MULTILINE)
         with open(config_path, "w") as f:
             f.write(content)
         return True
@@ -247,7 +248,7 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device):
+def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device, profile_enabled):
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
@@ -277,6 +278,9 @@ def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_
     else:
         yield "Invalid Matchup: At least one player must be an AI model (PPO, SAC, or DQN)."
         return
+
+    if profile_enabled:
+        cmd += ["--profile"]
         
     for log in stream_logs(cmd):
         yield log
@@ -307,13 +311,14 @@ def stop_match_process():
         pass
     return log_msg, "Agent State: **PAUSED** (Default)"
 
-def save_all_config(n_envs, win_rate, steps, port, input_display):
+def save_all_config(n_envs, win_rate, steps, port, input_display, activate_viz):
     updates = {
-        "N_ENVS": n_envs,
+        "N_ENVS": int(n_envs),
         "WIN_RATE_THRESHOLD": win_rate,
-        "STARTING_TOTAL_TIMESTEPS": steps,
-        "PORT": port,
-        "ENABLE_INPUT_DISPLAY": input_display
+        "STARTING_TOTAL_TIMESTEPS": int(steps),
+        "PORT": int(port),
+        "ENABLE_INPUT_DISPLAY": input_display,
+        "ACTIVATE_VISUALIZATION": activate_viz
     }
     success = True
     for k, v in updates.items():
@@ -322,6 +327,7 @@ def save_all_config(n_envs, win_rate, steps, port, input_display):
     
     if success:
         importlib.reload(config)
+        gr.Info("Configuration saved and environment reloaded!")
         return "✅ Configuration saved successfully!"
     return "❌ Error: Some variables could not be found in config.py"
 
@@ -468,8 +474,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         stop_match_btn = gr.Button("🛑 Terminate Match", variant="stop")
                     
                     with gr.Row():
+                        match_profile_checkbox = gr.Checkbox(label="Enable Performance Profiling", value=False)
                         toggle_agent_btn = gr.Button("⏯️ Toggle Agent (Play/Pause)", variant="secondary")
-                        agent_state_status = gr.Markdown("Agent State: **PAUSED** (Default)")
+                    
+                    agent_state_status = gr.Markdown("Agent State: **PAUSED** (Default)")
                     
                     match_upload_status = gr.Markdown("")
                 
@@ -507,7 +515,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
             )
 
-            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device], outputs=[match_logs])
+            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device, match_profile_checkbox], outputs=[match_logs])
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
 
@@ -520,6 +528,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     cfg_steps = gr.Number(label="Default Training Steps", value=config.STARTING_TOTAL_TIMESTEPS, precision=0)
                     cfg_port = gr.Number(label="Base Socket Port", value=config.PORT, precision=0)
                     cfg_input_display = gr.Checkbox(label="Enable Input Display in Match Tests", value=getattr(config, 'ENABLE_INPUT_DISPLAY', True))
+                    cfg_activate_visualization = gr.Checkbox(label="Enable Training Visualization", value=getattr(config, 'ACTIVATE_VISUALIZATION', True))
                     
                     save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
                     cfg_status = gr.Markdown("")
@@ -529,7 +538,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     state_upload = gr.File(label="Upload Custom Savestates (.State)", file_types=[".State"], file_count="multiple")
                     state_upload_status = gr.Markdown("")
             
-            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port, cfg_input_display], outputs=[cfg_status])
+            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port, cfg_input_display, cfg_activate_visualization], outputs=[cfg_status])
 
     # --- GLOBAL EVENT HANDLERS ---
     
