@@ -4,32 +4,33 @@
 This project implements a production-grade Reinforcement Learning (RL) pipeline for Street Fighter II' - Special Champion Edition on the Sega Genesis. Using a custom lock-step TCP bridge between Python (Stable Baselines3) and BizHawk (Lua), we train a Ryu specialist through a manual curriculum. The architecture is algorithm-agnostic (supporting PPO, SAC, DQN) and optimized for hardware acceleration (CUDA) and reproducible hyperparameter tuning via Optuna.
 
 ## 🎯 Goal
-Current focus: **Reliability, Performance, and Hyperparameter Optimization.**
-We are streamlining the transition from Optuna tuning to production training by ensuring tuning trials are isolated, normalization statistics (VecNorm) are preserved, and the system can be gracefully stopped without losing progress.
+Current focus: **Solving the Entropy Plateau and Stabilizing Convergence.**
+We have identified that the original `MultiBinary(10)` action space (1,024 combinations) was too sparse and invalid for the policy gradient to effectively explore, leading to stagnant learning. The goal is to transition to the `v3` architecture to accelerate win rate improvement.
 
 ## 🚀 Current State
-The project is now hardware-optimized and tuning-resilient:
-1.  **Hardware Efficiency**: All agents (PPO, DQN, SAC) target the Dedicated GPU (CUDA) by default. Inference is throttled to 1 CPU thread to prevent spikes.
-2.  **Tuning Isolation**: Optuna trials are namespaced into subdirectories (e.g., `models/tuning/ppo/`).
-3.  **State Persistence**: `SelectiveVecNormalize` statistics are saved for every tuning trial and production checkpoint.
-4.  **Graceful Emergency Lifecycle**: The dashboard "Stop" command triggers an `_EMERGENCY` save for both models and VecNorm files, with a 15s buffer to ensure disk write completion.
-5.  **Clean UI**: Dashboard dropdowns are strictly filtered by algorithm to prevent loading incompatible models.
-6.  **Performance Profiling**: Integrated `cProfile` support in testing scripts to identify bottlenecks.
+The project has undergone a major architectural stabilization phase:
+1.  **Translation Invariance (Fix C)**: `v2` and `v3` environments now use relative $X/Y$ coordinates and wall distance instead of absolute RAM values, enabling faster spatial generalization.
+2.  **Reward Normalization (Fix A)**: Enhanced `SelectiveVecNormalize` with a Welford online algorithm for rewards, preventing Value Function explosion while protecting one-hot encoded observations.
+3.  **v3 Architecture (Fix B)**: Implemented a new `MultiDiscrete([9, 7])` environment. This reduces the exploration space from **1,024 to 63** valid combinations and corrects button mapping for Ryu's full moveset (6 individual buttons).
+4.  **Hardware Resilience (Fix D)**: Socket deaths now return a `0.0` reward and a `socket_death` flag, preventing rollout buffer poisoning.
+5.  **Ecosystem Compatibility**: Dashboard and AI-vs-AI evaluation scripts now fully support mixed-version matchups and `v3` specific logic.
 
 ## 📂 Files Actively Edited
-- `src/agents/{ppo,dqn,sac}/optuna_study.py`: Tuning isolation, VecNorm saving, and interrupt handling.
-- `src/agents/{ppo,dqn,sac}/agent.py`: Best-model export and re-raising interrupts for reliability.
-- `src/scripts/web_dashboard.py`: UI filtering, shutdown logic, and performance toggles.
-- `src/core/config.py`: Configuration persistence and Lua bridge management.
+- `src/envs/sf2_v3.py`: Implementation of the MultiDiscrete environment.
+- `src/core/selective_norm.py`: Welford reward normalization and state persistence.
+- `src/envs/sf2_v2.py`: Relative coordinate updates and socket error handling.
+- `src/scripts/web_dashboard.py`: UI integration for v3 and mixed-version matchups.
+- `src/scripts/test_ai_vs_ai_v2.py` & `test_agent_v2.py`: Cross-version evaluation support.
+- `src/core/config.py`: `OBS_DIM` adjustment (11 to 10).
 
-## ❌ Failed Attempts (Archive)
-- **Regex Backreferences**: Previously used `\1` in config updates; switched to `\g<1>` to prevent numerical corruption (e.g., Group 110 errors).
-- **CPU Multi-threading**: Initial PPO CPU training caused 90%+ lag; resolved by forcing CUDA and `set_num_threads(1)`.
-- **Global Tuning Folder**: Trial 0 for PPO used to overwrite Trial 0 for DQN; fixed with subdirectory namespacing.
-- **Swallowing Interrupts**: Agent loops used to catch `KeyboardInterrupt` without re-raising; fixed to allow `train.py` retry loops to stop definitively.
-- **PowerShell Syntax**: Attempted `&&` for command chaining; switched to `;` for compatibility.
+## ❌ Failed Attempts (Compressed)
+- **Absolute Coordinates**: Caused the network to learn identical interactions multiple times based on screen position.
+- **MultiBinary(10) Exploration**: Confirmed via telemetry (entropy loss -6.83 at 675K steps) to be statistically intractable for fast convergence.
+- **-50.0 Socket Penalty**: Poisoned the training buffer with artificial hardware-failure data.
+- **Fuzzy Dashboard Matches**: Initial UI replacements for Player 2 rows caused syntax errors due to duplicate lines; resolved via targeted surgical edits.
+- **Regex Backreferences**: Switched `\1` to `\g<1>` for numerical config safety.
 
 ## ⏭️ Next Steps
-1.  **Config Sync**: Manually update `PHASE_HYPERPARAMS` in `src/agents/{algo}/config.py` using values from the newly generated `best_params.json` files.
-2.  **Extended Tuning**: Run a high-trial tuning session (50+ trials) on Phase 3/4 to find optimal coefficients for late-game matchups.
-3.  **Validation**: Test the `best_model.zip` (exported after tuning) in a Matchup to confirm it outperforms the baseline.
+1.  **v3 Optimization**: Run a short Optuna study (20 trials, 75K steps) specifically for the `v3` environment (`python src/scripts/tune.py --algo ppo --env v3`).
+2.  **Entropy Monitoring**: Verify that `v3` entropy loss reaches -6.50 or below within the first 200K steps.
+3.  **Production Migration**: Once hyperparameters are tuned, launch the first `v3` production run against the baseline curriculum.

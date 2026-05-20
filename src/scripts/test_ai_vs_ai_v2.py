@@ -17,16 +17,20 @@ from core.selective_norm import SelectiveVecNormalize
 
 directories = config.get_directory()
 
-class _MockV2Env(gym.Env):
+class _MockEnv(gym.Env):
     """
-    Zero-cost shell with correct v2 obs/action spaces.
+    Zero-cost shell with correct obs/action spaces.
     Satisfies SelectiveVecNormalize.load()'s venv argument.
     No socket, no subprocess, no blocking.
     """
-    def __init__(self):
+    def __init__(self, version="v2"):
         super().__init__()
-        self.action_space = spaces.MultiBinary(config.ACTION_DIM)
-        n = TOTAL_OBS_DIM * config.NUM_FRAMES  # 554 * 4 = 2216
+        if version == "v3":
+            self.action_space = spaces.MultiDiscrete([9, 7])
+        else:
+            self.action_space = spaces.MultiBinary(config.ACTION_DIM)
+            
+        n = TOTAL_OBS_DIM * config.NUM_FRAMES  
         self.observation_space = spaces.Box(
             low=np.zeros(n,  dtype=np.float32),
             high=np.ones(n,  dtype=np.float32),
@@ -91,7 +95,7 @@ def get_model_class(algo_name):
         return DQN
     return PPO
 
-def process_action(act, algo):
+def process_action(act, algo, env_version="v2"):
     if algo.lower() == "sac":
         bin_act = (act[0] > 0.0).astype(np.int8)
         return "".join(str(b) for b in bin_act)
@@ -99,7 +103,11 @@ def process_action(act, algo):
         val = act[0] if isinstance(act, np.ndarray) else act
         return format(val, f'0{config.ACTION_DIM}b')
     else:
-        return "".join(str(int(b)) for b in act[0])
+        if env_version == "v3":
+            from envs.sf2_v3 import discrete_to_binary
+            return discrete_to_binary(act[0])
+        else:
+            return "".join(str(int(b)) for b in act[0])
 
 def test_ai_vs_ai():
     # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
@@ -108,11 +116,13 @@ def test_ai_vs_ai():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo_p1", type=str, default="ppo")
+    parser.add_argument("--env_p1",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip_p1", type=str, required=True)
     parser.add_argument("--load_pkl_p1", type=str, required=True)
     parser.add_argument("--device_p1", type=str, default="auto")
     
     parser.add_argument("--algo_p2", type=str, default="ppo")
+    parser.add_argument("--env_p2",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
     parser.add_argument("--device_p2", type=str, default="auto")
@@ -171,12 +181,22 @@ def test_ai_vs_ai():
 
     print("Booting Master Socket...")
     # ── 1. Boot ONE master socket env ──
-    master_env = StreetFighterEnvV2(
-        lua_path=config.MATCH_TEST_ENV_CLIENT_LUA_PATH,
-        trainable=False,
-        rank=0,
-        player=1  
-    )
+    # If any player uses v3, we must use the v3 environment class for correct parsing/logic
+    if args.env_p1 == "v3" or args.env_p2 == "v3":
+        from envs.sf2_v3 import StreetFighterEnvV3
+        master_env = StreetFighterEnvV3(
+            lua_path=config.MATCH_TEST_ENV_CLIENT_LUA_PATH,
+            trainable=False,
+            rank=0,
+            player=1  
+        )
+    else:
+        master_env = StreetFighterEnvV2(
+            lua_path=config.MATCH_TEST_ENV_CLIENT_LUA_PATH,
+            trainable=False,
+            rank=0,
+            player=1  
+        )
     
     # ── 2. Build perspective-isolated parsers ──
     parser_p1 = _PerspectiveParser(master_env, player=1)
@@ -187,14 +207,15 @@ def test_ai_vs_ai():
     buf_p2 = _FrameBuffer(n_frames=config.NUM_FRAMES, obs_dim=TOTAL_OBS_DIM)
 
     # ── 4. Load normalizers ──
-    dummy = DummyVecEnv([_MockV2Env])  
+    dummy_p1 = DummyVecEnv([lambda: _MockEnv(version=args.env_p1)])  
     vec_norm_p1 = SelectiveVecNormalize.load(
-        os.path.join(config.PROJECT_ROOT, args.load_pkl_p1), dummy
+        os.path.join(config.PROJECT_ROOT, args.load_pkl_p1), dummy_p1
     )
     vec_norm_p1.training = False
 
+    dummy_p2 = DummyVecEnv([lambda: _MockEnv(version=args.env_p2)])  
     vec_norm_p2 = SelectiveVecNormalize.load(
-        os.path.join(config.PROJECT_ROOT, args.load_pkl_p2), dummy
+        os.path.join(config.PROJECT_ROOT, args.load_pkl_p2), dummy_p2
     )
     vec_norm_p2.training = False
 
@@ -273,9 +294,9 @@ def test_ai_vs_ai():
             act_p1, _ = model_p1.predict(norm_p1, deterministic=False)
             act_p2, _ = model_p2.predict(norm_p2, deterministic=False)
 
-            # Process action depending on algo
-            cmd_p1 = process_action(act_p1, args.algo_p1)
-            cmd_p2 = process_action(act_p2, args.algo_p2)
+            # Process action depending on algo and env version
+            cmd_p1 = process_action(act_p1, args.algo_p1, env_version=args.env_p1)
+            cmd_p2 = process_action(act_p2, args.algo_p2, env_version=args.env_p2)
 
             # Build 20-bit command string
             cmd = cmd_p1 + cmd_p2 + "\n"

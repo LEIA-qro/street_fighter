@@ -33,6 +33,7 @@ def test_agent():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="ppo")
+    parser.add_argument("--env",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip", type=str, required=True)
     parser.add_argument("--load_pkl", type=str, required=True)
     parser.add_argument("--player", type=int, default=1)
@@ -83,11 +84,20 @@ def test_agent():
     vec_load_path = os.path.join(config.PROJECT_ROOT, args.load_pkl)
 
     # 1. Boot a single emulator window
-    env = StreetFighterEnvV2(
-        lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH , 
-        trainable = False, 
-        rank=-1, 
-        player=args.player
+    if args.env == "v3":
+        from envs.sf2_v3 import StreetFighterEnvV3
+        env = StreetFighterEnvV3(
+            lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH, 
+            trainable = False, 
+            rank=-1, 
+            player=args.player
+        )
+    else:
+        env = StreetFighterEnvV2(
+            lua_path = config.MATCH_TEST_ENV_CLIENT_LUA_PATH , 
+            trainable = False, 
+            rank=-1, 
+            player=args.player
         ) 
     
     env = DummyVecEnv([lambda: env])

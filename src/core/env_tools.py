@@ -17,7 +17,13 @@ def SFv2_make_env(rank, **kwargs):
             print(f"[Rank {rank}] Staggering boot: waiting {delay:.1f}s...")
             time.sleep(delay)
 
-        env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
+        if version == "v3":
+            from envs.sf2_v3 import StreetFighterEnvV3
+            env = StreetFighterEnvV3(rank=rank, player=player, verbose=(rank == 0))
+        else:
+            from envs.sf2_v2 import StreetFighterEnvV2
+            env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
+            
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")
         os.makedirs(log_dir, exist_ok=True)
         return Monitor(env, filename=os.path.join(log_dir, "monitor.csv"))

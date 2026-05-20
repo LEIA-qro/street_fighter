@@ -107,7 +107,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "ppo_sf2_test_nearch" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "ppo_sf2_test1_v3" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 

@@ -248,7 +248,7 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device, profile_enabled):
+def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled):
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
@@ -261,19 +261,19 @@ def run_matchup(p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_
 
     if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
-               "--algo_p1", p1_algo, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl, "--device_p1", p1_device,
-               "--algo_p2", p2_algo, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl, "--device_p2", p2_device]
+               "--algo_p1", p1_algo, "--env_p1", p1_env, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl, "--device_p1", p1_device,
+               "--algo_p2", p2_algo, "--env_p2", p2_env, "--load_zip_p2", p2_zip, "--load_pkl_p2", p2_pkl, "--device_p2", p2_device]
     elif p1_is_ai:
         # P1 is AI, P2 is Player or CPU
         opp_type = "cpu" if p2_algo == "CPU (Built-in AI)" else "human"
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p1_algo, "--load_zip", p1_zip, "--load_pkl", p1_pkl, 
+               "--algo", p1_algo, "--env", p1_env, "--load_zip", p1_zip, "--load_pkl", p1_pkl, 
                "--player", "1", "--opponent_type", opp_type, "--device", p1_device]
     elif p2_is_ai:
         # P2 is AI, P1 is Player
         opp_type = "cpu" if p1_algo == "CPU (Built-in AI)" else "human"
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_agent_v2.py"),
-               "--algo", p2_algo, "--load_zip", p2_zip, "--load_pkl", p2_pkl, 
+               "--algo", p2_algo, "--env", p2_env, "--load_zip", p2_zip, "--load_pkl", p2_pkl, 
                "--player", "2", "--opponent_type", opp_type, "--device", p2_device]
     else:
         yield "Invalid Matchup: At least one player must be an AI model (PPO, SAC, or DQN)."
@@ -375,7 +375,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 with gr.Column(scale=1):
                     algo_sel = gr.Dropdown(label="Algorithm", choices=["ppo", "sac", "dqn"], value="ppo")
                 with gr.Column(scale=1):
-                    env_sel = gr.Dropdown(label="Environment", choices=["v1", "v2"], value="v2")
+                    env_sel = gr.Dropdown(label="Environment", choices=["v1", "v2", "v3"], value="v2")
                 with gr.Column(scale=1):
                     tb_main_btn = gr.Button("📈 Launch TensorBoard", variant="secondary")
             
@@ -446,7 +446,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("### Player 1 (Ryu)")
-                    p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
+                    with gr.Row():
+                        p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
+                        p1_env = gr.Dropdown(label="P1 Environment", choices=["v2", "v3"], value="v2")
                     p1_device = gr.Dropdown(label="P1 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p1_model_group:
@@ -458,7 +460,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             p1_pkl_upload = gr.File(label="Upload P1 Normalization (.pkl)", file_types=[".pkl"])
                     
                     gr.Markdown("### Player 2 (Opponent)")
-                    p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
+                    with gr.Row():
+                        p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
+                        p2_env = gr.Dropdown(label="P2 Environment", choices=["v2", "v3"], value="v2")
                     p2_device = gr.Dropdown(label="P2 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p2_model_group:
@@ -515,7 +519,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
             )
 
-            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_zip, p1_pkl, p1_device, p2_algo, p2_zip, p2_pkl, p2_device, match_profile_checkbox], outputs=[match_logs])
+            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, match_profile_checkbox], outputs=[match_logs])
+
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
 

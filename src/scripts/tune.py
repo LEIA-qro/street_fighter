@@ -22,7 +22,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Street Fighter II RL Hyperparameter Tuning via Optuna")
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"], help="RL algorithm to tune")
-    parser.add_argument("--env", default="v2", choices=["v1", "v2"], help="Environment version")
+    parser.add_argument("--env", default="v2", choices=["v1", "v2", "v3"], help="Environment version")
     parser.add_argument("--trials", type=int, default=2, help="Number of Optuna trials to run")
     parser.add_argument("--study_name", type=str, default="ppo_sf2_tuning", help="Unique name for the Optuna study")
     
@@ -55,7 +55,7 @@ def main():
         agent = module.build_agent()
         
         # Factory function for environment creation
-        env_fn = lambda rank: SFv2_make_env(rank)
+        env_fn = lambda rank: SFv2_make_env(rank, version=args.env)
         
         # Run the tuning process
         agent.tune(
