@@ -8,12 +8,12 @@ from collections import deque
 import core.config as config
 from core.bizhawk_base import BizHawkBaseEnv
 
-CONTINUOUS_DIM = config.OBS_DIM  # HP(2), X(2), Y(2), Proj_X(2), Vel_X(2), RelDist(1) = 11
+CONTINUOUS_DIM = config.OBS_DIM  # HP(2), RelX(1), RelY(1), WallDist(1), Proj_X(2), Vel_X(2), RelDist(1) = 10
 ACT_CATEGORIES = 256 # 
 CHAR_CATEGORIES = 16
 ONE_HOT_ACT_DIM = ACT_CATEGORIES * 2
 ONE_HOT_CHAR_DIM = CHAR_CATEGORIES * 2
-TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 11+512+32 = 555
+TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32 = 554
 
 
 class StreetFighterEnvV2(BizHawkBaseEnv):
@@ -37,13 +37,11 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         self.action_space = spaces.MultiBinary(config.ACTION_DIM)
         
         # --- THE NEW HYBRID SPACE ---
-        # Continuous bounds: P1_HP, P2_HP, P1_X, P2_X, P1_Y, P2_Y, P1_ProjX, P2_ProjX
-        # Velocity range: max observable delta per 4-frame skip is ~100px
-        # rel_dist range is 0 to 187
-        cont_low  = [0., 0., 0., 0., 0., 0., -1., -1., -100., -100., 0.]
-        cont_high = [176., 176., 500., 500., 200., 200., 500., 500., 100., 100., 187.]
+        # Continuous bounds: P1_HP, P2_HP, RelX, RelY, P1_WallDist, P1_ProjX, P2_ProjX, P1_VelX, P2_VelX, RelDist
+        cont_low  = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.]
+        cont_high = [176., 176., 500., 200., 250., 500., 500., 100., 100., 187.]
         
-        # One-Hot bounds: 552 zeros and ones
+        # One-Hot bounds: 544 zeros and ones
         act_low = [0.] * ONE_HOT_ACT_DIM
         act_high = [1.] * ONE_HOT_ACT_DIM
         char_low = [0.] * ONE_HOT_CHAR_DIM
@@ -53,9 +51,9 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         single_frame_high = cont_high + act_high + char_high
 
         # Change dtype throughout
-        low  = np.array(single_frame_low  * config.NUM_FRAMES, dtype=np.float32)  # was int32
-        high = np.array(single_frame_high * config.NUM_FRAMES, dtype=np.float32)  # was int32
-        self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32) # was int32
+        low  = np.array(single_frame_low  * config.NUM_FRAMES, dtype=np.float32)
+        high = np.array(single_frame_high * config.NUM_FRAMES, dtype=np.float32)
+        self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
     
         # ------------------------------------
         self.active_training_states = config.TRAINING_STATES
@@ -106,7 +104,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
             # Do NOT let this propagate - it kills the SubpocVecEnv
             print(f"[Rank {self.port - config.PORT}] Socket error in step: {e}. Returning terminal obs.")
             obs = self._get_obs() if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM * config.NUM_FRAMES, dtype=np.float32)
-            return obs, -50.0, True, False, {"socket_death": True}
+            return obs, 0.0, True, False, {"socket_death": True}
         
         observation = self._parse_payload(data, is_reset=False)
 
@@ -126,8 +124,8 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
         FOOTSIE_BASE_REWARD  = 0.05
         FOOTSIE_DECAY_RATE   = 0.05   # at 60 idle steps (~6 in-game seconds): 0.05*e^-3 ≈ 0.0025
 
-        # Read the engine-native distance from observation (index 10)
-        rel_dist = int(observation[10])
+        # Read the engine-native distance from observation (index 9)
+        rel_dist = int(observation[9])
 
         # Exponentially decaying footsie reward:
         if rel_dist <= FOOTSIE_RANGE_MAX:
@@ -196,8 +194,17 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
                 self.prev_my_hp    = float(observation[0]) if observation[0] > 0 else 176.0
                 self.prev_enemy_hp = float(observation[1]) if observation[1] > 0 else 176.0
-                self.prev_p1_x = int(observation[2])
-                self.prev_p2_x = int(observation[3])
+                
+                # Internal absolute coordinates are still tracked for velocity calculation
+                # (These are NOT in the final observation anymore, but we need them for deltas)
+                csv_string = data.strip().split(" ")[-1]
+                parts = csv_string.split(",")
+                if len(parts) == 13:
+                    raw = [int(x) for x in parts]
+                    if self.player == 2:
+                        self.prev_p1_x, self.prev_p2_x = raw[3], raw[2]
+                    else:
+                        self.prev_p1_x, self.prev_p2_x = raw[2], raw[3]
 
                 # Reset reward tracking
                 self.footsie_steps = 0
@@ -226,14 +233,14 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
     def _parse_payload(self, data, is_reset=False):
         """
-        Builds a 555-dimensional float32 observation.
+        Builds a 554-dimensional float32 observation.
  
         Layout per frame:
-          [0-10]   Continuous: HP(2), X(2), Y(2), ProjX(2), VelX(2), RelDist(1)
-          [11-266] P1 action one-hot (256)
-          [267-522] P2 action one-hot (256)
-          [523-538] P1 char one-hot (16)
-          [539-554] P2 char one-hot (16)
+          [0-9]   Continuous: HP(2), RelX(1), RelY(1), WallDist(1), ProjX(2), VelX(2), RelDist(1)
+          [10-265] P1 action one-hot (256)
+          [266-521] P2 action one-hot (256)
+          [522-537] P1 char one-hot (16)
+          [538-553] P2 char one-hot (16)
         """
         # Grab strictly the CSV string, stripping off the leading zero
         csv_string = data.strip().split(" ")[-1]
@@ -256,14 +263,21 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
                 rel_dist = raw[12]
 
+                # --- FIX C: TRANSLATION INVARIANCE ---
+                rel_x = int(np.clip(p2_x - p1_x, -500, 500))
+                rel_y = int(np.clip(p2_y - p1_y, -200, 200))
+                p1_corner_dist = min(p1_x, 500 - p1_x) # Wall awareness
+
                 p1_vel_x = 0 if is_reset else int(np.clip(p1_x - self.prev_p1_x, -100, 100))
                 p2_vel_x = 0 if is_reset else int(np.clip(p2_x - self.prev_p2_x, -100, 100))
+                
+                # CRITICAL: Preserve internal tracking for velocity deltas
                 self.prev_p1_x, self.prev_p2_x = p1_x, p2_x
-                # 1. Continuous Features
-                cont_obs = np.array([p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, p1_proj, p2_proj, p1_vel_x, p2_vel_x, rel_dist], dtype=np.float32)
+
+                # 1. Continuous Features (10 dims)
+                cont_obs = np.array([p1_hp, p2_hp, rel_x, rel_y, p1_corner_dist, p1_proj, p2_proj, p1_vel_x, p2_vel_x, rel_dist], dtype=np.float32)
                 
                 # 2. Categorical Features (One-Hot Encoded)
-                # One-hot dims can stay int32 in the raw array, but the concat must be float32
                 p1_act_oh  = self._one_hot(p1_act,  ACT_CATEGORIES)
                 p2_act_oh  = self._one_hot(p2_act,  ACT_CATEGORIES)
                 p1_char_oh = self._one_hot(p1_char, CHAR_CATEGORIES)
@@ -274,7 +288,7 @@ class StreetFighterEnvV2(BizHawkBaseEnv):
 
             except ValueError: pass
 
-        # Failsafe: Return 555 zeros if the string is corrupted
+        # Failsafe: Return 554 zeros if the string is corrupted
         self.corrupt_payload_count += 1
         if self.corrupt_payload_count % 100 == 0:
             print(f"[WARNING] {self.corrupt_payload_count} corrupt payloads received. Check socket integrity.")

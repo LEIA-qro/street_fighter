@@ -9,21 +9,14 @@ class SelectiveVecNormalize(VecEnvWrapper):
     Normalizes only the continuous dimensions of a mixed continuous/one-hot
     observation vector. One-hot dimensions are passed through unchanged.
  
-    Saves and loads via pickle (.pkl) to match SB3 VecNormalize conventions
-    so resume scripts work without modification.
- 
-    Args:
-        venv:              The wrapped vectorized environment.
-        n_continuous_dims: Number of continuous features per frame (default 10).
-        n_frames:          Number of stacked frames (default 4).
-        clip:              Symmetric clip range after normalization (default 10.0).
+    Now includes Reward Normalization (Fix A) and proper state persistence.
     """
-    def __init__(self, venv, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES, clip=10.0, training=True):
+    def __init__(self, venv, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES, 
+                 clip=10.0, training=True, norm_reward=True, reward_clip=10.0):
         super().__init__(venv)
         self.n_cont = n_continuous_dims
         self.n_frames = n_frames
         
-        # Bug 6 Fix: Strict dimension validation to prevent silent data corruption
         obs_shape = venv.observation_space.shape[0]
         if obs_shape % n_frames != 0:
             raise ValueError(
@@ -34,15 +27,25 @@ class SelectiveVecNormalize(VecEnvWrapper):
         self.total_dim_per_frame = obs_shape // n_frames
         self.clip = clip
         self._training = training
+        self._norm_reward = norm_reward
+        self.reward_clip = reward_clip
+
+        # Observation stats
         self.running_mean = np.zeros(n_continuous_dims, dtype=np.float64)
         self.running_var  = np.ones(n_continuous_dims, dtype=np.float64)
         self.count = 1e-4
+
+        # Reward stats (Fix A)
+        self.ret_rms_mean = 0.0
+        self.ret_rms_var  = 1.0
+        self.ret_rms_count = 1e-4
+        self._returns = np.zeros(venv.num_envs, dtype=np.float64)
 
     def _update_stats(self, obs: np.ndarray):
         if not self._training:
             return
 
-        # Only use the NEWEST frame (last in the stacked vector) to avoid 4x duplicate counting
+        # Only use the NEWEST frame to avoid 4x duplicate counting
         start_latest = (self.n_frames - 1) * self.total_dim_per_frame
         latest_cont = obs[:, start_latest : start_latest + self.n_cont].astype(np.float64)
 
@@ -63,16 +66,11 @@ class SelectiveVecNormalize(VecEnvWrapper):
 
     def normalize_obs(self, obs):
         self._update_stats(obs)
-        
-        # Pre-calculate normalization factors for efficiency
-        # Variance floor of 1e-8 to prevent NaN/Inf
         std = np.sqrt(self.running_var + 1e-8)
         
         for i in range(self.n_frames):
             start = i * self.total_dim_per_frame
             cont  = obs[:, start : start + self.n_cont].astype(np.float64)
-            
-            # Vectorized normalization and clipping
             normalized = (cont - self.running_mean) / std
             obs[:, start : start + self.n_cont] = np.clip(
                 normalized, -self.clip, self.clip
@@ -80,30 +78,65 @@ class SelectiveVecNormalize(VecEnvWrapper):
             
         return obs
 
+    def _normalize_reward(self, rews: np.ndarray, dones: np.ndarray) -> np.ndarray:
+        """Discounted return running estimate (Welford online)."""
+        # Note: Using a fixed 0.99 gamma for internal return estimation
+        self._returns = self._returns * 0.99 + rews
+        
+        batch_mean = self._returns.mean()
+        batch_var  = self._returns.var()
+        n = len(self._returns)
+        
+        total = self.ret_rms_count + n
+        delta = batch_mean - self.ret_rms_mean
+        
+        self.ret_rms_mean += delta * n / total
+        self.ret_rms_var = (
+            self.ret_rms_var * self.ret_rms_count
+            + batch_var * n
+            + delta**2 * self.ret_rms_count * n / total
+        ) / total
+        self.ret_rms_count = total
+        
+        # Reset returns on episode end
+        self._returns[dones.astype(bool)] = 0.0
+
+        std = np.sqrt(self.ret_rms_var + 1e-8)
+        return np.clip(rews / std, -self.reward_clip, self.reward_clip).astype(np.float32)
+
     def step_wait(self):
         obs, rews, dones, infos = self.venv.step_wait()
-        return self.normalize_obs(obs), rews, dones, infos
+        obs = self.normalize_obs(obs)
+        if self._norm_reward and self._training:
+            rews = self._normalize_reward(rews, dones)
+        return obs, rews, dones, infos
 
     def reset(self):
         obs = self.venv.reset()
+        # Reset internal returns tracker on environment reset
+        self._returns = np.zeros(self.venv.num_envs, dtype=np.float64)
         return self.normalize_obs(obs)
     
-    # FIX BUG 3: Standardize Save/Load to .pkl and SB3 conventions
     def save(self, path: str):
         stats = {
-            "running_mean": self.running_mean,
-            "running_var":  self.running_var,
-            "count":        self.count,
-            "n_cont":       self.n_cont,
-            "n_frames":     self.n_frames,
-            "clip":         self.clip,
+            "running_mean":   self.running_mean,
+            "running_var":    self.running_var,
+            "count":          self.count,
+            "n_cont":         self.n_cont,
+            "n_frames":       self.n_frames,
+            "clip":           self.clip,
+            # Reward normalization state (Fix A)
+            "ret_rms_mean":   self.ret_rms_mean,
+            "ret_rms_var":    self.ret_rms_var,
+            "ret_rms_count":  self.ret_rms_count,
+            "norm_reward":    self._norm_reward,
+            "reward_clip":    self.reward_clip,
         }
         with open(path, "wb") as f:
             pickle.dump(stats, f)
         print(f"[SelectiveVecNormalize] Stats saved -> {path}")
 
     def env_method(self, method_name, *method_args, indices=None, **method_kwargs):
-        """Explicitly delegate env_method calls down to the vectorized environment."""
         return self.venv.env_method(
             method_name, *method_args, indices=indices, **method_kwargs
         )
@@ -113,7 +146,6 @@ class SelectiveVecNormalize(VecEnvWrapper):
         with open(path, "rb") as f:
             stats = pickle.load(f)
             
-        # Bug 6 Fix: Verify compatibility between loaded stats and current environment
         obs_shape = venv.observation_space.shape[0]
         n_frames = stats["n_frames"]
         if obs_shape % n_frames != 0:
@@ -127,31 +159,31 @@ class SelectiveVecNormalize(VecEnvWrapper):
             n_continuous_dims=stats["n_cont"],
             n_frames=n_frames,
             clip=stats["clip"],
+            norm_reward=stats.get("norm_reward", False), # Default for old pkls
+            reward_clip=stats.get("reward_clip", 10.0),
         )
-        wrapper.running_mean = stats["running_mean"]
-        wrapper.running_var  = stats["running_var"]
-        wrapper.count        = stats["count"]
+        wrapper.running_mean  = stats["running_mean"]
+        wrapper.running_var   = stats["running_var"]
+        wrapper.count         = stats["count"]
+        # Restore reward stats
+        wrapper.ret_rms_mean  = stats.get("ret_rms_mean", 0.0)
+        wrapper.ret_rms_var   = stats.get("ret_rms_var", 1.0)
+        wrapper.ret_rms_count = stats.get("ret_rms_count", 1e-4)
         print(f"[SelectiveVecNormalize] Stats loaded <- {path}")
         return wrapper
     
-
-    # Expose training flag for API parity with VecNormalize
-    # (SelectiveVecNormalize always updates stats during step — this flag
-    # is a no-op kept for drop-in compatibility with resume script patterns.)
     @property
     def training(self):
         return self._training
  
     @training.setter
     def training(self, value):
-        self._training = value   # Now actually respected
+        self._training = value
  
-    # norm_reward parity — reward normalization not implemented here;
-    # accepted silently to avoid AttributeError in resume scripts.
     @property
     def norm_reward(self):
-        return False
+        return self._norm_reward
  
     @norm_reward.setter
-    def norm_reward(self, value):
-        pass
+    def norm_reward(self, value: bool):
+        self._norm_reward = value
