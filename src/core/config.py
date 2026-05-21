@@ -34,7 +34,7 @@ TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "traini
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
 INPUT_DISPLAY_LUA_PATH = os.path.join(LUA_DIR, "Input_Display.lua")
 ENABLE_INPUT_DISPLAY = True
-ACTIVATE_VISUALIZATION = True
+ACTIVATE_VISUALIZATION = False
 
 # Player Labels for On-Screen Display
 P1_MODEL_NAME = "None"
@@ -107,7 +107,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "ppo_sf2_test1_v3" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "ppo_v3_defensive" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
@@ -122,7 +122,7 @@ RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 SAVE_FREQ_STEPS = 1_000_000
 
 # Number of parallel BizHawk instances for Optuna trials
-N_ENVS = 10
+N_ENVS = 16
 
 
 # ===========================================================
@@ -156,44 +156,107 @@ RYU_ONLY_STATES_PHASE_0 = [
 ]
 
 RYU_ONLY_STATES_PHASE_1 = [
-    # New Challengers Blanka, ChunLi, Dhalsim, Ken
+    # Lvl 1
     "RYU_CHUNLI_R1_lvl1.State",
     "RYU_DHALSIM_R1_lvl1.State",
+    "RYU_KEN_R1_lvl1.State",
+    "RYU_ZANGIEF_R1_lvl1.State",
+    "RYU_RYU_R1_lvl1.State",
+    "RYU_EHONDA_R1_lvl1.State",
+    "RYU_GUILE_R1_lvl1.State",
+    "RYU_BALROG_R1_lvl1.State",
+    "RYU_VEGA_R1_lvl1.State",
+    "RYU_SAGAT_R1_lvl1.State",
+    "RYU_MBISON_R1_lvl1.State",
+    "RYU_BLANKA_R1_lvl1.State",
+    # Lvl 2
     "RYU_BLANKA_R1_lvl2.State",
     "RYU_KEN_R1_lvl2.State",
+    "RYU_EHONDA_R1_lvl2.State",
+    "RYU_GUILE_R1_lvl2.State",
+    "RYU_CHUNLI_R1_lvl2.State",
+    "RYU_ZANGIEF_R1_lvl2.State",
+    "RYU_DHALSIM_R1_lvl2.State",
+    "RYU_RYU_R1_lvl2.State",
+    "RYU_BALROG_R1_lvl2.State",
+    "RYU_VEGA_R1_lvl2.State",
+    "RYU_SAGAT_R1_lvl2.State",
+    "RYU_MBISON_R1_lvl2.State",
+    # Lvl 3
     "RYU_BLANKA_R1_lvl3.State",
+    "RYU_DHALSIM_R1_lvl3.State",
+    "RYU_RYU_R1_lvl3.State",
+    "RYU_ZANGIEF_R1_lvl3.State",
+    "RYU_EHONDA_R1_lvl3.State",
+    "RYU_GUILE_R1_lvl3.State",
+    "RYU_CHUNLI_R1_lvl3.State",
+    "RYU_BALROG_R1_lvl3.State",
+    "RYU_VEGA_R1_lvl3.State",
+    "RYU_SAGAT_R1_lvl3.State",
+    "RYU_MBISON_R1_lvl3.State",
     "RYU_KEN_R1_lvl3.State"
 ]
 
 RYU_ONLY_STATES_PHASE_2 = [
-    # Legacy Roaster Blanka, ChunLi, Dhalsim, Ken
+    # Lvl 4
+    "RYU_DHALSIM_R1_lvl4.State",
+    "RYU_BLANKA_R1_lvl4.State",
+    "RYU_GUILE_R1_lvl4.State",
+    "RYU_CHUNLI_R1_lvl4.State",
+    "RYU_RYU_R1_lvl4.State",
+    "RYU_EHONDA_R1_lvl4.State",
+    "RYU_BALROG_R1_lvl4.State",
+    "RYU_VEGA_R1_lvl4.State",
+    "RYU_SAGAT_R1_lvl4.State",
+    "RYU_MBISON_R1_lvl4.State",
+    "RYU_KEN_R1_lvl4.State",
+    "RYU_ZANGIEF_R1_lvl4.State",
+    # Lvl 5
+    "RYU_RYU_R1_lvl5.State",
     "RYU_BLANKA_R1_lvl5.State",
     "RYU_CHUNLI_R1_lvl5.State",
-    "RYU_DHALSIM_R1_lvl4.State",
-    "RYU_KEN_R1_lvl4.State",
-    # New Challengers Ryu, Zangief
-    "RYU_RYU_R1_lvl5.State",
-    "RYU_ZANGIEF_R1_lvl4.State"
-
+    "RYU_KEN_R1_lvl5.State",
+    "RYU_ZANGIEF_R1_lvl5.State",
+    "RYU_DHALSIM_R1_lvl5.State",
+    "RYU_EHONDA_R1_lvl5.State",
+    "RYU_GUILE_R1_lvl5.State",
+    "RYU_BALROG_R1_lvl5.State",
+    "RYU_VEGA_R1_lvl5.State",
+    "RYU_SAGAT_R1_lvl5.State",
+    "RYU_MBISON_R1_lvl5.State"  
 ]
 
 RYU_ONLY_STATES_PHASE_3 = [
-    # The legacy Matchups Blanka, ChunLi, Dhalsim, Ken, Ryu, Zangief
-    "RYU_BLANKA_R1_lvl7.State",
+    # Lvl 6
+    "RYU_EHONDA_R1_lvl6.State",
+    "RYU_GUILE_R1_lvl6.State",
     "RYU_CHUNLI_R1_lvl6.State",
+    "RYU_RYU_R1_lvl6.State",
+    "RYU_ZANGIEF_R1_lvl6.State",
+    "RYU_KEN_R1_lvl6.State",
+    "RYU_DHALSIM_R1_lvl6.State",
+    "RYU_BLANKA_R1_lvl6.State",
+    "RYU_BALROG_R1_lvl6.State",
+    "RYU_VEGA_R1_lvl6.State",
+    "RYU_SAGAT_R1_lvl6.State",
+    "RYU_MBISON_R1_lvl6.State",
+    # Lvl 7
     "RYU_DHALSIM_R1_lvl7.State",
     "RYU_KEN_R1_lvl7.State",
-    "RYU_RYU_R1_lvl6.State",
     "RYU_RYU_R1_lvl7.State",
-    "RYU_ZANGIEF_R1_lvl6.State",
-    # The new Challengers Balrog, E.Honda, Guile 
     "RYU_BALROG_R1_lvl7.State",
-    "RYU_EHONDA_R1_lvl6.State",
-    "RYU_GUILE_R1_lvl6.State"
+    "RYU_BLANKA_R1_lvl7.State",
+    "RYU_GUILE_R1_lvl7.State",
+    "RYU_CHUNLI_R1_lvl7.State",
+    "RYU_ZANGIEF_R1_lvl7.State",
+    "RYU_EHONDA_R1_lvl7.State",
+    "RYU_VEGA_R1_lvl7.State",
+    "RYU_SAGAT_R1_lvl7.State",
+    "RYU_MBISON_R1_lvl7.State"
 ]
 
 RYU_ONLY_STATES_PHASE_4 = [
-    # The legacy Matchups Balrog, Blanka, ChunLi, Dhalsim, E.Honda, Guile, Ken, Ryu, Zangief
+    # Lvl 8 Hardest
     "RYU_BALROG_R1_HARD.State",
     "RYU_BLANKA_R1_HARD.State",
     "RYU_CHUNLI_R1_HARD.State",
@@ -203,7 +266,6 @@ RYU_ONLY_STATES_PHASE_4 = [
     "RYU_KEN_R1_HARD.State",
     "RYU_RYU_R1_HARD.State",
     "RYU_ZANGIEF_R1_HARD.State",
-    # The New Challengers
     "RYU_SAGAT_R1_HARD.State",
     "RYU_VEGA_R1_HARD.State",
     "RYU_MBISON_R1_HARD.State"

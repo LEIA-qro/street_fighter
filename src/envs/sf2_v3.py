@@ -64,8 +64,8 @@ class StreetFighterEnvV3(StreetFighterEnvV2):
         damage_dealt = min(max(0, self.prev_enemy_hp - current_enemy_hp), damage_clamp)
         damage_taken = min(max(0, self.prev_my_hp - current_my_hp), damage_clamp)
 
-        COMBO_WINDOW = 10
-        DAMAGE_TAKEN_PENALTY = 0.45
+        COMBO_WINDOW = 6
+        DAMAGE_TAKEN_PENALTY = 0.70
         FOOTSIE_RANGE_MAX = 80
         FOOTSIE_BASE_REWARD = 0.05
         FOOTSIE_DECAY_RATE = 0.05
