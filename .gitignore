@@ -1,5 +1,7 @@
 /venv
 venv/
+.venv/
+
 src/__pycache__/
 
 src/agents/ppo/__pycache__/
@@ -35,3 +37,4 @@ GEMINI.md
 /src/scripts/__pycache__
 /src/agents/sac/__pycache__
 /src/agents/sac/__pycache__
+/src/agents/pbt/__pycache__

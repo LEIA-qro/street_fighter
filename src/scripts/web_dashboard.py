@@ -35,7 +35,7 @@ def refresh_dropdowns():
     z, p = get_model_files()
     upd_z = gr.update(choices=z, value="None")
     upd_p = gr.update(choices=p, value="None")
-    return upd_z, upd_p, upd_z, upd_p, upd_z, upd_p, upd_z, upd_p
+    return upd_z, upd_p, upd_z, upd_p, upd_z, upd_p, upd_z, upd_p, upd_z, upd_p
 
 def load_hyperparams_from_json(file_path):
     if file_path is None:
@@ -360,6 +360,19 @@ def handle_upload(file_obj, algo):
         return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
     except Exception as e: return f"**Error:** {e}"
 
+def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, resume):
+    cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_pbt.py"), 
+           "--algo", algo, "--env", env, "--model_name", model_name,
+           "--steps", str(total_steps), "--population", str(population),
+           "--steps_per_exploit", str(exploit_steps), "--phase", str(phase)]
+    
+    if load_zip != "None": cmd += ["--load_zip", load_zip]
+    if load_pkl != "None": cmd += ["--load_pkl", load_pkl]
+    if resume: cmd += ["--resume"]
+    
+    for log in stream_logs(cmd):
+        yield log
+
 # --- UI Construction ---
 
 zips_init, pkls_init = get_model_files("ppo")
@@ -429,6 +442,26 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 get_results_btn = gr.Button("🔍 Fetch Best Results")
                             best_params_output = gr.Textbox(label="Best Hyperparameters", interactive=False)
                             download_json = gr.File(label="Download Best Hyperparameters", interactive=False)
+                        
+                        # Section C: PBT
+                        with gr.Tab("🧬 PBT Training"):
+                            gr.Markdown("Population Based Training (PB2) for automatic hyperparameter scheduling.")
+                            pbt_model_name_input = gr.Textbox(label="Output Model Name", value="PBT_BEST_model")
+                            
+                            with gr.Row():
+                                pbt_zip_drop = gr.Dropdown(label="Base Model to Seed Population (.zip)", choices=zips_init, value="None")
+                                pbt_pkl_drop = gr.Dropdown(label="Base Norm to Seed Population (.pkl)", choices=pkls_init, value="None")
+                            
+                            with gr.Row():
+                                pbt_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
+                                pbt_steps = gr.Number(label="Total Timesteps", value=5000000, precision=0)
+                                pbt_exploit_steps = gr.Number(label="Steps per Exploit", value=500000, precision=0)
+                            
+                            with gr.Row():
+                                pbt_pop = gr.Slider(label="Population Size", minimum=2, maximum=16, value=10, step=1)
+                                pbt_resume = gr.Checkbox(label="Resume existing PBT run (loads from Ray Tuner cache)", value=False)
+                            
+                            start_pbt_btn = gr.Button("🧬 Launch PBT", variant="primary")
 
                     gr.Markdown("---")
                     with gr.Row():
@@ -581,6 +614,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input, tune_device], outputs=[unified_logs]).then(
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
+    
+    start_pbt_btn.click(run_pbt, inputs=[algo_sel, env_sel, pbt_model_name_input, pbt_zip_drop, pbt_pkl_drop, pbt_phase_drop, pbt_steps, pbt_exploit_steps, pbt_pop, pbt_resume], outputs=[unified_logs]).then(
+        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
+    )
+    
     get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
     
     copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Logs copied to clipboard!'); return []; }")

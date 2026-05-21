@@ -177,7 +177,12 @@ class SACAgent(BaseAgent):
             study_name=study_name,
             storage=storage_url,
             direction="maximize",
-            load_if_exists=True
+            load_if_exists=True,
+            pruner=optuna.pruners.HyperbandPruner(
+                min_resource=10000,
+                max_resource=timesteps,
+                reduction_factor=3
+            )
         )
         
         study.optimize(

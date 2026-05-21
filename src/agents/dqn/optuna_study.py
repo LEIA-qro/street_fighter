@@ -8,6 +8,33 @@ from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 
+from stable_baselines3.common.callbacks import BaseCallback
+from collections import deque
+
+class OptunaPruningCallback(BaseCallback):
+    def __init__(self, trial, report_interval=25000, pruning_threshold=0.05):
+        super().__init__()
+        self.trial = trial
+        self.report_interval = report_interval
+        self.pruning_threshold = pruning_threshold
+        self.win_buffer = deque(maxlen=250)
+        self.last_report_step = 0
+
+    def _on_step(self):
+        for info in self.locals.get("infos", []):
+            if "win" in info:
+                self.win_buffer.append(info["win"])
+        
+        if self.num_timesteps - self.last_report_step >= self.report_interval:
+            win_rate = sum(self.win_buffer) / len(self.win_buffer) if len(self.win_buffer) > 0 else 0.0
+            self.trial.report(win_rate, self.num_timesteps)
+            
+            if self.trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+                
+            self.last_report_step = self.num_timesteps
+        return True
+
 def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning_timesteps=50000, device="cuda"):
     lr = trial.suggest_float("lr", 1e-5, 1e-3, log=True)
     gamma = trial.suggest_float("gamma", 0.95, 0.9999, log=True)

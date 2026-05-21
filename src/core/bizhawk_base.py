@@ -2,6 +2,7 @@ import gymnasium as gym
 import socket
 import subprocess
 import time
+import sys
 
 import core.config as config
 
@@ -92,12 +93,23 @@ class BizHawkBaseEnv(gym.Env):
 
     
         except (ConnectionResetError, BrokenPipeError) as e:
-            if self.verbose: print(f"[WARN] send_command failed in interactive mode: {e}")
             if self.trainable:
                 raise RuntimeError(f"Socket broken during training: {e}")
-            # Non-trainable (interactive) mode: log and continue
-            else:
-                if self.verbose: print(f"\n[Connection] Waiting for your Lua connection...")
+            
+            # Non-trainable (interactive) mode:
+            # 1. Check if the emulator was closed by the user
+            if self.emulator_process and self.emulator_process.poll() is not None:
+                if self.verbose: print(f"\n[INFO] BizHawk process terminated. Exiting Python...")
+                sys.exit(0)
+            
+            # 2. If it's still open, wait for a new Lua connection (e.g. script restart)
+            if self.verbose: 
+                print(f"[WARN] send_command failed: {e}")
+                print(f"\n[Connection] Waiting for your Lua connection...")
+            
+            self.conn, addr = self.server_socket.accept()
+            self.conn.settimeout(None) # Always wait forever in interactive mode
+            if self.verbose: print(f"[Connection] Connection RE-ESTABLISHED at {addr}")
 
 
     def receive_payload(self) -> str:
@@ -119,8 +131,25 @@ class BizHawkBaseEnv(gym.Env):
             if self.verbose: print("\n[FAILSAFE] Python timed out waiting for BizHawk. Forcing crash...")
             raise RuntimeError("BizHawk Socket Timeout")
             
-        except (ConnectionResetError, ConnectionAbortedError):
-            return ""  
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
+            if self.trainable:
+                raise RuntimeError(f"Socket broken during training: {e}")
+            
+            # Non-trainable (interactive) mode:
+            # 1. Check if the emulator was closed by the user
+            if self.emulator_process and self.emulator_process.poll() is not None:
+                if self.verbose: print(f"\n[INFO] BizHawk process terminated. Exiting Python...")
+                sys.exit(0)
+            
+            # 2. If it's still open, wait for a new Lua connection (e.g. script restart)
+            if self.verbose: 
+                print(f"[WARN] receive_payload failed: {e}")
+                print(f"\n[Connection] Waiting for your Lua connection...")
+            
+            self.conn, addr = self.server_socket.accept()
+            self.conn.settimeout(None) # Always wait forever in interactive mode
+            if self.verbose: print(f"[Connection] Connection RE-ESTABLISHED at {addr}")
+            return "" # Return empty string once to satisfy the call, but loop will resume correctly now that conn is valid again
 
     def close(self):
         """Clean teardown of network and subprocess."""
