@@ -1,36 +1,32 @@
-# Project Handoff: Street Fighter II RL (Ryu Specialist)
+# Project Handoff: Street Fighter II RL (PBT Scaling & Stability)
 
 ## 📝 Project Summary
-This project implements a production-grade Reinforcement Learning (RL) pipeline for Street Fighter II' - Special Champion Edition on the Sega Genesis. Using a custom lock-step TCP bridge between Python (Stable Baselines3) and BizHawk (Lua), we train a Ryu specialist through a manual curriculum. The architecture is algorithm-agnostic (supporting PPO, SAC, DQN) and optimized for hardware acceleration (CUDA) and reproducible hyperparameter tuning via Optuna.
+This project trains a Ryu specialist for Street Fighter II' SCE using a custom TCP bridge between SB3 and BizHawk. The current focus is a high-throughput Population Based Training (PBT/PB2) pipeline using Ray Tune to automate hyperparameter scheduling (LR, Entropy, Clip Range).
 
 ## 🎯 Goal
-Current focus: **Solving the Entropy Plateau and Stabilizing Convergence.**
-We have identified that the original `MultiBinary(10)` action space (1,024 combinations) was too sparse and invalid for the policy gradient to effectively explore, leading to stagnant learning. The goal is to transition to the `v3` architecture to accelerate win rate improvement.
+**Maximize PBT Throughput and Scaling Stability.**
+Enable training of large populations (12+ agents) using "Time-Multiplexing" (Synchronous PBT) and multiple emulator instances per agent to accelerate exploration without overwhelming system resources.
 
 ## 🚀 Current State
-The project has undergone a major architectural stabilization phase:
-1.  **Translation Invariance (Fix C)**: `v2` and `v3` environments now use relative $X/Y$ coordinates and wall distance instead of absolute RAM values, enabling faster spatial generalization.
-2.  **Reward Normalization (Fix A)**: Enhanced `SelectiveVecNormalize` with a Welford online algorithm for rewards, preventing Value Function explosion while protecting one-hot encoded observations.
-3.  **v3 Architecture (Fix B)**: Implemented a new `MultiDiscrete([9, 7])` environment. This reduces the exploration space from **1,024 to 63** valid combinations and corrects button mapping for Ryu's full moveset (6 individual buttons).
-4.  **Hardware Resilience (Fix D)**: Socket deaths now return a `0.0` reward and a `socket_death` flag, preventing rollout buffer poisoning.
-5.  **Ecosystem Compatibility**: Dashboard and AI-vs-AI evaluation scripts now fully support mixed-version matchups and `v3` specific logic.
+The PBT architecture is now robust and high-throughput:
+1.  **Synchronous PBT (Time-Multiplexing)**: Enabled `synch=True` in PB2. When `population > max_concurrent`, Ray Tune now pauses active trials at the exploit milestone to let pending trials run. This prevents agent starvation.
+2.  **Multi-Env per Agent**: PBT workers now support `envs_per_worker > 1`. Each worker uses a `DummyVecEnv` to manage multiple parallel BizHawk instances, significantly increasing sample throughput per Python process.
+3.  **Regex-Based Rank Safety**: Fixed a critical "Rank Theft" bug where cloned agents copied ports from their donors. Ranks are now derived from the unique `trial_id` suffix via Regex, ensuring immutable port assignments (`rank * 10 + i`).
+4.  **TensorBoard Unified Logging**: The dashboard's "Launch TensorBoard" now uses `--logdir_spec` to monitor both standard `logs/` and PBT tuning directories (`models/tuning/pbt`).
+5.  **Dashboard UI**: Added "Envs per Worker" slider and updated PBT logic to pass throughput parameters to the orchestrator.
 
 ## 📂 Files Actively Edited
-- `src/envs/sf2_v3.py`: Implementation of the MultiDiscrete environment.
-- `src/core/selective_norm.py`: Welford reward normalization and state persistence.
-- `src/envs/sf2_v2.py`: Relative coordinate updates and socket error handling.
-- `src/scripts/web_dashboard.py`: UI integration for v3 and mixed-version matchups.
-- `src/scripts/test_ai_vs_ai_v2.py` & `test_agent_v2.py`: Cross-version evaluation support.
-- `src/core/config.py`: `OBS_DIM` adjustment (11 to 10).
+- `src/agents/pbt/pbt_orchestrator.py`: Synchronous PB2 logic, Regex-rank derivation, and Multi-Env support.
+- `src/scripts/train_pbt.py`: CLI support for `--envs_per_worker`.
+- `src/scripts/web_dashboard.py`: Unified TensorBoard logging and PBT throughput UI.
 
-## ❌ Failed Attempts (Compressed)
-- **Absolute Coordinates**: Caused the network to learn identical interactions multiple times based on screen position.
-- **MultiBinary(10) Exploration**: Confirmed via telemetry (entropy loss -6.83 at 675K steps) to be statistically intractable for fast convergence.
-- **-50.0 Socket Penalty**: Poisoned the training buffer with artificial hardware-failure data.
-- **Fuzzy Dashboard Matches**: Initial UI replacements for Player 2 rows caused syntax errors due to duplicate lines; resolved via targeted surgical edits.
-- **Regex Backreferences**: Switched `\1` to `\g<1>` for numerical config safety.
+## ❌ Failed Attempts (Summarized)
+- **Asynchronous PBT Scaling**: Using `max_concurrent < population` in async mode caused "Starvation"; trials never relinquished slots, preventing pending trials from ever starting. (Fixed by `synch=True`).
+- **Config-Based Rank Storage**: Storing `rank` in the config dictionary caused port collisions during PBT "Exploit" phases because cloning copied the port assignments. (Fixed by Trial ID derivation).
+- **String-Split Rank Extraction**: Simple `split("_")[-1]` logic was unreliable during cloning; replaced with robust Regex extraction.
+- **Global `taskkill`**: Caused cascade failures in parallel mode. (Fixed by isolated PID-based `failsafe_env`).
 
 ## ⏭️ Next Steps
-1.  **v3 Optimization**: Run a short Optuna study (20 trials, 75K steps) specifically for the `v3` environment (`python src/scripts/tune.py --algo ppo --env v3`).
-2.  **Entropy Monitoring**: Verify that `v3` entropy loss reaches -6.50 or below within the first 200K steps.
-3.  **Production Migration**: Once hyperparameters are tuned, launch the first `v3` production run against the baseline curriculum.
+1.  **Time-Multiplexing Validation**: Verify that when Trial 0 hits 50k steps, it suspends and allows Trial 5 (Pending) to start.
+2.  **Hardware Profiling**: Test the limit of `envs_per_worker`. (e.g., 4 concurrent agents x 4 envs each = 16 BizHawk instances).
+3.  **PBT Phase Transitions**: Observe if synchronous PBT correctly synchronizes 12 agents before performing the first global PB2 exploit/explore step.

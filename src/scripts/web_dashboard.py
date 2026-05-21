@@ -242,7 +242,10 @@ def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr
         yield log
 
 def launch_tb():
-    cmd = f'"{VENV_PYTHON}" -m tensorboard.main --logdir "{config.LOG_DIR}" --port 6006'
+    pbt_log_dir = os.path.join(config.get_directory()["tuning"], "pbt")
+    # Use logdir_spec to monitor multiple directories
+    log_spec = f'logs:"{config.LOG_DIR}",pbt_tuning:"{pbt_log_dir}"'
+    cmd = f'"{VENV_PYTHON}" -m tensorboard.main --logdir_spec {log_spec} --port 6006'
     subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(2)
     webbrowser.open("http://localhost:6006")
@@ -360,11 +363,13 @@ def handle_upload(file_obj, algo):
         return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
     except Exception as e: return f"**Error:** {e}"
 
-def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, resume):
+def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, max_concurrent, resume, envs_per_worker):
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_pbt.py"), 
            "--algo", algo, "--env", env, "--model_name", model_name,
            "--steps", str(total_steps), "--population", str(population),
-           "--steps_per_exploit", str(exploit_steps), "--phase", str(phase)]
+           "--max_concurrent", str(max_concurrent),
+           "--steps_per_exploit", str(exploit_steps), "--phase", str(phase),
+           "--envs_per_worker", str(envs_per_worker)]
     
     if load_zip != "None": cmd += ["--load_zip", load_zip]
     if load_pkl != "None": cmd += ["--load_pkl", load_pkl]
@@ -458,7 +463,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 pbt_exploit_steps = gr.Number(label="Steps per Exploit", value=500000, precision=0)
                             
                             with gr.Row():
-                                pbt_pop = gr.Slider(label="Population Size", minimum=2, maximum=16, value=10, step=1)
+                                pbt_pop = gr.Slider(label="Population Size", minimum=4, maximum=16, value=10, step=1)
+                                pbt_concurrent = gr.Slider(label="Max Concurrent Trials", minimum=1, maximum=16, value=4, step=1)
+                                pbt_envs = gr.Slider(label="Envs per Worker", minimum=1, maximum=8, value=1, step=1)
                                 pbt_resume = gr.Checkbox(label="Resume existing PBT run (loads from Ray Tuner cache)", value=False)
                             
                             start_pbt_btn = gr.Button("🧬 Launch PBT", variant="primary")
@@ -615,7 +622,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     
-    start_pbt_btn.click(run_pbt, inputs=[algo_sel, env_sel, pbt_model_name_input, pbt_zip_drop, pbt_pkl_drop, pbt_phase_drop, pbt_steps, pbt_exploit_steps, pbt_pop, pbt_resume], outputs=[unified_logs]).then(
+    start_pbt_btn.click(run_pbt, inputs=[algo_sel, env_sel, pbt_model_name_input, pbt_zip_drop, pbt_pkl_drop, pbt_phase_drop, pbt_steps, pbt_exploit_steps, pbt_pop, pbt_concurrent, pbt_resume, pbt_envs], outputs=[unified_logs]).then(
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     

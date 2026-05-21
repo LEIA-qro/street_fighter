@@ -43,12 +43,11 @@ def failsafe_env(env=None, model=None):
         except Exception:
             pass
 
-    print("[ENV]Executing Failsafe: Purging zombie instances and VRAM...")
-    # 1. Kill Emulators
-    os.system("taskkill /F /IM EmuHawk.exe >nul 2>&1")
-    time.sleep(2)
+    print("[ENV] Executing Failsafe: Clearing VRAM and GC...")
+    # NOTE: Global taskkill of EmuHawk is removed to prevent cascade failures in PBT/Parallel training.
+    # Individual environment teardown (via env.close()) handles its own subprocess termination.
     
-    # 2. The Thread Sniper
+    # 1. The Thread Sniper (Only kills children of THIS process)
     active_children = multiprocessing.active_children()
     if active_children:
         for child in active_children:
@@ -57,7 +56,7 @@ def failsafe_env(env=None, model=None):
             except Exception:
                 pass
     
-    # 3. The VRAM Purge
+    # 2. The VRAM Purge
     gc.collect()
     try:
         import torch
@@ -66,5 +65,6 @@ def failsafe_env(env=None, model=None):
     except ImportError:
         pass
         
-    time.sleep(3)
-    print("[ENV] Failsafe complete. All zombie processes terminated and VRAM cleared.")
+    time.sleep(1)
+    print("[ENV] Failsafe complete.")
+

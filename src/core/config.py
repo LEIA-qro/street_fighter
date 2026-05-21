@@ -122,7 +122,7 @@ RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 SAVE_FREQ_STEPS = 1_000_000
 
 # Number of parallel BizHawk instances for Optuna trials
-N_ENVS = 16
+N_ENVS = 1
 
 
 # ===========================================================

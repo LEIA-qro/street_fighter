@@ -30,17 +30,29 @@ def main():
     parser.add_argument("--steps", type=int, default=5000000)
     parser.add_argument("--steps_per_exploit", type=int, default=500000)
     parser.add_argument("--population", type=int, default=10)
+    parser.add_argument("--max_concurrent", type=int, default=None, help="Max concurrent trials (default: population size)")
+    parser.add_argument("--envs_per_worker", type=int, default=1, help="Number of environments per PBT agent")
     parser.add_argument("--resume", action="store_true")
     
     args = parser.parse_args()
 
-    if args.population > 16: sys.exit("Error: Population > 16")
-    if args.population < 2: sys.exit("Error: Population < 2")
+    # Set max_concurrent to population if not provided
+    if args.max_concurrent is None:
+        args.max_concurrent = args.population
 
-    print(f"Starting PBT (Pop: {args.population}, Steps: {args.steps})...")
+    # FIX 3: Correct PB2 Population Guards
+    # Max safe ports = 10015 - 9999 = 16. Total envs = max_concurrent * envs_per_worker.
+    if args.population < 4:
+        sys.exit(
+            "Error: Population < 4 — PB2's Gaussian Process requires a minimum viable "
+            "sample size. Use --population 4 or higher."
+        )
+
+    print(f"Starting PBT (Pop: {args.population}, Concurrent: {args.max_concurrent}, Envs/Worker: {args.envs_per_worker}, Steps: {args.steps})...")
     orchestrator = build_orchestrator()
     best_config = orchestrator.run(
         algo=args.algo, env_version=args.env, total_steps=args.steps, population_size=args.population,
+        max_concurrent=args.max_concurrent, envs_per_worker=args.envs_per_worker,
         steps_per_exploit=args.steps_per_exploit, start_phase=args.phase, 
         base_zip=args.load_zip, base_pkl=args.load_pkl, model_name=args.model_name, resume=args.resume
     )
