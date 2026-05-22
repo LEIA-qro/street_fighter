@@ -97,11 +97,29 @@ def get_model_class(algo_name):
 
 def process_action(act, algo, env_version="v2"):
     if algo.lower() == "sac":
-        bin_act = (act[0] > 0.0).astype(np.int8)
-        return "".join(str(b) for b in bin_act)
+        if env_version == "v3":
+            from envs.sf2_v3 import discrete_to_binary
+            seg1 = act[0][:9]
+            seg2 = act[0][9:]
+            discrete_act = np.array([np.argmax(seg1), np.argmax(seg2)])
+            return discrete_to_binary(discrete_act)
+        else:
+            bin_act = (act[0] > 0.0).astype(np.int8)
+            return "".join(str(b) for b in bin_act)
     elif algo.lower() == "dqn":
         val = act[0] if isinstance(act, np.ndarray) else act
-        return format(val, f'0{config.ACTION_DIM}b')
+        if env_version == "v3":
+            from envs.sf2_v3 import discrete_to_binary
+            nvec = [9, 7]
+            decoded = []
+            remaining = int(val)
+            for n in reversed(nvec):
+                decoded.append(remaining % n)
+                remaining //= n
+            discrete_act = np.array(list(reversed(decoded)))
+            return discrete_to_binary(discrete_act)
+        else:
+            return format(val, f'0{config.ACTION_DIM}b')
     else:
         if env_version == "v3":
             from envs.sf2_v3 import discrete_to_binary

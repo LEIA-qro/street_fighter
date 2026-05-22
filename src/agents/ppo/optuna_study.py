@@ -133,7 +133,17 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         model.learn(total_timesteps=tuning_timesteps, callback=pruning_callback)
 
         # 4. Evaluate
-        mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        # Temporarily disable training and reward normalization during evaluation to prevent statistics contamination and reward compression
+        old_training = env.training
+        old_norm_reward = env.norm_reward
+        env.training = False
+        env.norm_reward = False
+        
+        try:
+            mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        finally:
+            env.training = old_training
+            env.norm_reward = old_norm_reward
         
         # ASHA-style manual pruning: If win_rate after tuning is extremely low, prune
         # (This is redundant if callback worked, but good as a final check)

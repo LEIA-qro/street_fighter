@@ -163,15 +163,30 @@ def test_agent():
         while True:
             action, _states = model.predict(obs, deterministic=False) 
             
-            # Process action depending on algo
+            # Process action depending on algo and environment version
             if args.algo.lower() == "sac":
-                bin_act = (action[0] > 0.0).astype(np.int8)
-                processed_action = np.array([bin_act])
+                if args.env == "v3":
+                    seg1 = action[0][:9]
+                    seg2 = action[0][9:]
+                    processed_action = np.array([[np.argmax(seg1), np.argmax(seg2)]], dtype=np.int64)
+                else:
+                    bin_act = (action[0] > 0.0).astype(np.int8)
+                    processed_action = np.array([bin_act])
             elif args.algo.lower() == "dqn":
                 val = action[0] if isinstance(action, np.ndarray) else action
-                binary_str = format(val, f'0{config.ACTION_DIM}b')
-                bin_act = np.array([int(b) for b in binary_str], dtype=np.int8)
-                processed_action = np.array([bin_act])
+                if args.env == "v3":
+                    # Decode flat index -> MultiDiscrete([9, 7]) via divmod
+                    nvec = [9, 7]
+                    decoded = []
+                    remaining = int(val)
+                    for n in reversed(nvec):
+                        decoded.append(remaining % n)
+                        remaining //= n
+                    processed_action = np.array([list(reversed(decoded))], dtype=np.int64)
+                else:
+                    binary_str = format(val, f'0{config.ACTION_DIM}b')
+                    bin_act = np.array([int(b) for b in binary_str], dtype=np.int8)
+                    processed_action = np.array([bin_act])
             else:
                 processed_action = action
 

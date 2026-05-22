@@ -6,7 +6,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
-from manual_curriculum_callback import ManualCurriculumCallback
+from agents.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 

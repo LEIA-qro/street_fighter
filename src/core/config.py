@@ -116,6 +116,7 @@ ACTION_DIM = 10 # Controler or Inputs from the AI -- DO NOT CHANGE
 OBS_DIM = 10 # Includes relative X/Y and wall awareness instead of absolute coords
 
 NUM_FRAMES = 4 # Frame Stacking = 4
+MAX_STEPS_PER_ROUND = 1500 # Artificial round timeout limit
 STARTING_TOTAL_TIMESTEPS = 1000 # For train production or train sinlge PPO
 RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 

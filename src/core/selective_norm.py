@@ -64,8 +64,9 @@ class SelectiveVecNormalize(VecEnvWrapper):
         ) / total
         self.count = total
 
-    def normalize_obs(self, obs):
-        self._update_stats(obs)
+    def normalize_obs(self, obs, update=True):
+        if update:
+            self._update_stats(obs)
         std = np.sqrt(self.running_var + 1e-8)
         
         for i in range(self.n_frames):
@@ -107,6 +108,16 @@ class SelectiveVecNormalize(VecEnvWrapper):
     def step_wait(self):
         obs, rews, dones, infos = self.venv.step_wait()
         obs = self.normalize_obs(obs)
+        # Normalize terminal observations stored by VecEnv auto-reset.
+        # Without this, PPO computes V(s_T) on unnormalized inputs at
+        # episode boundaries, creating a discontinuity in value estimates.
+        for i in range(len(dones)):
+            if dones[i] and "terminal_observation" in infos[i]:
+                terminal_obs = infos[i]["terminal_observation"]
+                infos[i]["terminal_observation"] = self.normalize_obs(
+                    terminal_obs.reshape(1, -1).astype(np.float32),
+                    update=False
+                )[0]
         if self._norm_reward and self._training:
             rews = self._normalize_reward(rews, dones)
         return obs, rews, dones, infos

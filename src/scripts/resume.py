@@ -10,7 +10,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from core import config
 from core.selective_norm import SelectiveVecNormalize
-from manual_curriculum_callback import ManualCurriculumCallback 
+from agents.manual_curriculum_callback import ManualCurriculumCallback
 from core.env_tools import failsafe_env, SFv2_make_env
 
 directories = config.get_directory()
@@ -31,6 +31,11 @@ def resume_training(model_path, vec_path,
     if callback_class is None:
         callback_class = ManualCurriculumCallback
     
+    import torch
+    # Performance Optimization: Restrict PyTorch to 2 CPU threads during training
+    # This prevents it from hijacking logical cores alongside active EmuHawk emulators.
+    torch.set_num_threads(2)
+
     print(f"Initializing {config.N_ENVS}-Core Resume Environment...")
     
     # --- RESTORE CURRICULUM STATE ---
@@ -136,7 +141,7 @@ if __name__ == "__main__":
     current_vec_path = os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
 
     restart_count = 0
-    phase_state = 1 # Placeholder for future phase advancement
+    phase_state = None # Load saved phase dynamically from curriculum_state.json
     while True:
         result = resume_training(current_model_path, current_vec_path, start_phase=phase_state)
         

@@ -3,8 +3,8 @@ import random
 import numpy as np
 from gymnasium import spaces
 from collections import deque
-import config
-from bizhawk_base import BizHawkBaseEnv
+import core.config as config
+from core.bizhawk_base import BizHawkBaseEnv
 
 class StreetFighterEnv(BizHawkBaseEnv):
     """Street Fighter II RL Environment."""
@@ -44,6 +44,7 @@ class StreetFighterEnv(BizHawkBaseEnv):
         
         self.prev_my_hp = 176
         self.prev_enemy_hp = 176
+        self._steps = 0
 
         self.frames = deque(maxlen=config.NUM_FRAMES)  
 
@@ -97,12 +98,15 @@ class StreetFighterEnv(BizHawkBaseEnv):
         self.prev_my_hp = current_my_hp
         self.prev_enemy_hp = current_enemy_hp
         
+        self._steps += 1
+
         if self.trainable:
             terminated = bool(current_my_hp <= 0 or current_enemy_hp <= 0)
         else:
             terminated = False
         
-        return self._get_obs(), reward, terminated, False, {}
+        truncated = bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated
+        return self._get_obs(), reward, terminated, truncated, {}
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -122,6 +126,7 @@ class StreetFighterEnv(BizHawkBaseEnv):
         
         self.prev_my_hp = observation[0]
         self.prev_enemy_hp = observation[1]
+        self._steps = 0
 
         self.frames.clear()
         for _ in range(config.NUM_FRAMES):

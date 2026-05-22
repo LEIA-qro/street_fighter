@@ -71,18 +71,67 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         from gymnasium import ActionWrapper, spaces
         import numpy as np
 
-        class ContinuousToMultiBinaryWrapper(ActionWrapper):
-            def __init__(self, env):
+        class ContinuousToDiscreteSoftRelaxationWrapper(ActionWrapper):
+            """Convert SAC's continuous output to MultiBinary or MultiDiscrete.
+
+            Differentiable soft relaxation during training via Sigmoid/Softmax
+            stochastic sampling. Deterministic thresholding during evaluation.
+            """
+            def __init__(self, env, training=True):
                 super().__init__(env)
-                self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(env.action_space.shape[0],), dtype=np.float32)
+                self.training = training
+                raw_space = env.action_space
+                
+                if isinstance(raw_space, spaces.MultiBinary):
+                    self._mode = "multibinary"
+                    self._n_buttons = raw_space.n
+                    self.action_space = spaces.Box(
+                        low=-1.0, high=1.0, shape=(self._n_buttons,), dtype=np.float32
+                    )
+                elif isinstance(raw_space, spaces.MultiDiscrete):
+                    self._mode = "multidiscrete"
+                    self._nvec = raw_space.nvec.copy()
+                    self._dims = [int(n) for n in self._nvec]
+                    self.action_space = spaces.Box(
+                        low=-1.0, high=1.0, shape=(sum(self._dims),), dtype=np.float32
+                    )
+                else:
+                    raise TypeError(
+                        f"SAC wrapper: unsupported action space "
+                        f"{type(raw_space).__name__}. Expected "
+                        f"MultiBinary or MultiDiscrete."
+                    )
 
             def action(self, action):
-                return (action > 0.0).astype(np.int8)
+                if self._mode == "multibinary":
+                    if self.training:
+                        probs = 1.0 / (1.0 + np.exp(-3.0 * action))
+                        sampled = (np.random.rand(*probs.shape) < probs).astype(np.int8)
+                        return sampled
+                    else:
+                        return (action > 0.0).astype(np.int8)
+                else:
+                    discrete_actions = []
+                    start_idx = 0
+                    for dim in self._dims:
+                        seg = action[start_idx : start_idx + dim]
+                        start_idx += dim
+                        
+                        if self.training:
+                            temp = 0.5
+                            exp_logits = np.exp((seg - np.max(seg)) / temp)
+                            probs = exp_logits / np.sum(exp_logits)
+                            choice = np.random.choice(dim, p=probs)
+                            discrete_actions.append(choice)
+                        else:
+                            discrete_actions.append(np.argmax(seg))
+                            
+                    return np.array(discrete_actions, dtype=np.int64)
 
         def make_sac_env(rank):
             original_init = env_fn(rank)
             def _init():
-                return ContinuousToMultiBinaryWrapper(original_init())
+                return ContinuousToDiscreteSoftRelaxationWrapper(original_init())
             return _init
 
         env = SubprocVecEnv([make_sac_env(i) for i in range(n_envs)])
@@ -132,7 +181,27 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         pruning_callback = OptunaPruningCallback(trial)
         model.learn(total_timesteps=tuning_timesteps, callback=pruning_callback)
 
-        mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        # Temporarily disable training and reward normalization during evaluation to prevent statistics contamination and reward compression
+        old_training = env.training
+        old_norm_reward = env.norm_reward
+        env.training = False
+        env.norm_reward = False
+        
+        # Disable wrapper training mode in all parallel sub-environments during evaluation
+        try:
+            env.env_method("set_attr", "training", False)
+        except Exception:
+            pass
+            
+        try:
+            mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        finally:
+            env.training = old_training
+            env.norm_reward = old_norm_reward
+            try:
+                env.env_method("set_attr", "training", True)
+            except Exception:
+                pass
         
         # 5. Save Trial Model and VecNorm
         trial_dir = os.path.join(directories["tuning"], "sac")

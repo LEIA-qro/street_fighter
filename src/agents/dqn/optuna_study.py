@@ -72,13 +72,42 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         import numpy as np
 
         class DiscreteToMultiBinaryWrapper(ActionWrapper):
+            """Convert DQN's Discrete output to MultiBinary or MultiDiscrete.
+
+            Supports both action space types:
+            - MultiBinary(n): Discrete(2^n) with binary string decode
+            - MultiDiscrete(nvec): Discrete(prod(nvec)) with divmod decode
+            """
             def __init__(self, env):
                 super().__init__(env)
-                self.action_space = spaces.Discrete(2 ** env.action_space.shape[0])
+                raw_space = env.action_space
+                if isinstance(raw_space, spaces.MultiBinary):
+                    self._mode = "multibinary"
+                    self._n_buttons = raw_space.n
+                    self.action_space = spaces.Discrete(2 ** self._n_buttons)
+                elif isinstance(raw_space, spaces.MultiDiscrete):
+                    self._mode = "multidiscrete"
+                    self._nvec = raw_space.nvec.copy()
+                    self.action_space = spaces.Discrete(int(np.prod(self._nvec)))
+                else:
+                    raise TypeError(
+                        f"DQN wrapper: unsupported action space "
+                        f"{type(raw_space).__name__}. Expected "
+                        f"MultiBinary or MultiDiscrete."
+                    )
 
             def action(self, action):
-                binary_str = format(action, f'0{self.env.action_space.shape[0]}b')
-                return np.array([int(b) for b in binary_str], dtype=np.int8)
+                if self._mode == "multibinary":
+                    binary_str = format(action, f'0{self._n_buttons}b')
+                    return np.array([int(b) for b in binary_str], dtype=np.int8)
+                else:
+                    # Decode flat index → MultiDiscrete via divmod
+                    decoded = []
+                    remaining = int(action)
+                    for n in reversed(self._nvec):
+                        decoded.append(remaining % n)
+                        remaining //= n
+                    return np.array(list(reversed(decoded)), dtype=np.int64)
 
         def make_dqn_env(rank):
             original_init = env_fn(rank)
@@ -130,7 +159,17 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
         print(f"[Optuna] Trial {trial.number} started: lr={lr:.6f}, phase={start_phase}, timesteps={tuning_timesteps}")
         model.learn(total_timesteps=tuning_timesteps)
 
-        mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        # Temporarily disable training and reward normalization during evaluation to prevent statistics contamination and reward compression
+        old_training = env.training
+        old_norm_reward = env.norm_reward
+        env.training = False
+        env.norm_reward = False
+        
+        try:
+            mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=5)
+        finally:
+            env.training = old_training
+            env.norm_reward = old_norm_reward
         
         # 5. Save Trial Model and VecNorm
         trial_dir = os.path.join(directories["tuning"], "dqn")
