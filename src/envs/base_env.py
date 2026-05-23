@@ -167,6 +167,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         info = {}
         if terminated or truncated:
             info["win"] = 1 if current_enemy_hp <= 0 and current_my_hp > 0 else 0
+            if hasattr(self, "current_state_file"):
+                info["state_file"] = self.current_state_file
 
         return self._get_obs(), reward, terminated, truncated, info
 
@@ -179,6 +181,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 # Random Domain Selection
                 # Phase selection
                 chosen_state_file = random.choice(self.active_training_states)
+                self.current_state_file = chosen_state_file
                 full_state_path = os.path.join(config.STATES_DIR, chosen_state_file)
 
                 # Send Reset via Parent Method

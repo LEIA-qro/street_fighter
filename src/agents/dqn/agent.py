@@ -11,7 +11,7 @@ from agents.base_agent import BaseAgent
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
 
 class DQNAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda"):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda", auto_curriculum=False):
         print(f"[Training] Initializing DQN Curriculum Production Training in {save_dir}...")
         print(f"[Training] Compute Device: {device}")
         
@@ -20,30 +20,55 @@ class DQNAgent(BaseAgent):
         if load_pkl and load_pkl != "None":
             print(f"[Training] Loading normalization from: {load_pkl}")
             
-        # Handle different phase types
-        if start_phase == "RYU_ONLY":
-            config.TRAINING_STATES = config.RYU_ONLY_STATES
-            active_phase_idx = 0
-            print("[Training] Using RYU_ONLY states.")
-        elif start_phase == "CUSTOM":
-            config.TRAINING_STATES = config.CUSTOM_STATES if config.CUSTOM_STATES else config.AVAILABLE_STATES
-            active_phase_idx = 0
-            print(f"[Training] Using CUSTOM states ({len(config.TRAINING_STATES)} found).")
+        # Handle different phase types / auto curriculum pre-load
+        if auto_curriculum:
+            from agents.auto_curriculum_callback import AutoCurriculumCallback
+            curr_state = AutoCurriculumCallback.load_state(save_dir)
+            start_level = curr_state.get("current_level", 1)
+            introduced = curr_state.get("introduced_states", [])
+            
+            # Reconstruct starting lottery pool for EmuHawk boot safety
+            pool = []
+            for lvl in range(1, start_level):
+                if lvl in config.DIFFICULTY_LEVELS:
+                    pool.extend(config.DIFFICULTY_LEVELS[lvl])
+            if start_level in config.DIFFICULTY_LEVELS:
+                pool.extend(config.DIFFICULTY_LEVELS[start_level] * 3)
+            for s in introduced:
+                pool.extend([s] * 5)
+                
+            config.TRAINING_STATES = pool
+            active_phase_idx = start_level
+            print(f"[Training] Auto-Curriculum active. Initialized starting lottery pool for Level {start_level} ({len(introduced)} introduced).")
         else:
-            try:
-                active_phase_idx = int(start_phase)
-                config.TRAINING_STATES = config.CURRICULUM_PHASES[active_phase_idx]
-            except (ValueError, IndexError):
-                print(f"[Training][WARN] Invalid phase {start_phase}. Defaulting to Phase 0.")
+            if start_phase == "RYU_ONLY":
+                config.TRAINING_STATES = config.RYU_ONLY_STATES
                 active_phase_idx = 0
-                config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
+                print("[Training] Using RYU_ONLY states.")
+            elif start_phase == "CUSTOM":
+                config.TRAINING_STATES = config.CUSTOM_STATES if config.CUSTOM_STATES else config.AVAILABLE_STATES
+                active_phase_idx = 0
+                print(f"[Training] Using CUSTOM states ({len(config.TRAINING_STATES)} found).")
+            else:
+                try:
+                    active_phase_idx = int(start_phase)
+                    config.TRAINING_STATES = config.CURRICULUM_PHASES[active_phase_idx]
+                except (ValueError, IndexError):
+                    print(f"[Training][WARN] Invalid phase {start_phase}. Defaulting to Phase 0.")
+                    active_phase_idx = 0
+                    config.TRAINING_STATES = config.CURRICULUM_PHASES[0]
 
         n_envs = config.N_ENVS
         
-        phase_params = PHASE_HYPERPARAMS[active_phase_idx].copy()
+        # Base phase params
+        phase_params = PHASE_HYPERPARAMS[active_phase_idx % len(PHASE_HYPERPARAMS)].copy() if not auto_curriculum else {}
+        if auto_curriculum:
+            # Under auto_curriculum, resolve hyperparams fallback
+            phase_idx = (active_phase_idx - 1) // 2
+            phase_params = PHASE_HYPERPARAMS.get(phase_idx, PHASE_HYPERPARAMS[0]).copy()
         
-        active_lr = lr if lr > 0.0 else phase_params["lr"]
-        active_expl_frac = phase_params["exploration_fraction"]
+        active_lr = lr if lr > 0.0 else phase_params.get("lr", 1e-4)
+        active_expl_frac = phase_params.get("exploration_fraction", 0.1)
         
         env = None
         model = None
@@ -148,29 +173,44 @@ class DQNAgent(BaseAgent):
                 env_part = path_parts[-2]
 
             state_name = None
-            if start_phase == "RYU_ONLY":
-                state_name = "ryu_only"
-            elif start_phase == "CUSTOM":
-                state_name = "custom"
+            if not auto_curriculum:
+                if start_phase == "RYU_ONLY":
+                    state_name = "ryu_only"
+                elif start_phase == "CUSTOM":
+                    state_name = "custom"
 
-            callback = ManualCurriculumCallback(
-                save_path=save_dir,
-                phase_hyperparams=PHASE_HYPERPARAMS,
-                start_phase=active_phase_idx,
-                eval_interval=500,
-                save_interval=config.SAVE_FREQ_STEPS,
-                algo=algo_part,
-                env_version=env_part,
-                model_name=config.MODEL_NAME,
-                state_name=state_name
-            )
+            if auto_curriculum:
+                from agents.auto_curriculum_callback import AutoCurriculumCallback
+                callback = AutoCurriculumCallback(
+                    save_path=save_dir,
+                    phase_hyperparams=PHASE_HYPERPARAMS,
+                    start_level=active_phase_idx,
+                    eval_interval=500,
+                    save_interval=config.SAVE_FREQ_STEPS,
+                    algo=algo_part,
+                    env_version=env_part,
+                    model_name=config.MODEL_NAME,
+                    state_name=state_name
+                )
+            else:
+                callback = ManualCurriculumCallback(
+                    save_path=save_dir,
+                    phase_hyperparams=PHASE_HYPERPARAMS,
+                    start_phase=active_phase_idx,
+                    eval_interval=500,
+                    save_interval=config.SAVE_FREQ_STEPS,
+                    algo=algo_part,
+                    env_version=env_part,
+                    model_name=config.MODEL_NAME,
+                    state_name=state_name
+                )
             
             print("[Training] Press Ctrl + C to stop the training. ")
 
             model.learn(
                 total_timesteps=steps, 
                 callback=callback,
-                tb_log_name=config.MODEL_NAME
+                tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}"
             )
             
             # Dynamic Final Save

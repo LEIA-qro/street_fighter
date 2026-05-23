@@ -34,6 +34,7 @@ end
 if (port == "9999" or port == 9999) and activate_visualization then
     client.setwindowsize(2)
     client.invisibleemulation(false)
+    client.displaymessages(true)
 end
 
 console.log("Listening on port: " .. port)
@@ -46,6 +47,22 @@ local step_count = 0 -- Tracks agent steps for debugging
 -- Initialize Previous Projectile Variables outside the loop
 local prev_p1_proj_x = 0
 local prev_p2_proj_x = 0
+
+-- Match State Tracking
+local current_match_state = "None"
+
+local function get_state_display_name(path)
+    if path == nil then return "Loading..." end
+    -- Extract filename from path (handling both backslash and forward slash)
+    local name = path:match("^.+\\(.+)$") or path:match("^.+/(.+)$") or path
+    return string.gsub(name, "%.State$", "")
+end
+
+local function draw_match_state()
+    if activate_visualization then
+        gui.text(10, 10, "Match: " .. current_match_state, 0xFFFF00FF, "topleft")
+    end
+end
 
 while true do
     -- Read RAM
@@ -140,8 +157,10 @@ while true do
         local state_file_path = string.sub(response, 7) -- Extract the state name after "RESET "
         console.log("Received RESET command. Loading New Random State... ")
         savestate.load(state_file_path)
+        current_match_state = get_state_display_name(state_file_path)
         
         -- Skip input injection and frame advance, yield control to the newly loaded state
+        draw_match_state()
         emu.frameadvance() 
     else
         -- Normal Step: Inject Inputs
@@ -164,6 +183,7 @@ while true do
         -- ACTION REPEAT: Hold the input and advance multiple frames
         for i = 1, FRAME_SKIP do
             joypad.set(input)
+            draw_match_state()
             emu.frameadvance()
         end
     end

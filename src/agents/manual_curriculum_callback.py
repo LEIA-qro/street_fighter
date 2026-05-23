@@ -73,6 +73,10 @@ class ManualCurriculumCallback(BaseCallback):
         # Threshold milestone tracker
         self._threshold_save_fired: set[int] = set()
 
+        # Active Best Model Pruning references to prevent disk bloat
+        self._last_best_reward_path: str = None
+        self._last_best_winrate_path: str = None
+
     def _get_base_filename(self, metric_tag: str) -> str:
         """Construct the dynamic base filename: {algo}_{env}_{customName}_{state}_{metricTag}_{steps}"""
         state_tag = self.state_name if self.state_name is not None else f"phase{self.current_phase}"
@@ -276,27 +280,53 @@ class ManualCurriculumCallback(BaseCallback):
     # ------------------------------------------------------------------
     # Save helpers
     # ------------------------------------------------------------------
+    def _safe_remove_model(self, base_path: str):
+        if base_path:
+            for ext in [".zip", "_vecnorm.pkl"]:
+                full_path = base_path + ext
+                try:
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
+                        if self.verbose:
+                            print(f"[Prune] Removed old inferior best model: {os.path.basename(full_path)}")
+                except Exception as e:
+                    print(f"[Prune][WARN] Could not remove old model {full_path}: {e}")
+
     def _save_best_reward(self):
+        # Clean up previous inferior best reward model
+        if hasattr(self, "_last_best_reward_path") and self._last_best_reward_path:
+            self._safe_remove_model(self._last_best_reward_path)
+
         reward_val = int(round(self._mean_reward()))
         base_name = self._get_base_filename(f"Rew{reward_val}")
         path     = os.path.join(self.save_path, base_name)
         vec_path = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
+        
         self.model.save(path)
         self.training_env.save(vec_path)
-        self._save_phase_state()  # ADD THIS
+        
+        self._last_best_reward_path = path
+        self._save_phase_state()
         if self.verbose:
             print(f"[Best-Reward *] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase} | "
                   f"New best: {self._get_phase_best('reward'):.2f} (Saved as: {base_name})")
 
     def _save_best_winrate(self):
+        # Clean up previous inferior best winrate model
+        if hasattr(self, "_last_best_winrate_path") and self._last_best_winrate_path:
+            self._safe_remove_model(self._last_best_winrate_path)
+
         winrate_pct = int(round(self._win_rate() * 100))
         base_name = self._get_base_filename(f"WR{winrate_pct}pct")
         path     = os.path.join(self.save_path, base_name)
         vec_path = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
+        
         self.model.save(path)
         self.training_env.save(vec_path)
-        self._save_phase_state()  # ADD THIS
+        
+        self._last_best_winrate_path = path
+        self._save_phase_state()
         if self.verbose:
             print(f"[Best-WinRate *] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase} | "
@@ -382,6 +412,14 @@ class ManualCurriculumCallback(BaseCallback):
     # ------------------------------------------------------------------
     
     def _on_step(self) -> bool:
+        # Check for graceful file-based stop signal
+        stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
+        if os.path.exists(stop_file):
+            try:
+                os.remove(stop_file)
+            except Exception:
+                pass
+            raise KeyboardInterrupt
  
         # ---- Collect episode outcomes from Monitor's info dict ----
         for info in self.locals.get("infos", []):

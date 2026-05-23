@@ -134,32 +134,47 @@ def stream_logs(cmd):
         state.active_process = None
 
 def stop_active_process():
-    """Gracefully stops the active process by sending CTRL_C, allowing a model save."""
+    """Gracefully stops the active process by writing a stop trigger file and sending CTRL_BREAK, allowing a model save."""
     if state.active_process:
         proc = state.active_process
         state.stop_event.set()
-        try:
-            # 1. Send CTRL_C_EVENT to the process group
-            # This triggers KeyboardInterrupt in Python, causing the EMERGENCY save
-            print(f"[Dashboard] Sending Graceful Stop (CTRL_C) to PID {proc.pid}...")
-            os.kill(proc.pid, signal.CTRL_C_EVENT)
-            
-            # 2. Wait up to 15 seconds for the agent to finish its EMERGENCY save logic
-            for _ in range(15):
-                if proc.poll() is not None:
-                    break
-                time.sleep(1)
-            
-            # 3. Final Tree-Kill Failsafe: Ensure BizHawk and Lua are definitely dead
-            if proc.poll() is None:
-                print(f"[Dashboard] Process {proc.pid} timed out during stop. Force killing...")
-                subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
-            else:
-                print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
-                
-        except Exception as e:
-            print(f"[Dashboard] Error during stop: {e}")
         
+        # 1. Write the file-based stop trigger to the project root
+        stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
+        try:
+            with open(stop_file, "w") as f:
+                f.write("STOP")
+            print(f"[Dashboard] Graceful stop file written to {stop_file}")
+        except Exception as e:
+            print(f"[Dashboard] Error writing stop trigger file: {e}")
+
+        # 2. Send CTRL_BREAK_EVENT as a backup signal (highly robust on Windows for process groups)
+        try:
+            print(f"[Dashboard] Sending backup Graceful Stop (CTRL_BREAK) to PID {proc.pid}...")
+            os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
+        except Exception as e:
+            print(f"[Dashboard] Signal error (ignored): {e}")
+            
+        # 3. Wait up to 15 seconds for the agent to finish its EMERGENCY save logic
+        for _ in range(15):
+            if proc.poll() is not None:
+                break
+            time.sleep(1)
+        
+        # Clean up the stop file if it wasn't already consumed by the callback
+        if os.path.exists(stop_file):
+            try:
+                os.remove(stop_file)
+            except Exception:
+                pass
+            
+        # 4. Final Tree-Kill Failsafe: Ensure BizHawk and Lua are definitely dead
+        if proc.poll() is None:
+            print(f"[Dashboard] Process {proc.pid} timed out during stop. Force killing...")
+            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+        else:
+            print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
+            
         state.active_process = None
         return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
     
@@ -235,7 +250,7 @@ except Exception as e:
     except Exception as e:
         return f"Subprocess execution error: {e}", None
 
-def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr, ent_coef, clip_range, device):
+def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr, ent_coef, clip_range, device, auto_curriculum):
     update_config_var("MODEL_NAME", model_name)
     
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train.py"), 
@@ -247,6 +262,7 @@ def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr
     if lr > 0.0: cmd += ["--lr", str(lr)]
     if ent_coef > 0.0: cmd += ["--ent_coef", str(ent_coef)]
     if clip_range > 0.0: cmd += ["--clip_range", str(clip_range)]
+    if auto_curriculum: cmd += ["--auto_curriculum"]
     
     for log in stream_logs(cmd):
         yield log
@@ -503,6 +519,135 @@ def get_league_pool_status_html():
     except Exception as e:
         return f"<div style='color: red; padding: 12px;'>Error reading pool analytics: {e}</div>"
 
+def get_auto_curriculum_status_html(algo, env):
+    """Parses auto_curriculum_state.json and renders a premium live progress and analytics card."""
+    try:
+        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
+        state_path = os.path.join(target_dir, "auto_curriculum_state.json")
+        
+        if not os.path.exists(state_path):
+            return """
+            <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
+                <h3 style='margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
+                    📈 Auto-Curriculum Analytics
+                </h3>
+                <div style='font-size: 0.9rem; color: #94a3b8; font-style: italic; text-align: center; padding: 16px;'>
+                    No active auto-curriculum session found for this algorithm/environment. Start auto-curriculum training to view real-time metrics!
+                </div>
+            </div>
+            """
+            
+        import json
+        with open(state_path, "r") as f:
+            state_data = json.load(f)
+            
+        current_level = state_data.get("current_level", 1)
+        stability_counter = state_data.get("stability_counter", 0)
+        introduced = state_data.get("introduced_states", [])
+        steps = state_data.get("num_timesteps", 0)
+        state_wins = state_data.get("state_win_buffers", {})
+        
+        # Formulate consecutive stability blocks e.g. [🟩][🟩][⬜]
+        stability_blocks = ""
+        for i in range(3):
+            if i < stability_counter:
+                stability_blocks += "<span style='font-size: 1.2rem; margin-right: 4px;'>🟩</span>"
+            else:
+                stability_blocks += "<span style='font-size: 1.2rem; margin-right: 4px;'>⬜</span>"
+                
+        level_pct = int((current_level / 8) * 100)
+        
+        html = f"""
+        <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
+            <h3 style='margin-top: 0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
+                📈 Auto-Curriculum Analytics
+            </h3>
+            
+            <div style='margin-bottom: 20px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.9rem;'>
+                    <span style='font-weight: 500; color: #94a3b8;'>Master Level</span>
+                    <span style='font-weight: 700; color: #3b82f6; font-size: 1rem;'>Lvl {current_level} / 8</span>
+                </div>
+                <div style='width: 100%; height: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;'>
+                    <div style='width: {level_pct}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 9999px; transition: width 0.4s ease;'></div>
+                </div>
+            </div>
+            
+            <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;'>
+                <div style='background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 12px; text-align: center;'>
+                    <div style='font-size: 1.25rem; font-weight: 700; color: #3b82f6;'>{steps:,}</div>
+                    <div style='font-size: 0.8rem; color: #93c5fd; margin-top: 4px; font-weight: 500;'>Steps Completed</div>
+                </div>
+                <div style='background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 12px; text-align: center;'>
+                    <div style='display: flex; justify-content: center; align-items: center; height: 1.25rem;'>{stability_blocks}</div>
+                    <div style='font-size: 0.8rem; color: #86efac; margin-top: 4px; font-weight: 500;'>Stability Streak</div>
+                </div>
+            </div>
+            
+            <h4 style='margin-top: 0; margin-bottom: 12px; font-size: 0.85rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;'>
+                🥋 Matchup Mastery (Active & New Pool)
+            </h4>
+        """
+        
+        active_states = config.DIFFICULTY_LEVELS.get(current_level, []).copy()
+        target_states = active_states + introduced
+        
+        if not state_wins:
+            html += """
+            <div style='font-size: 0.85rem; color: #94a3b8; font-style: italic; text-align: center; padding: 8px;'>
+                Waiting for first episode telemetry to gather win rates...
+            </div>
+            """
+        else:
+            found_any = False
+            for state in sorted(target_states):
+                if state in state_wins:
+                    found_any = True
+                    buf = state_wins[state]
+                    wr = sum(buf) / len(buf) if len(buf) > 0 else 0.0
+                    pct = int(wr * 100)
+                    
+                    if wr < 0.50:
+                         color = "#ef4444"
+                         badge = "WEAKNESS"
+                         bg_color = "rgba(239, 68, 68, 0.15)"
+                    elif wr < 0.75:
+                         color = "#f59e0b"
+                         badge = "CONTESTED"
+                         bg_color = "rgba(245, 158, 11, 0.15)"
+                    else:
+                         color = "#22c55e"
+                         badge = "MASTERED"
+                         bg_color = "rgba(34, 197, 94, 0.15)"
+                        
+                    is_introduced = state in introduced
+                    role_prefix = "New: " if is_introduced else "Act: "
+                    state_clean = state[4:] if state.startswith("RYU_") else state
+                    display_name = role_prefix + state_clean.replace("_R1", "").replace(".State", "")
+                    
+                    html += f"""
+                    <div style='margin-bottom: 12px;'>
+                        <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.85rem;'>
+                            <span style='font-weight: 500; color: #e2e8f0; font-size: 0.8rem;'>{display_name}</span>
+                            <span style='font-size: 0.7rem; font-weight: 600; padding: 1px 6px; border-radius: 9999px; color: {color}; background: {bg_color}; border: 1px solid {color}33;'>{badge} ({pct}%)</span>
+                        </div>
+                        <div style='width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;'>
+                            <div style='width: {pct}%; height: 100%; background: {color}; border-radius: 9999px; transition: width 0.3s ease;'></div>
+                        </div>
+                    </div>
+                    """
+            if not found_any:
+                html += """
+                <div style='font-size: 0.85rem; color: #94a3b8; font-style: italic; text-align: center; padding: 8px;'>
+                    No active state buffers recorded yet. Play a round!
+                </div>
+                """
+                
+        html += "</div>"
+        return html
+    except Exception as e:
+        return f"<div style='color: red; padding: 12px;'>Error reading auto-curriculum analytics: {e}</div>"
+
 def refresh_league_status():
     importlib.reload(config)
     all_states = get_all_state_files()
@@ -575,7 +720,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             upload_status = gr.Markdown("")
                             
                             with gr.Row():
-                                train_phase_drop = gr.Dropdown(label="Start Phase (States)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
+                                auto_curr_check = gr.Checkbox(label="Enable Auto-Curriculum (Progressive 8-Level)", value=False)
+                                train_phase_drop = gr.Dropdown(label="Start Phase (Manual)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
                                 train_steps = gr.Number(label="Total Timesteps", value=1000000, precision=0)
                                 train_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                             
@@ -589,6 +735,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 readonly_params = gr.JSON(label="Fixed / Read-Only Hyperparameters")
                             
                             start_train_btn = gr.Button("▶ Start Training", variant="primary")
+                            
+                            gr.Markdown("---")
+                            with gr.Row():
+                                refresh_curr_btn = gr.Button("🔄 Refresh Auto-Curriculum Stats", variant="secondary")
+                            auto_curr_card = gr.HTML(value=get_auto_curriculum_status_html("ppo", "v2"))
                         
                         # Section B: Optuna
                         with gr.Tab("🧪 Optuna Tuning"):
@@ -851,7 +1002,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             gr.update(value=f"{algo}_sf2_production")
         )
     
-    algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input, model_name_input])
+    algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input, model_name_input]).then(
+        get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card]
+    )
+    env_sel.change(get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
 
     # Link uploaders (Training Tab)
     ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel, env_sel], outputs=[upload_status]).then(
@@ -863,13 +1017,25 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
     upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
 
+    # Dynamic Auto-Curriculum UI overrides
+    def toggle_auto_curriculum_ui(is_enabled):
+        if is_enabled:
+            return gr.update(label="Start Level (Auto)", choices=[1, 2, 3, 4, 5, 6, 7, 8], value=1)
+        else:
+            return gr.update(label="Start Phase (Manual)", choices=[0, 1, 2, 3, "RYU_ONLY", "CUSTOM"], value=0)
+
+    auto_curr_check.change(toggle_auto_curriculum_ui, inputs=[auto_curr_check], outputs=[train_phase_drop])
+
+    # Auto-Curriculum Live Card Timer Updates (runs every 5 seconds)
+    gr.Timer(5).tick(fn=get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
+
     # Global Process Handlers
-    start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip, train_device], outputs=[unified_logs]).then(
-        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
+    start_train_btn.click(run_training, inputs=[algo_sel, env_sel, model_name_input, train_zip_drop, train_pkl_drop, train_phase_drop, train_steps, train_lr, train_ent, train_clip, train_device, auto_curr_check], outputs=[unified_logs]).then(
+        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     
     start_tune_btn.click(run_tuning, inputs=[algo_sel, env_sel, study_name_input, tune_zip_drop, tune_pkl_drop, tune_phase_drop, tune_steps, trials_input, tune_device], outputs=[unified_logs]).then(
-        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
+        refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     
     start_pbt_btn.click(run_pbt, inputs=[algo_sel, env_sel, pbt_model_name_input, pbt_zip_drop, pbt_pkl_drop, pbt_phase_drop, pbt_steps, pbt_exploit_steps, pbt_pop, pbt_concurrent, pbt_resume, pbt_envs], outputs=[unified_logs]).then(
@@ -882,7 +1048,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     copy_match_btn.click(None, inputs=[match_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Match logs copied to clipboard!'); return []; }")
 
     stop_btn.click(stop_active_process, outputs=[stop_status])
-    refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
+    refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
+    refresh_curr_btn.click(get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
     # League Tab Event Bindings

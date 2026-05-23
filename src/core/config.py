@@ -34,7 +34,7 @@ TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "traini
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
 INPUT_DISPLAY_LUA_PATH = os.path.join(LUA_DIR, "Input_Display.lua")
 ENABLE_INPUT_DISPLAY = True
-ACTIVATE_VISUALIZATION = False
+ACTIVATE_VISUALIZATION = True
 
 # Player Labels for On-Screen Display
 P1_MODEL_NAME = "None"
@@ -107,7 +107,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "ppo_v3_defensive" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "autocurrTest6" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
@@ -123,7 +123,7 @@ RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 SAVE_FREQ_STEPS = 1_000_000
 
 # Number of parallel BizHawk instances for Optuna trials
-N_ENVS = 1
+N_ENVS = 10
 
 
 # ===========================================================
@@ -278,6 +278,138 @@ RYU_ONLY_STATES = (
     RYU_ONLY_STATES_PHASE_3 +
     RYU_ONLY_STATES_PHASE_4
 )
+
+# Reorganized difficulty levels for automated curriculum learning (8 levels, 12 states each)
+LEVEL_1_STATES = [
+    "RYU_CHUNLI_R1_lvl1.State",
+    "RYU_DHALSIM_R1_lvl1.State",
+    "RYU_KEN_R1_lvl1.State",
+    "RYU_ZANGIEF_R1_lvl1.State",
+    "RYU_RYU_R1_lvl1.State",
+    "RYU_EHONDA_R1_lvl1.State",
+    "RYU_GUILE_R1_lvl1.State",
+    "RYU_BALROG_R1_lvl1.State",
+    "RYU_VEGA_R1_lvl1.State",
+    "RYU_SAGAT_R1_lvl1.State",
+    "RYU_MBISON_R1_lvl1.State",
+    "RYU_BLANKA_R1_lvl1.State",
+]
+
+LEVEL_2_STATES = [
+    "RYU_BLANKA_R1_lvl2.State",
+    "RYU_KEN_R1_lvl2.State",
+    "RYU_EHONDA_R1_lvl2.State",
+    "RYU_GUILE_R1_lvl2.State",
+    "RYU_CHUNLI_R1_lvl2.State",
+    "RYU_ZANGIEF_R1_lvl2.State",
+    "RYU_DHALSIM_R1_lvl2.State",
+    "RYU_RYU_R1_lvl2.State",
+    "RYU_BALROG_R1_lvl2.State",
+    "RYU_VEGA_R1_lvl2.State",
+    "RYU_SAGAT_R1_lvl2.State",
+    "RYU_MBISON_R1_lvl2.State",
+]
+
+LEVEL_3_STATES = [
+    "RYU_BLANKA_R1_lvl3.State",
+    "RYU_DHALSIM_R1_lvl3.State",
+    "RYU_RYU_R1_lvl3.State",
+    "RYU_ZANGIEF_R1_lvl3.State",
+    "RYU_EHONDA_R1_lvl3.State",
+    "RYU_GUILE_R1_lvl3.State",
+    "RYU_CHUNLI_R1_lvl3.State",
+    "RYU_BALROG_R1_lvl3.State",
+    "RYU_VEGA_R1_lvl3.State",
+    "RYU_SAGAT_R1_lvl3.State",
+    "RYU_MBISON_R1_lvl3.State",
+    "RYU_KEN_R1_lvl3.State",
+]
+
+LEVEL_4_STATES = [
+    "RYU_DHALSIM_R1_lvl4.State",
+    "RYU_BLANKA_R1_lvl4.State",
+    "RYU_GUILE_R1_lvl4.State",
+    "RYU_CHUNLI_R1_lvl4.State",
+    "RYU_RYU_R1_lvl4.State",
+    "RYU_EHONDA_R1_lvl4.State",
+    "RYU_BALROG_R1_lvl4.State",
+    "RYU_VEGA_R1_lvl4.State",
+    "RYU_SAGAT_R1_lvl4.State",
+    "RYU_MBISON_R1_lvl4.State",
+    "RYU_KEN_R1_lvl4.State",
+    "RYU_ZANGIEF_R1_lvl4.State",
+]
+
+LEVEL_5_STATES = [
+    "RYU_RYU_R1_lvl5.State",
+    "RYU_BLANKA_R1_lvl5.State",
+    "RYU_CHUNLI_R1_lvl5.State",
+    "RYU_KEN_R1_lvl5.State",
+    "RYU_ZANGIEF_R1_lvl5.State",
+    "RYU_DHALSIM_R1_lvl5.State",
+    "RYU_EHONDA_R1_lvl5.State",
+    "RYU_GUILE_R1_lvl5.State",
+    "RYU_BALROG_R1_lvl5.State",
+    "RYU_VEGA_R1_lvl5.State",
+    "RYU_SAGAT_R1_lvl5.State",
+    "RYU_MBISON_R1_lvl5.State",
+]
+
+LEVEL_6_STATES = [
+    "RYU_EHONDA_R1_lvl6.State",
+    "RYU_GUILE_R1_lvl6.State",
+    "RYU_CHUNLI_R1_lvl6.State",
+    "RYU_RYU_R1_lvl6.State",
+    "RYU_ZANGIEF_R1_lvl6.State",
+    "RYU_KEN_R1_lvl6.State",
+    "RYU_DHALSIM_R1_lvl6.State",
+    "RYU_BLANKA_R1_lvl6.State",
+    "RYU_BALROG_R1_lvl6.State",
+    "RYU_VEGA_R1_lvl6.State",
+    "RYU_SAGAT_R1_lvl6.State",
+    "RYU_MBISON_R1_lvl6.State",
+]
+
+LEVEL_7_STATES = [
+    "RYU_DHALSIM_R1_lvl7.State",
+    "RYU_KEN_R1_lvl7.State",
+    "RYU_RYU_R1_lvl7.State",
+    "RYU_BALROG_R1_lvl7.State",
+    "RYU_BLANKA_R1_lvl7.State",
+    "RYU_GUILE_R1_lvl7.State",
+    "RYU_CHUNLI_R1_lvl7.State",
+    "RYU_ZANGIEF_R1_lvl7.State",
+    "RYU_EHONDA_R1_lvl7.State",
+    "RYU_VEGA_R1_lvl7.State",
+    "RYU_SAGAT_R1_lvl7.State",
+    "RYU_MBISON_R1_lvl7.State",
+]
+
+LEVEL_8_STATES = [
+    "RYU_BALROG_R1_HARD.State",
+    "RYU_BLANKA_R1_HARD.State",
+    "RYU_CHUNLI_R1_HARD.State",
+    "RYU_DHALSIM_R1_HARD.State",
+    "RYU_EHONDA_R1_HARD.State",
+    "RYU_GUILE_R1_HARD.State",
+    "RYU_KEN_R1_HARD.State",
+    "RYU_RYU_R1_HARD.State",
+    "RYU_ZANGIEF_R1_HARD.State",
+    "RYU_SAGAT_R1_HARD.State",
+    "RYU_VEGA_R1_HARD.State",
+    "RYU_MBISON_R1_HARD.State",
+]
+
+DIFFICULTY_LEVELS = {
+    1: LEVEL_1_STATES,
+    2: LEVEL_2_STATES,
+    3: LEVEL_3_STATES,
+    4: LEVEL_4_STATES,
+    5: LEVEL_5_STATES,
+    6: LEVEL_6_STATES,
+    7: LEVEL_7_STATES,
+    8: LEVEL_8_STATES,
+}
 
 RYU_PVP_STATES = [
     "RYU_RYU_R1_PvP.State",

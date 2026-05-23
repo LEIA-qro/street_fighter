@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--load_pkl", type=str, default=None)
     parser.add_argument("--phase", type=str, default="0")
     parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--auto_curriculum", action="store_true", help="Use progressive auto-curriculum pipeline")
 
     # Advanced Hyperparameter Overrides
     parser.add_argument("--lr", type=float, default=0.0)
@@ -91,7 +92,8 @@ def main():
                 lr=args.lr, 
                 ent_coef=args.ent_coef, 
                 clip_range=args.clip_range,
-                device=device
+                device=device,
+                auto_curriculum=args.auto_curriculum
             )
 
             # If we reached here, training finished normally
@@ -110,23 +112,27 @@ def main():
             failsafe_env() # Ensure everything is dead
             time.sleep(10)
 
-            # Read progress from curriculum_state.json if available
-            state_path = os.path.join(save_dir, "curriculum_state.json")
+            # Read progress from curriculum_state.json or auto_curriculum_state.json if available
+            state_file_name = "auto_curriculum_state.json" if args.auto_curriculum else "curriculum_state.json"
+            state_path = os.path.join(save_dir, state_file_name)
             if os.path.exists(state_path):
                 import json
                 try:
                     with open(state_path, "r") as f:
                         state_data = json.load(f)
-                        # Sync steps and phase
+                        # Sync steps and phase/level
                         steps_completed = state_data.get("num_timesteps", steps_completed)
 
-                        # Preserve special phase names if that was the original choice
-                        if original_phase_choice in ["RYU_ONLY", "CUSTOM"]:
-                            current_phase = original_phase_choice
+                        if args.auto_curriculum:
+                            current_phase = str(state_data.get("current_level", current_phase))
                         else:
-                            current_phase = str(state_data.get("current_phase", current_phase))
+                            # Preserve special phase names if that was the original choice
+                            if original_phase_choice in ["RYU_ONLY", "CUSTOM"]:
+                                current_phase = original_phase_choice
+                            else:
+                                current_phase = str(state_data.get("current_phase", current_phase))
 
-                        print(f"[RETRY LOOP] Progress synced from disk: {steps_completed} steps, Phase {current_phase}")
+                        print(f"[RETRY LOOP] Progress synced from disk: {steps_completed} steps, Phase/Level {current_phase}")
 
                         # BREAK IF ALREADY DONE
                         if steps_completed >= total_target_steps:

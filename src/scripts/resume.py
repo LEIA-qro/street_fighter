@@ -54,15 +54,43 @@ def resume_training(model_path, vec_path,
         algo_part = path_parts[-2]
 
     # --- RESTORE CURRICULUM STATE ---
-    phase_state = ManualCurriculumCallback.load_state(directories["production"])
-    restored_phase = start_phase if start_phase is not None else phase_state["current_phase"]
-    phase_params   = PHASE_HYPERPARAMS[restored_phase]
-    state_name = phase_state.get("state_name", None)
+    is_auto = os.path.exists(os.path.join(directories["production"], "auto_curriculum_state.json"))
+    
+    if is_auto:
+        from agents.auto_curriculum_callback import AutoCurriculumCallback
+        phase_state = AutoCurriculumCallback.load_state(directories["production"])
+        restored_phase = start_phase if start_phase is not None else phase_state["current_level"]
+        
+        # Resolve hyperparams fallback
+        phase_idx = (restored_phase - 1) // 2
+        phase_params = PHASE_HYPERPARAMS.get(phase_idx, PHASE_HYPERPARAMS[0])
+        state_name = phase_state.get("state_name", None)
+        
+        # Point training states to the restored level's lottery pool (not config default)
+        start_level = restored_phase
+        introduced = phase_state.get("introduced_states", [])
+        pool = []
+        for lvl in range(1, start_level):
+            if lvl in config.DIFFICULTY_LEVELS:
+                pool.extend(config.DIFFICULTY_LEVELS[lvl])
+        if start_level in config.DIFFICULTY_LEVELS:
+            pool.extend(config.DIFFICULTY_LEVELS[start_level] * 3)
+        for s in introduced:
+            pool.extend([s] * 5)
+            
+        config.TRAINING_STATES = pool
+        print(f"[Resume] Restoring to Auto-Curriculum Level {restored_phase} "
+              f"with {len(introduced)} introduced states. Pool size: {len(config.TRAINING_STATES)}")
+    else:
+        phase_state = ManualCurriculumCallback.load_state(directories["production"])
+        restored_phase = start_phase if start_phase is not None else phase_state["current_phase"]
+        phase_params   = PHASE_HYPERPARAMS[restored_phase]
+        state_name = phase_state.get("state_name", None)
 
-    # Point training states to the restored phase (not config default)
-    config.TRAINING_STATES = config.CURRICULUM_PHASES[restored_phase]
-    print(f"[Resume] Restoring to Phase {restored_phase} "
-          f"with states: {config.TRAINING_STATES}")
+        # Point training states to the restored phase (not config default)
+        config.TRAINING_STATES = config.CURRICULUM_PHASES[restored_phase]
+        print(f"[Resume] Restoring to Phase {restored_phase} "
+              f"with states: {config.TRAINING_STATES}")
     
     # 1. Boot Parallel Emulators
     print(f"Initializing {config.N_ENVS}-Core Resume Environment...")
@@ -91,47 +119,66 @@ def resume_training(model_path, vec_path,
                 "learning_rate": phase_params["lr"],
                 "ent_coef":      phase_params["ent_coef"],
                 "clip_range":    phase_params["clip"],
-                # n_steps and batch_size intentionally omitted —
-                # they are structural and cannot change mid-training in SB3.
-                # They remain as saved in the model zip.
             }
         )
 
-        # model.target_kl = 0.03   # THE FIX: Restored to standard 0.03 
-        # model.n_epochs = 10      
-        callback = callback_class(
-            save_path=directories["production"],
-            phase_hyperparams=PHASE_HYPERPARAMS,
-            start_phase=restored_phase,   # <-- The fix
-            eval_interval=500,
-            save_interval=config.SAVE_FREQ_STEPS,
-            algo=algo_part,
-            env_version=env_part,
-            model_name=config.MODEL_NAME,
-            state_name=state_name
-        )
+        if is_auto:
+            from agents.auto_curriculum_callback import AutoCurriculumCallback
+            callback = callback_class if callback_class != ManualCurriculumCallback else AutoCurriculumCallback
+            callback = callback(
+                save_path=directories["production"],
+                phase_hyperparams=PHASE_HYPERPARAMS,
+                start_level=restored_phase,
+                eval_interval=500,
+                save_interval=config.SAVE_FREQ_STEPS,
+                algo=algo_part,
+                env_version=env_part,
+                model_name=config.MODEL_NAME,
+                state_name=state_name
+            )
+            # Restore buffers
+            from collections import deque
+            state_wins_raw = phase_state.get("state_win_buffers", {})
+            for s_name, lst in state_wins_raw.items():
+                if s_name in callback.state_win_buffers:
+                    callback.state_win_buffers[s_name] = deque(lst, maxlen=100)
+            callback.introduced_states = phase_state.get("introduced_states", [])
+            callback.stability_counter = phase_state.get("stability_counter", 0)
+        else:
+            callback = callback_class(
+                save_path=directories["production"],
+                phase_hyperparams=PHASE_HYPERPARAMS,
+                start_phase=restored_phase,
+                eval_interval=500,
+                save_interval=config.SAVE_FREQ_STEPS,
+                algo=algo_part,
+                env_version=env_part,
+                model_name=config.MODEL_NAME,
+                state_name=state_name
+            )
+            callback._phase_bests = phase_state.get("phase_bests", {})
         
-        callback._phase_bests = phase_state.get("phase_bests", {})
         callback._threshold_save_fired = phase_state.get("threshold_save_fired", set())
         callback.last_save_step        = phase_state.get("last_save_step", 0)  
         callback.last_eval_step        = phase_state.get("last_eval_step", 0)   
-        if start_phase is not None and start_phase != phase_state.get("current_phase", 0):
+        
+        if not is_auto and start_phase is not None and start_phase != phase_state.get("current_phase", 0):
             print(f"[Resume] start_phase override detected. "
                 f"Clearing phase {start_phase} bests for fresh tracking.")
             callback._phase_bests.pop(start_phase, None)  # Remove stale threshold for this phase
        
-        if restored_phase > 0:
+        if is_auto or restored_phase > 0:
             try:
-                env.env_method("set_training_states", config.CURRICULUM_PHASES[restored_phase])
-                print(f"[Resume] States broadcast to all {config.N_ENVS} workers -> Phase {restored_phase}")
+                env.env_method("set_training_states", config.TRAINING_STATES)
+                print(f"[Resume] States broadcast to all {config.N_ENVS} workers -> Level/Phase {restored_phase}")
             except Exception as e:
                 print(f"[Resume][WARN] Could not broadcast states to workers: {e}")
                 
         model.learn(
             total_timesteps=config.RESUME_PRODUCTION_TIMESTEPS, 
             callback=callback,
-            tb_log_name=config.MODEL_NAME,
-            reset_num_timesteps=False # reset_num_timesteps=False ensures TensorBoard continues the graph smoothly
+            tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}",
+            reset_num_timesteps=False
         )
         
         # Save Final Grandmaster (Dynamic Final Save)
