@@ -279,6 +279,22 @@ RYU_ONLY_STATES = (
     RYU_ONLY_STATES_PHASE_4
 )
 
+RYU_PVP_STATES = [
+    "RYU_RYU_R1_PvP.State",
+    "RYU_KEN_R1_PvP.State",
+    "RYU_CHUNLI_R1_PvP.State",
+    "RYU_GUILE_R1_PvP.State",
+    "RYU_EHONDA_R1_PvP.State",
+    "RYU_BLANKA_R1_PvP.State",
+    "RYU_ZANGIEF_R1_PvP.State",
+    "RYU_DHALSIM_R1_PvP.State",
+    "RYU_BALROG_R1_PvP.State",
+    "RYU_VEGA_R1_PvP.State",
+    "RYU_SAGAT_R1_PvP.State",
+    "RYU_MBISON_R1_PvP.State"
+]
+
+
 
 CURRICULUM_PHASES = [
     RYU_ONLY_STATES_PHASE_1,   # Now Phase 0 — easy but live opponents, diverse states

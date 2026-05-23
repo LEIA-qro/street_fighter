@@ -68,6 +68,10 @@ def run_agent_worker(config_dict):
     except Exception:
         rank = config_dict["rank"] # Fallback
     
+    # Performance Optimization: Restrict each parallel PBT Ray worker to exactly 1 CPU thread
+    # This prevents logical core thrashing when up to 10-16 workers run in parallel.
+    torch.set_num_threads(1)
+
     if torch.cuda.is_available():
         # Limit VRAM to prevent out-of-memory when running many parallel workers
         torch.cuda.set_per_process_memory_fraction(0.09)

@@ -157,12 +157,31 @@ class SACAgent(BaseAgent):
                     device=device
                 )
 
+            # Extract env_version and algo from save_dir safely
+            normalized_path = os.path.normpath(save_dir)
+            path_parts = normalized_path.split(os.sep)
+            algo_part = "sac"
+            env_part = "v2"
+            if len(path_parts) >= 2:
+                algo_part = path_parts[-1]
+                env_part = path_parts[-2]
+
+            state_name = None
+            if start_phase == "RYU_ONLY":
+                state_name = "ryu_only"
+            elif start_phase == "CUSTOM":
+                state_name = "custom"
+
             callback = ManualCurriculumCallback(
                 save_path=save_dir,
                 phase_hyperparams=PHASE_HYPERPARAMS,
                 start_phase=active_phase_idx,
                 eval_interval=500,
-                save_interval=config.SAVE_FREQ_STEPS
+                save_interval=config.SAVE_FREQ_STEPS,
+                algo=algo_part,
+                env_version=env_part,
+                model_name=config.MODEL_NAME,
+                state_name=state_name
             )
             
             print("[Training] Press Ctrl + C to stop the training. ")
@@ -173,9 +192,15 @@ class SACAgent(BaseAgent):
                 tb_log_name=config.MODEL_NAME
             )
             
-            model.save(os.path.join(save_dir, config.MODEL_NAME + "_FINAL"))
-            if hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_FINAL.pkl"))
-            print("\nProduction Training Complete!")
+            # Dynamic Final Save
+            winrate_pct = int(round(callback._win_rate() * 100))
+            state_tag = callback.state_name if callback.state_name is not None else f"phase{callback.current_phase}"
+            final_base = f"{algo_part}_{env_part}_{config.MODEL_NAME}_{state_tag}_final_WR{winrate_pct}pct_{callback.num_timesteps}steps"
+            
+            model.save(os.path.join(save_dir, final_base))
+            if hasattr(env, "save"): 
+                env.save(os.path.join(save_dir, f"{final_base}_vecnorm.pkl"))
+            print(f"\nProduction Training Complete! Saved final model as: {final_base}")
             
         except KeyboardInterrupt:
             print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")

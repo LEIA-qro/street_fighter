@@ -20,6 +20,11 @@ def update_ppo_config_var(key, value):
 def main():
     config.generate_lua_config()
 
+    import torch
+    # Performance Optimization: Restrict PyTorch to 2 CPU threads during PBT run
+    # Prevents logical core thrashing alongside active EmuHawk instances.
+    torch.set_num_threads(2)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", default="ppo")
     parser.add_argument("--env", default="v2")

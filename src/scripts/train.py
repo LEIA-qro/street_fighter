@@ -48,7 +48,7 @@ def main():
     agent   = module.build_agent()
     env_fn  = lambda rank: SFv2_make_env(rank, version=args.env)
 
-    save_dir = os.path.join(config.get_directory()["production"], args.algo)
+    save_dir = os.path.join(config.get_directory()["production"], args.env, args.algo)
     os.makedirs(save_dir, exist_ok=True)
 
     total_target_steps = args.steps

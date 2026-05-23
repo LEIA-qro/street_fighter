@@ -38,10 +38,26 @@ def resume_training(model_path, vec_path,
 
     print(f"Initializing {config.N_ENVS}-Core Resume Environment...")
     
+    algo_part = "ppo"
+    env_part = "v2"
+    
+    # Try parsing from model_path
+    normalized_model_path = os.path.normpath(model_path)
+    path_parts = normalized_model_path.split(os.sep)
+    
+    if "production" in path_parts:
+        idx = path_parts.index("production")
+        if len(path_parts) > idx + 2:
+            env_part = path_parts[idx + 1]
+            algo_part = path_parts[idx + 2]
+    elif len(path_parts) >= 3:
+        algo_part = path_parts[-2]
+
     # --- RESTORE CURRICULUM STATE ---
     phase_state = ManualCurriculumCallback.load_state(directories["production"])
     restored_phase = start_phase if start_phase is not None else phase_state["current_phase"]
     phase_params   = PHASE_HYPERPARAMS[restored_phase]
+    state_name = phase_state.get("state_name", None)
 
     # Point training states to the restored phase (not config default)
     config.TRAINING_STATES = config.CURRICULUM_PHASES[restored_phase]
@@ -88,7 +104,11 @@ def resume_training(model_path, vec_path,
             phase_hyperparams=PHASE_HYPERPARAMS,
             start_phase=restored_phase,   # <-- The fix
             eval_interval=500,
-            save_interval=config.SAVE_FREQ_STEPS
+            save_interval=config.SAVE_FREQ_STEPS,
+            algo=algo_part,
+            env_version=env_part,
+            model_name=config.MODEL_NAME,
+            state_name=state_name
         )
         
         callback._phase_bests = phase_state.get("phase_bests", {})
@@ -114,10 +134,14 @@ def resume_training(model_path, vec_path,
             reset_num_timesteps=False # reset_num_timesteps=False ensures TensorBoard continues the graph smoothly
         )
         
-        # Save Final Grandmaster
-        model.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_FINAL"))
-        env.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_FINAL.pkl"))
-        print("\nProduction Training Complete!")
+        # Save Final Grandmaster (Dynamic Final Save)
+        winrate_pct = int(round(callback._win_rate() * 100))
+        state_tag = callback.state_name if callback.state_name is not None else f"phase{callback.current_phase}"
+        final_base = f"{algo_part}_{env_part}_{config.MODEL_NAME}_{state_tag}_final_WR{winrate_pct}pct_{callback.num_timesteps}steps"
+        
+        model.save(os.path.join(directories["production"], final_base))
+        env.save(os.path.join(directories["production"], f"{final_base}_vecnorm.pkl"))
+        print(f"\nProduction Training Complete! Saved final model as: {final_base}")
         return {"success": True, "reason": "completed"}
         
     except KeyboardInterrupt:

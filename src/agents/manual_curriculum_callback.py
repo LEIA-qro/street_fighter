@@ -41,7 +41,9 @@ class ManualCurriculumCallback(BaseCallback):
     MAX_CHECKPOINTS_TO_KEEP = 3
 
     def __init__(self, save_path: str, phase_hyperparams: dict, verbose: int = 1, start_phase: int = 0, 
-                 eval_interval: int = 500, save_interval: int = None):
+                 eval_interval: int = 500, save_interval: int = None,
+                 algo: str = "ppo", env_version: str = "v2", model_name: str = "league",
+                 state_name: str = None):
         
         super().__init__(verbose)
         self.save_path = save_path
@@ -49,6 +51,12 @@ class ManualCurriculumCallback(BaseCallback):
         self.current_phase = start_phase
         self.eval_interval = eval_interval
         self.save_interval = save_interval if save_interval is not None else config.SAVE_FREQ_STEPS
+
+        # Metadata for dynamic naming
+        self.algo = algo.lower()
+        self.env_version = env_version.lower()
+        self.model_name = model_name
+        self.state_name = state_name
 
         self.win_buffer    = deque(maxlen=config.WIN_RATE_WINDOW)
         self.reward_buffer = deque(maxlen=300)
@@ -64,6 +72,12 @@ class ManualCurriculumCallback(BaseCallback):
 
         # Threshold milestone tracker
         self._threshold_save_fired: set[int] = set()
+
+    def _get_base_filename(self, metric_tag: str) -> str:
+        """Construct the dynamic base filename: {algo}_{env}_{customName}_{state}_{metricTag}_{steps}"""
+        state_tag = self.state_name if self.state_name is not None else f"phase{self.current_phase}"
+        return f"{self.algo}_{self.env_version}_{self.model_name}_{state_tag}_{metric_tag}_{self.num_timesteps}steps"
+
 
     def set_phase(self, new_phase_idx: int):
         """
@@ -118,10 +132,11 @@ class ManualCurriculumCallback(BaseCallback):
  
         # 6. Write a permanent phase-entry checkpoint
         tag = f"phase{self.current_phase}_entry"
+        base_name = self._get_base_filename(tag)
         self.model.save(
-            os.path.join(self.save_path, f"{config.MODEL_NAME}_{tag}"))
+            os.path.join(self.save_path, base_name))
         self.training_env.save(
-            os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_{tag}.pkl"))
+            os.path.join(self.save_path, f"{base_name}_vecnorm.pkl"))
  
         # 7. Persist updated state to disk
         self._save_phase_state() 
@@ -207,6 +222,7 @@ class ManualCurriculumCallback(BaseCallback):
             "threshold_save_fired":  list(self._threshold_save_fired),  # ADD THIS
             "last_save_step":       self.last_save_step,   # ADD
             "last_eval_step":       self.last_eval_step,   # ADD
+            "state_name":           self.state_name,
         }
         path = os.path.join(self.save_path, "curriculum_state.json")
         with open(path, "w") as f:
@@ -261,36 +277,36 @@ class ManualCurriculumCallback(BaseCallback):
     # Save helpers
     # ------------------------------------------------------------------
     def _save_best_reward(self):
-        path     = os.path.join(self.save_path, f"{config.MODEL_NAME}_BEST_REWARD")
-        vec_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_BEST_REWARD.pkl")
+        reward_val = int(round(self._mean_reward()))
+        base_name = self._get_base_filename(f"Rew{reward_val}")
+        path     = os.path.join(self.save_path, base_name)
+        vec_path = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
         self.model.save(path)
         self.training_env.save(vec_path)
         self._save_phase_state()  # ADD THIS
         if self.verbose:
             print(f"[Best-Reward *] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase} | "
-                  f"New best: {self._get_phase_best('reward'):.2f}")
+                  f"New best: {self._get_phase_best('reward'):.2f} (Saved as: {base_name})")
 
     def _save_best_winrate(self):
-        path     = os.path.join(self.save_path, f"{config.MODEL_NAME}_BEST_WINRATE")
-        vec_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_BEST_WINRATE.pkl")
+        winrate_pct = int(round(self._win_rate() * 100))
+        base_name = self._get_base_filename(f"WR{winrate_pct}pct")
+        path     = os.path.join(self.save_path, base_name)
+        vec_path = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
         self.model.save(path)
         self.training_env.save(vec_path)
         self._save_phase_state()  # ADD THIS
         if self.verbose:
             print(f"[Best-WinRate *] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase} | "
-                  f"New best: {self._win_rate():.1%}")
+                  f"New best: {self._win_rate():.1%} (Saved as: {base_name})")
 
     def _save_periodic_checkpoint(self):
-        path = os.path.join(
-            self.save_path,
-            f"{config.MODEL_NAME}_ckpt_{self.num_timesteps}_steps"
-        )
-        vec_path = os.path.join(
-            self.save_path,
-            f"{config.MODEL_NAME}_vecnorm_ckpt_{self.num_timesteps}_steps.pkl"
-        )
+        winrate_pct = int(round(self._win_rate() * 100))
+        base_name = self._get_base_filename(f"WR{winrate_pct}pct_ckpt")
+        path = os.path.join(self.save_path, base_name)
+        vec_path = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
         self.model.save(path)
         self.training_env.save(vec_path)
         self._checkpoint_registry.append((path + ".zip", vec_path))
@@ -312,7 +328,8 @@ class ManualCurriculumCallback(BaseCallback):
             print(f"\n[Checkpoint] {self.num_timesteps:,} steps | "
                   f"Phase {self.current_phase} | "
                   f"Win Rate: {self._win_rate():.1%} | "
-                  f"Mean Reward: {self._mean_reward():.2f}")
+                  f"Mean Reward: {self._mean_reward():.2f} | "
+                  f"Saved: {base_name}")
 
     def _save_threshold_milestone(self, win_rate: float):
         """
@@ -320,9 +337,10 @@ class ManualCurriculumCallback(BaseCallback):
         Does NOT advance the phase — that remains your manual decision.
         Creates a uniquely named artifact so it's never overwritten.
         """
-        tag = f"phase{self.current_phase}_WR{int(win_rate * 100)}pct_{self.num_timesteps}steps"
-        model_path = os.path.join(self.save_path, f"{config.MODEL_NAME}_{tag}")
-        vec_path   = os.path.join(self.save_path, f"{config.MODEL_NAME}_vecnorm_{tag}.pkl")
+        winrate_pct = int(round(win_rate * 100))
+        base_name = self._get_base_filename(f"WR{winrate_pct}pct_milestone")
+        model_path = os.path.join(self.save_path, base_name)
+        vec_path   = os.path.join(self.save_path, f"{base_name}_vecnorm.pkl")
         
         self.model.save(model_path)
         self.training_env.save(vec_path)
@@ -336,7 +354,7 @@ class ManualCurriculumCallback(BaseCallback):
             print(f"[THRESHOLD MILESTONE] Phase {self.current_phase} cleared!")
             print(f"  Win Rate : {win_rate:.1%} >= {config.WIN_RATE_THRESHOLD:.1%}")
             print(f"  Steps    : {self.num_timesteps:,}")
-            print(f"  Saved    : {model_path}.zip")
+            print(f"  Saved    : {base_name}.zip")
             print(f"  Manually call callback.set_phase({self.current_phase + 1}) to advance.")
             print(f"{'*'*60}\n")
     # ==================================================================

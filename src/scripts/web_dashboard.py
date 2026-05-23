@@ -54,34 +54,44 @@ def load_hyperparams_from_json(file_path):
         return 0.0, 0.0, 0.0, {"error": f"Failed to parse JSON: {e}"}
 
 def get_model_files(algo=None):
-    """Scans models directory for zip and pkl files, optionally filtering by algorithm."""
+    """Scans models directory recursively for zip and pkl files, filtering by algorithm if provided."""
     models_dir = os.path.join(config.PROJECT_ROOT, "models")
     if not os.path.exists(models_dir):
         return ["None"], ["None"]
     
-    # If algorithm is specified, narrow the search scope
+    zip_files = []
+    pkl_files = []
+    
     if algo:
-        search_dirs = [
-            os.path.join(models_dir, "production", algo),
-            os.path.join(models_dir, "tuning", algo)
-        ]
-        
-        zip_files = []
-        pkl_files = []
-        for d in search_dirs:
-            if os.path.exists(d):
-                # Look for files directly in the algorithm's dedicated directories
-                zip_files.extend(glob.glob(os.path.join(d, "**/*.zip"), recursive=True))
-                pkl_files.extend(glob.glob(os.path.join(d, "**/*.pkl"), recursive=True))
+        # Search recursively for algorithm subfolders (e.g. models/production/v2/ppo/ or models/production/ppo/)
+        for category in ["production", "tuning"]:
+            cat_dir = os.path.join(models_dir, category)
+            if os.path.exists(cat_dir):
+                for root, dirs, files in os.walk(cat_dir):
+                    for d in dirs:
+                        if d.lower() == algo.lower():
+                            target_path = os.path.join(root, d)
+                            zip_files.extend(glob.glob(os.path.join(target_path, "**/*.zip"), recursive=True))
+                            pkl_files.extend(glob.glob(os.path.join(target_path, "**/*.pkl"), recursive=True))
     else:
         zip_files = glob.glob(os.path.join(models_dir, "**/*.zip"), recursive=True)
         pkl_files = glob.glob(os.path.join(models_dir, "**/*.pkl"), recursive=True)
-    
+        
     # Remove duplicates and return relative paths with forward slashes
     zips = sorted(list(set([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in zip_files])))
     pkls = sorted(list(set([os.path.relpath(f, config.PROJECT_ROOT).replace("\\", "/") for f in pkl_files])))
     
     return ["None"] + zips, ["None"] + pkls
+
+def get_all_state_files():
+    """Scans STATES_DIR for all available .State or .state files dynamically."""
+    states_dir = config.STATES_DIR
+    if not os.path.exists(states_dir):
+        return ["None"]
+    state_files = glob.glob(os.path.join(states_dir, "*.State"))
+    state_files.extend(glob.glob(os.path.join(states_dir, "*.state")))
+    names = sorted(list(set([os.path.basename(f) for f in state_files])))
+    return ["None"] + names
 
 def stream_logs(cmd):
     """Executes a command and yields output for Gradio."""
@@ -184,8 +194,8 @@ def update_config_var(key, value):
 # --- Dashboard Tab Handlers ---
 
 def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials, device):
-    # Store in models/tuning/{algo}/
-    tuning_dir = os.path.join(config.PROJECT_ROOT, "models", "tuning", algo)
+    # Store in models/tuning/{env}/{algo}/
+    tuning_dir = os.path.join(config.PROJECT_ROOT, "models", "tuning", env, algo)
     os.makedirs(tuning_dir, exist_ok=True)
     
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "tune.py"), 
@@ -199,9 +209,9 @@ def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, tria
     for log in stream_logs(cmd):
         yield log
 
-def get_best_tuning_params(algo, study_name):
-    # Resolve storage path based on algorithm
-    tuning_dir = os.path.join(config.get_directory()["tuning"], algo)
+def get_best_tuning_params(algo, env, study_name):
+    # Resolve storage path based on env and algorithm
+    tuning_dir = os.path.join(config.get_directory()["tuning"], env, algo)
     os.makedirs(tuning_dir, exist_ok=True)
     db_path = os.path.abspath(os.path.join(tuning_dir, "study.db")).replace("\\", "/")
     json_path = os.path.abspath(os.path.join(tuning_dir, f"best_params_{study_name}.json")).replace("\\", "/")
@@ -351,16 +361,16 @@ def update_config_list(key, new_values):
         return True
     return False
 
-def handle_upload(file_obj, algo):
+def handle_upload(file_obj, algo, env):
     if file_obj is None: return "Please select a file."
     try:
         import shutil
         file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
         filename = os.path.basename(file_path)
-        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", algo)
+        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
         os.makedirs(target_dir, exist_ok=True)
         shutil.copy2(file_path, os.path.join(target_dir, filename))
-        return f"**Success:** Saved `{filename}` to `models/production/{algo}/`"
+        return f"**Success:** Saved `{filename}` to `models/production/{env}/{algo}/`"
     except Exception as e: return f"**Error:** {e}"
 
 def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, max_concurrent, resume, envs_per_worker):
@@ -377,6 +387,157 @@ def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, explo
     
     for log in stream_logs(cmd):
         yield log
+
+def run_league(model_name, steps, env_version, matchup_mode, custom_state, resume, device):
+    cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_league.py"), 
+           "--model_name", model_name,
+           "--steps", str(int(steps)), "--env_version", env_version, "--device", device]
+           
+    mode_map = {
+        "Ryu vs. Ryu (Strict Self-Play)": "ryu_vs_ryu",
+        "Ryu vs. All (12 Characters)": "ryu_vs_all",
+        "Custom Savestate (Uploaded)": "custom"
+    }
+    mode_val = mode_map.get(matchup_mode, "ryu_vs_ryu")
+    cmd += ["--matchup_mode", mode_val]
+    
+    if mode_val == "custom" and custom_state and custom_state != "None":
+        cmd += ["--custom_state", custom_state]
+        
+    if resume:
+        cmd += ["--resume"]
+        
+    for log in stream_logs(cmd):
+        yield log
+
+def run_exploiter(model_name, exploiter_type, steps, env_version, matchup_mode, custom_state, device):
+    cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_exploiter.py"), 
+           "--model_name", model_name,
+           "--type", exploiter_type, "--steps", str(int(steps)), "--env_version", env_version, "--device", device]
+           
+    mode_map = {
+        "Ryu vs. Ryu (Strict Self-Play)": "ryu_vs_ryu",
+        "Ryu vs. All (12 Characters)": "ryu_vs_all",
+        "Custom Savestate (Uploaded)": "custom"
+    }
+    mode_val = mode_map.get(matchup_mode, "ryu_vs_ryu")
+    cmd += ["--matchup_mode", mode_val]
+    
+    if mode_val == "custom" and custom_state and custom_state != "None":
+        cmd += ["--custom_state", custom_state]
+        
+    for log in stream_logs(cmd):
+        yield log
+
+def get_league_pool_status_html():
+    from agents.league.pool_manager import LeaguePoolManager
+    try:
+        pool_manager = LeaguePoolManager()
+        past_self, exploiters = pool_manager.scan_pool()
+        
+        n_checkpoints = len(past_self)
+        n_exploiters = len(exploiters)
+        
+        html = f"""
+        <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
+            <h3 style='margin-top: 0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
+                🏆 League Pool Status & Analytics
+            </h3>
+            <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;'>
+                <div style='background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 16px; text-align: center;'>
+                    <div style='font-size: 1.75rem; font-weight: 700; color: #3b82f6;'>{n_checkpoints}</div>
+                    <div style='font-size: 0.85rem; color: #93c5fd; margin-top: 4px; font-weight: 500;'>Self Checkpoints</div>
+                </div>
+                <div style='background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 16px; text-align: center;'>
+                    <div style='font-size: 1.75rem; font-weight: 700; color: #a855f7;'>{n_exploiters}</div>
+                    <div style='font-size: 0.85rem; color: #d8b4fe; margin-top: 4px; font-weight: 500;'>Active Exploiters</div>
+                </div>
+            </div>
+            
+            <h4 style='margin-top: 0; margin-bottom: 12px; font-size: 0.95rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;'>
+                📊 Matchup Win Rates (Weakness Patching)
+            </h4>
+        """
+        
+        opponents = list(pool_manager.win_buffers.keys())
+        if not opponents:
+            html += """
+            <div style='font-size: 0.9rem; color: #94a3b8; font-style: italic; text-align: center; padding: 16px;'>
+                No matches played yet. Start League training to populate analytics!
+            </div>
+            """
+        else:
+            for opp_id in sorted(opponents):
+                wr = pool_manager.get_win_rate(opp_id)
+                pct = int(wr * 100)
+                
+                if wr < 0.50:
+                    color = "#ef4444"
+                    badge = "CRITICAL WEAKNESS"
+                    bg_color = "rgba(239, 68, 68, 0.15)"
+                elif wr < 0.75:
+                    color = "#f59e0b"
+                    badge = "CONTESTED"
+                    bg_color = "rgba(245, 158, 11, 0.15)"
+                else:
+                    color = "#22c55e"
+                    badge = "MASTERED"
+                    bg_color = "rgba(34, 197, 94, 0.15)"
+                    
+                display_name = opp_id.replace("past_self_", "Checkpt: ").replace("exploiter_", "Exploiter: ").replace("current_self", "Current Self").replace(".zip", "")
+                
+                html += f"""
+                <div style='margin-bottom: 16px;'>
+                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.9rem;'>
+                        <span style='font-weight: 500; color: #e2e8f0;'>{display_name}</span>
+                        <span style='font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 9999px; color: {color}; background: {bg_color}; border: 1px solid {color}33;'>{badge} ({pct}%)</span>
+                    </div>
+                    <div style='width: 100%; height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 9999px; overflow: hidden;'>
+                        <div style='width: {pct}%; height: 100%; background: {color}; border-radius: 9999px; transition: width 0.3s ease;'></div>
+                    </div>
+                </div>
+                """
+                
+        html += "</div>"
+        return html
+    except Exception as e:
+        return f"<div style='color: red; padding: 12px;'>Error reading pool analytics: {e}</div>"
+
+def refresh_league_status():
+    importlib.reload(config)
+    all_states = get_all_state_files()
+    html = get_league_pool_status_html()
+    return html, gr.update(choices=all_states), gr.update(choices=all_states)
+
+def toggle_league_matchup_mode(mode):
+    is_custom = (mode == "Custom Savestate (Uploaded)")
+    return gr.update(visible=is_custom), gr.update(visible=is_custom), gr.update(visible=is_custom)
+
+def toggle_exploiter_matchup_mode(mode):
+    is_custom = (mode == "Custom Savestate (Uploaded)")
+    return gr.update(visible=is_custom), gr.update(visible=is_custom), gr.update(visible=is_custom)
+
+def handle_league_state_upload(file_obj):
+    if file_obj is None: 
+        return gr.update(), "❌ No file selected."
+    try:
+        import shutil
+        file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
+        name = os.path.basename(file_path)
+        target = os.path.join(config.STATES_DIR, name)
+        shutil.copy2(file_path, target)
+        
+        # Update config.py CUSTOM_STATES for backward compatibility
+        current_custom = list(config.CUSTOM_STATES)
+        if name not in current_custom:
+            new_custom = list(set(current_custom + [name]))
+            update_config_list("CUSTOM_STATES", new_custom)
+            importlib.reload(config)
+            
+        all_states = get_all_state_files()
+        return gr.update(choices=all_states, value=name), f"✅ Uploaded `{name}` successfully!"
+    except Exception as e:
+        return gr.update(), f"❌ Upload error: {e}"
 
 # --- UI Construction ---
 
@@ -481,6 +642,95 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     unified_logs = gr.Textbox(label="Console Output", lines=35, max_lines=45, interactive=False, elem_id="terminal")
                     copy_btn = gr.Button("📋 Copy Logs", size="sm")
 
+        # --- TAB 1.5: AUTO-LEARNING LEAGUE ---
+        with gr.Tab("🏆 Auto-Learning League"):
+            gr.Markdown("### 🏆 Street Fighter II' Auto-Learning League Control Panel")
+            
+            with gr.Row():
+                # LEFT COLUMN: Controls & Logs
+                with gr.Column(scale=7):
+                    with gr.Tabs():
+                        # Sub-tab 1: Self-Play League
+                        with gr.Tab("🎯 Self-Play League Training"):
+                            gr.Markdown("Orchestrate active Main Agent training against the dynamic historical matchmaking pool.")
+                            
+                            with gr.Row():
+                                league_model_name = gr.Textbox(label="League Model Name", value="league")
+                                league_steps = gr.Number(label="Total Timesteps", value=5000000, precision=0)
+                                league_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3"], value="v2")
+                                league_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
+                                
+                            all_states = get_all_state_files()
+                            with gr.Row():
+                                league_matchup_mode = gr.Dropdown(
+                                    label="Matchup Mode", 
+                                    choices=["Ryu vs. Ryu (Strict Self-Play)", "Ryu vs. All (12 Characters)", "Custom Savestate (Uploaded)"], 
+                                    value="Ryu vs. Ryu (Strict Self-Play)"
+                                )
+                                league_custom_state = gr.Dropdown(
+                                    label="Select Custom Fight Savestate", 
+                                    choices=all_states, 
+                                    value="None", 
+                                    visible=False
+                                )
+                                league_resume = gr.Checkbox(label="Resume from previous active League model", value=True)
+                            
+                            with gr.Row():
+                                league_state_upload = gr.File(
+                                    label="Upload Custom Savestate (.State)", 
+                                    file_types=[".State"], 
+                                    visible=False
+                                )
+                                league_upload_status = gr.Markdown("", visible=False)
+                                
+                            start_league_btn = gr.Button("▶ Launch League Training", variant="primary")
+                            
+                        # Sub-tab 2: Specialized Exploiters
+                        with gr.Tab("⚔️ Specialized Exploiter Training"):
+                            gr.Markdown("Train a dedicated agent to search for and exploit weaknesses in the current Main Agent.")
+                            
+                            with gr.Row():
+                                exploiter_model_name = gr.Textbox(label="Target League Model Name", value="league")
+                                exploiter_type = gr.Dropdown(label="Exploiter Archetype", choices=["rusher", "spammer", "turtle"], value="rusher")
+                                exploiter_steps = gr.Number(label="Timesteps", value=1000000, precision=0)
+                                
+                            with gr.Row():
+                                exploiter_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3"], value="v2")
+                                exploiter_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
+                                exploiter_matchup_mode = gr.Dropdown(
+                                    label="Matchup Mode", 
+                                    choices=["Ryu vs. Ryu (Strict Self-Play)", "Ryu vs. All (12 Characters)", "Custom Savestate (Uploaded)"], 
+                                    value="Ryu vs. Ryu (Strict Self-Play)"
+                                )
+                                
+                            with gr.Row():
+                                exploiter_custom_state = gr.Dropdown(
+                                    label="Select Custom Fight Savestate", 
+                                    choices=all_states, 
+                                    value="None", 
+                                    visible=False
+                                )
+                                exploiter_state_upload = gr.File(
+                                    label="Upload Custom Savestate (.State)", 
+                                    file_types=[".State"], 
+                                    visible=False
+                                )
+                                exploiter_upload_status = gr.Markdown("", visible=False)
+                                
+                            start_exploiter_btn = gr.Button("⚔️ Launch Exploiter Training", variant="primary")
+                    
+                    gr.Markdown("---")
+                    league_logs = gr.Textbox(label="League Console Output", lines=20, max_lines=25, interactive=False, elem_id="terminal")
+                    
+                    with gr.Row():
+                        refresh_league_btn = gr.Button("🔄 Refresh Pool Status & States")
+                        stop_league_btn = gr.Button("🛑 Stop Active League Runs", variant="stop")
+                        copy_league_logs_btn = gr.Button("📋 Copy League Logs", size="sm")
+                        
+                # RIGHT COLUMN: Pool Analytics Card
+                with gr.Column(scale=4):
+                    league_analytics_card = gr.HTML(value=get_league_pool_status_html())
+
         # --- TAB 2: MATCHUPS ---
         with gr.Tab("🎮 Model Testing & Matchups"):
             with gr.Row():
@@ -546,16 +796,16 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             p2_algo.change(update_match_ui, inputs=[p2_algo], outputs=[p2_model_group, p2_zip, p2_pkl])
 
             # Link matchup uploaders
-            p1_zip_upload.upload(handle_upload, inputs=[p1_zip_upload, p1_algo], outputs=[match_upload_status]).then(
+            p1_zip_upload.upload(handle_upload, inputs=[p1_zip_upload, p1_algo, p1_env], outputs=[match_upload_status]).then(
                 lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
             )
-            p1_pkl_upload.upload(handle_upload, inputs=[p1_pkl_upload, p1_algo], outputs=[match_upload_status]).then(
+            p1_pkl_upload.upload(handle_upload, inputs=[p1_pkl_upload, p1_algo, p1_env], outputs=[match_upload_status]).then(
                 lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
             )
-            p2_zip_upload.upload(handle_upload, inputs=[p2_zip_upload, p2_algo], outputs=[match_upload_status]).then(
+            p2_zip_upload.upload(handle_upload, inputs=[p2_zip_upload, p2_algo, p2_env], outputs=[match_upload_status]).then(
                 lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
             )
-            p2_pkl_upload.upload(handle_upload, inputs=[p2_pkl_upload, p2_algo], outputs=[match_upload_status]).then(
+            p2_pkl_upload.upload(handle_upload, inputs=[p2_pkl_upload, p2_algo, p2_env], outputs=[match_upload_status]).then(
                 lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
             )
 
@@ -604,10 +854,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     algo_sel.change(update_ui_on_algo, inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, study_name_input, model_name_input])
 
     # Link uploaders (Training Tab)
-    ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel], outputs=[upload_status]).then(
+    ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel, env_sel], outputs=[upload_status]).then(
         lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
     )
-    ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel], outputs=[upload_status]).then(
+    ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel, env_sel], outputs=[upload_status]).then(
         lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
     )
 
@@ -626,7 +876,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
         refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl]
     )
     
-    get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, study_name_input], outputs=[best_params_output, download_json])
+    get_results_btn.click(get_best_tuning_params, inputs=[algo_sel, env_sel, study_name_input], outputs=[best_params_output, download_json])
     
     copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Logs copied to clipboard!'); return []; }")
     copy_match_btn.click(None, inputs=[match_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Match logs copied to clipboard!'); return []; }")
@@ -634,6 +884,65 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     stop_btn.click(stop_active_process, outputs=[stop_status])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
+
+    # League Tab Event Bindings
+    league_matchup_mode.change(
+        toggle_league_matchup_mode, 
+        inputs=[league_matchup_mode], 
+        outputs=[league_custom_state, league_state_upload, league_upload_status]
+    )
+    
+    exploiter_matchup_mode.change(
+        toggle_exploiter_matchup_mode, 
+        inputs=[exploiter_matchup_mode], 
+        outputs=[exploiter_custom_state, exploiter_state_upload, exploiter_upload_status]
+    )
+    
+    league_state_upload.upload(
+        handle_league_state_upload, 
+        inputs=[league_state_upload], 
+        outputs=[league_custom_state, league_upload_status]
+    )
+    
+    exploiter_state_upload.upload(
+        handle_league_state_upload, 
+        inputs=[exploiter_state_upload], 
+        outputs=[exploiter_custom_state, exploiter_upload_status]
+    )
+
+    start_league_btn.click(
+        run_league, 
+        inputs=[league_model_name, league_steps, league_env, league_matchup_mode, league_custom_state, league_resume, league_device], 
+        outputs=[league_logs]
+    ).then(
+        refresh_league_status, 
+        outputs=[league_analytics_card, league_custom_state, exploiter_custom_state]
+    )
+    
+    start_exploiter_btn.click(
+        run_exploiter, 
+        inputs=[exploiter_model_name, exploiter_type, exploiter_steps, exploiter_env, exploiter_matchup_mode, exploiter_custom_state, exploiter_device], 
+        outputs=[league_logs]
+    ).then(
+        refresh_league_status, 
+        outputs=[league_analytics_card, league_custom_state, exploiter_custom_state]
+    )
+    
+    refresh_league_btn.click(
+        refresh_league_status, 
+        outputs=[league_analytics_card, league_custom_state, exploiter_custom_state]
+    )
+    
+    stop_league_btn.click(
+        stop_active_process, 
+        outputs=[league_logs]
+    )
+    
+    copy_league_logs_btn.click(
+        None, 
+        inputs=[league_logs], 
+        js="(text) => { navigator.clipboard.writeText(text); alert('League logs copied to clipboard!'); return []; }"
+    )
 
     def handle_state_upload(file_objs):
         if not file_objs: return "No files selected."

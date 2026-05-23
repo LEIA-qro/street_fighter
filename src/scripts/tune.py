@@ -15,6 +15,10 @@ def main():
 
     # GPU Verification
     import torch
+    # Performance Optimization: Restrict PyTorch to 2 CPU threads during tuning
+    # This prevents it from hijacking logical cores alongside active EmuHawk emulators.
+    torch.set_num_threads(2)
+
     if torch.cuda.is_available():
         print(f"[Hardware] Tuning on GPU: {torch.cuda.get_device_name(0)}")
     else:

@@ -1,32 +1,52 @@
-# Project Handoff: Street Fighter II RL (PBT Scaling & Stability)
+# Project Handoff: Street Fighter II RL (Dynamic Naming, Self-Play League, & Stability)
 
 ## 📝 Project Summary
-This project trains a Ryu specialist for Street Fighter II' SCE using a custom TCP bridge between SB3 and BizHawk. The current focus is a high-throughput Population Based Training (PBT/PB2) pipeline using Ray Tune to automate hyperparameter scheduling (LR, Entropy, Clip Range).
+This project implements a high-performance Reinforcement Learning pipeline for Street Fighter II' SCE on Genesis (Ryu specialist). It employs a custom, lock-step TCP bridge between Stable Baselines3 (PPO, DQN, SAC) and BizHawk. The current phase establishes massive stability improvements, centralized state scanning/upload interfaces, and a premium dynamic model checkpoint naming scheme inside all training callbacks.
+
+---
 
 ## 🎯 Goal
-**Maximize PBT Throughput and Scaling Stability.**
-Enable training of large populations (12+ agents) using "Time-Multiplexing" (Synchronous PBT) and multiple emulator instances per agent to accelerate exploration without overwhelming system resources.
+*   **Establish a robust, highly descriptive, dynamic model checkpoint naming convention** across all curriculum and self-play league callbacks to track training performance inline.
+*   **Maintain crash recovery reliability** by keeping emergency saves static, preventing recovery failures.
+*   **Centralize state pool settings, dynamic PvP state uploads, and matchup selectors** inside the Gradio Web Control Center.
+
+---
 
 ## 🚀 Current State
-The PBT architecture is now robust and high-throughput:
-1.  **Synchronous PBT (Time-Multiplexing)**: Enabled `synch=True` in PB2. When `population > max_concurrent`, Ray Tune now pauses active trials at the exploit milestone to let pending trials run. This prevents agent starvation.
-2.  **Multi-Env per Agent**: PBT workers now support `envs_per_worker > 1`. Each worker uses a `DummyVecEnv` to manage multiple parallel BizHawk instances, significantly increasing sample throughput per Python process.
-3.  **Regex-Based Rank Safety**: Fixed a critical "Rank Theft" bug where cloned agents copied ports from their donors. Ranks are now derived from the unique `trial_id` suffix via Regex, ensuring immutable port assignments (`rank * 10 + i`).
-4.  **TensorBoard Unified Logging**: The dashboard's "Launch TensorBoard" now uses `--logdir_spec` to monitor both standard `logs/` and PBT tuning directories (`models/tuning/pbt`).
-5.  **Dashboard UI**: Added "Envs per Worker" slider and updated PBT logic to pass throughput parameters to the orchestrator.
+The codebase is structurally clean, high-performance, and completely verified:
+1.  **Dynamic Naming System**: `ManualCurriculumCallback` (in `manual_curriculum_callback.py`) and `LeagueMatchmakingCallback` (in `train_league.py`) now dynamically format saved checkpoints:
+    - *Best Win Rate:* `{algo}_{env_version}_{model_name}_{state}_WR{winRate}pct_{steps}`
+    - *Best Reward:* `{algo}_{env_version}_{model_name}_{state}_Rew{reward}_{steps}`
+    - *Periodic Checkpoints:* `{algo}_{env_version}_{model_name}_{state}_WR{winRate}pct_ckpt_{steps}`
+    - *Final Saves:* `{algo}_{env_version}_{model_name}_{state}_final_WR{winRate}pct_{steps}`
+2.  **Launcher Metadata Extraction**: Agent dispatchers (PPO, DQN, SAC in `agent.py`) and `resume.py` extract environment version, algorithm, and custom model name metadata dynamically from their directory paths and forward them into the callbacks without breaking method signatures.
+3.  **Handoff Persistence**: `state_name` (e.g. `ryu_only` or `custom`) is now serialized within `curriculum_state.json` so special override phases survive resumes.
+4.  **League Win Rate Calculation**: `LeagueMatchmakingCallback` computes the main agent's overall rolling win rate dynamically across all registered opponent pools and saves milestone checkpoints reflecting the matchup mode:
+    `{algo}_{env_version}_{model_name}_{matchup_mode}_WR{winRate}pct_ckpt_{steps}`
+5.  **Premium Savestate Uploads**: The Gradio web dashboard dynamically scans the `states/` directory for `.State` files, supports inline savestate uploads, and auto-refreshes selectors.
+6.  **Symmetric relative controls**: Environment wrappers implement translation-invariant left/right relative button mappings to resolve Player 2's starting side bias.
+7.  **Blackwell GPU Verification**: Virtual environment is fully updated to PyTorch `2.11.0+cu128` (CUDA 12.8), verifying native GPU calculation on the active RTX 5070 Ti.
+
+---
+
+## ❌ Failed Attempts (Summarized & Unified)
+*   **Dynamic Crash Saves Port Collisions**: Swapping `_CRASH_SAVE` and `_EMERGENCY` to dynamic formats broke `train.py`'s supervisor which searches for static file tags. (Fixed by keeping crash/emergency files static).
+*   **Space Path Execution Failures**: Running commands in directories containing spaces (e.g., `Diego Perea`) failed in Windows shells. (Fixed by properly quoting paths, e.g., `python "C:\Path with spaces\test.py"`).
+*   **External Relative Root Path Shift**: Unit tests located in subdirectory paths incorrectly resolved the project root via `parents[5]`, causing imports to fail. (Fixed by injecting literal project root paths inside test headers).
+*   **Asynchronous Ray PBT Starvation**: Async Ray workers starved slots under concurrent caps. (Fixed by switching to synchronous PB2 Ray orchestration).
+*   **Direct Class Instantiation during Tests**: Directly instantiating environment objects spawned subprocesses and crashed on active ports. (Fixed by mocking target environment structures).
+
+---
 
 ## 📂 Files Actively Edited
-- `src/agents/pbt/pbt_orchestrator.py`: Synchronous PB2 logic, Regex-rank derivation, and Multi-Env support.
-- `src/scripts/train_pbt.py`: CLI support for `--envs_per_worker`.
-- `src/scripts/web_dashboard.py`: Unified TensorBoard logging and PBT throughput UI.
+*   `src/agents/manual_curriculum_callback.py` (Parameters, dynamic filenames, `state_name` serialization).
+*   `src/scripts/train_league.py` (`LeagueMatchmakingCallback` rolling win rates and dynamic milestone saves).
+*   `src/agents/ppo/agent.py`, `src/agents/dqn/agent.py`, & `src/agents/sac/agent.py` (Metadata forwarding and dynamic final saves).
+*   `src/scripts/resume.py` (Resumption path parsing and dynamic final saves).
+*   `scratch/test_dynamic_naming.py` (Dynamic filename formatting test suite).
 
-## ❌ Failed Attempts (Summarized)
-- **Asynchronous PBT Scaling**: Using `max_concurrent < population` in async mode caused "Starvation"; trials never relinquished slots, preventing pending trials from ever starting. (Fixed by `synch=True`).
-- **Config-Based Rank Storage**: Storing `rank` in the config dictionary caused port collisions during PBT "Exploit" phases because cloning copied the port assignments. (Fixed by Trial ID derivation).
-- **String-Split Rank Extraction**: Simple `split("_")[-1]` logic was unreliable during cloning; replaced with robust Regex extraction.
-- **Global `taskkill`**: Caused cascade failures in parallel mode. (Fixed by isolated PID-based `failsafe_env`).
+---
 
 ## ⏭️ Next Steps
-1.  **Time-Multiplexing Validation**: Verify that when Trial 0 hits 50k steps, it suspends and allows Trial 5 (Pending) to start.
-2.  **Hardware Profiling**: Test the limit of `envs_per_worker`. (e.g., 4 concurrent agents x 4 envs each = 16 BizHawk instances).
-3.  **PBT Phase Transitions**: Observe if synchronous PBT correctly synchronizes 12 agents before performing the first global PB2 exploit/explore step.
+1.  **Curriculum Progression Check**: Launch a brief curriculum training run (e.g. 5,000 steps) via the Gradio control center and verify that checkpoints are written under `models/production/v3/ppo/` with correct winrate parameters.
+2.  **PvP Matchmaking Run**: Validate that the dynamic league checkpoints successfully expand the active matchmaking pool and load onto vectorized workers without latency spikes.
