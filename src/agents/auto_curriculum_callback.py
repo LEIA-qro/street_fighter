@@ -74,6 +74,7 @@ class AutoCurriculumCallback(BaseCallback):
 
         # Gating JSON I/O and responsive telemetry saves
         self.last_json_save_step = 0
+        self.last_print_step = 0
 
         # Self-restore previous training state if resuming/restarting
         self._load_and_restore_state()
@@ -138,13 +139,13 @@ class AutoCurriculumCallback(BaseCallback):
             state_categories["new"].append(state)
 
         # 4. Generate balanced lottery pool matching targeted category weight ratios
-        # Total Category Weights (proportional to past=1, mastered=2, active=3, weakness=4, new=5)
+        # Total Category Weights (proportional to past=1, mastered=2, active=3, weakness=5, new=4)
         cat_weights = {
             "past": 12,
             "mastered": 24,
             "active": 36,
-            "weakness": 48,
-            "new": 60
+            "weakness": 60,
+            "new": 48
         }
 
         pool: List[str] = []
@@ -295,7 +296,7 @@ class AutoCurriculumCallback(BaseCallback):
                 json.dump(state, f, indent=2)
             os.replace(temp_path, path)
             self.last_json_save_step = self.num_timesteps
-            if self.verbose:
+            if self.verbose and force:
                 print(f"[AutoCurriculum] Progress saved -> Lvl {self.current_level} "
                       f"(+ {len(self.introduced_states)} introduced) at {self.num_timesteps:,} steps")
         except Exception as e:
@@ -315,13 +316,15 @@ class AutoCurriculumCallback(BaseCallback):
                 self.last_save_step = state.get("last_save_step", 0)
                 self.last_eval_step = state.get("last_eval_step", 0)
                 self.last_json_save_step = state.get("num_timesteps", 0)
+                self.last_print_step = state.get("num_timesteps", 0)
                 self._threshold_save_fired = set(state.get("threshold_save_fired", []))
                 
-                # Restore deques
+                # Restore deques (including best performance metrics trackers)
                 saved_buffers = state.get("state_win_buffers", {})
                 for state_key, buf_list in saved_buffers.items():
-                    if state_key in self.state_win_buffers:
-                        self.state_win_buffers[state_key] = deque(buf_list, maxlen=100)
+                    if state_key in self.state_win_buffers or state_key.startswith("best_"):
+                        m_len = 1 if state_key.startswith("best_") else 100
+                        self.state_win_buffers[state_key] = deque(buf_list, maxlen=m_len)
                 
                 if self.verbose:
                     print(f"[AutoCurriculum] Callback self-restored state from disk -> Level {self.current_level} "
@@ -356,6 +359,12 @@ class AutoCurriculumCallback(BaseCallback):
 
     def _on_training_start(self) -> None:
         """Restore serialization vectors on training startup."""
+        # Align all callback step counters with the model's starting timesteps to prevent frozen hooks
+        self.last_eval_step = self.num_timesteps
+        self.last_save_step = self.num_timesteps
+        self.last_json_save_step = self.num_timesteps
+        self.last_print_step = self.num_timesteps
+
         self._apply_level_hyperparams(self.current_level)
         self.update_environment_states()
         self._save_curriculum_state(force=True)
@@ -505,10 +514,12 @@ class AutoCurriculumCallback(BaseCallback):
                     state_clean = state[4:] if state.startswith("RYU_") else state
                     missing_states_info.append(f"{state_clean.replace('_R1', '').replace('.State', '')} ({n_eps}/{min_samples_per_state})")
 
-            # Global overall winrate for logging (across all buffers)
+            # Global overall winrate for logging (across all buffers, excluding best trackers)
             global_wins = 0
             global_episodes = 0
             for state, buf in self.state_win_buffers.items():
+                if state.startswith("best_"):
+                    continue
                 global_wins += sum(buf)
                 global_episodes += len(buf)
             overall_wr = (global_wins / global_episodes) if global_episodes > 0 else 0.0
@@ -523,10 +534,11 @@ class AutoCurriculumCallback(BaseCallback):
                     self.stability_counter = 0  # Broken streak (reset on deficit)
             else:
                 self.stability_counter = 0  # Gated by sample size
-                if self.verbose and len(missing_states_info) > 0:
+                if self.verbose and len(missing_states_info) > 0 and (self.num_timesteps - self.last_print_step >= 25000):
                     print(f"[AutoCurriculum][Gating] Evaluation deferred. Waiting for state buffers: {', '.join(missing_states_info[:4])}...")
 
-            if self.verbose:
+            if self.verbose and (self.num_timesteps - self.last_print_step >= 25000):
+                self.last_print_step = self.num_timesteps
                 self.print_status(active_wr, total_episodes, overall_wr)
 
             # Periodically write current metrics to JSON to keep the live dashboard updated
@@ -580,21 +592,24 @@ class AutoCurriculumCallback(BaseCallback):
 
             # Perform periodic saves based on global metrics
             # Note: We rely on global best saves to preserve the absolute strongest model overall
-            # Best winrate checkpoint
+            # Best winrate checkpoint - compared using rounded integer percentages to prevent I/O storm on noise
             best_wr_key = f"best_wr_lvl{self.current_level}"
-            if overall_wr > self.state_win_buffers.get(best_wr_key, deque([0.0]))[0] and global_episodes >= 50:
+            current_best_wr = self.state_win_buffers.get(best_wr_key, deque([0.0]))[0]
+            current_best_pct = int(round(current_best_wr * 100))
+            overall_wr_pct = int(round(overall_wr * 100))
+
+            if overall_wr_pct > current_best_pct and global_episodes >= 50:
                 # Store the float value inside our lookup dictionary safely
-                # Reset best tracker
                 self.state_win_buffers[best_wr_key] = deque([overall_wr], maxlen=1)
                 self._save_best_winrate(overall_wr)
 
         # ---- 5. Periodic Save Checkpoint ----
         if self.num_timesteps - self.last_save_step >= self.save_interval:
-            # Pull global winrate
+            # Pull global winrate, excluding best trackers
             g_wins = 0
             g_episodes = 0
             for state, buf in self.state_win_buffers.items():
-                if isinstance(buf, deque):
+                if isinstance(buf, deque) and not state.startswith("best_"):
                     g_wins += sum(buf)
                     g_episodes += len(buf)
             checkpoint_wr = (g_wins / g_episodes) if g_episodes > 0 else 0.0

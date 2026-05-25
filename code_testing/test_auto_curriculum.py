@@ -80,10 +80,10 @@ class TestAutoCurriculum(unittest.TestCase):
             count = pool.count(s)
             self.assertEqual(count, 3, f"Expected active state {s} to have multiplicity 3, found {count}")
             
-        # 3. Introduced Level 3 states (Weight 5)
+        # 3. Introduced Level 3 states (Category weight 48 / 2 states = multiplicity 24)
         for s in introduced:
             count = pool.count(s)
-            self.assertEqual(count, 5, f"Expected new state {s} to have multiplicity 5, found {count}")
+            self.assertEqual(count, 24, f"Expected new state {s} to have multiplicity 24, found {count}")
             
         # 4. Unintroduced Level 3 states (Weight 0 - not in pool)
         unintroduced = [s for s in config.DIFFICULTY_LEVELS[3] if s not in introduced]
@@ -122,11 +122,11 @@ class TestAutoCurriculum(unittest.TestCase):
         self.callback.stability_counter = 0
         
         # Populate buffers of Level 1 states with high win rates (100% winrate)
-        # Minimum episodes needed: 10
+        # Minimum episodes per state needed: 15 (min_samples_per_state)
         for i, state in enumerate(config.DIFFICULTY_LEVELS[1]):
-            # Append 2 wins per state -> 24 episodes total (> 10)
-            self.callback.state_win_buffers[state].append(1)
-            self.callback.state_win_buffers[state].append(1)
+            # Append 15 wins per state to clear confidence gating
+            for _ in range(15):
+                self.callback.state_win_buffers[state].append(1)
 
         # Mock locals to avoid crash on reward/status check
         self.callback.locals = {"infos": []}

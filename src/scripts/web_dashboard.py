@@ -377,17 +377,36 @@ def update_config_list(key, new_values):
         return True
     return False
 
-def handle_upload(file_obj, algo, env):
-    if file_obj is None: return "Please select a file."
+def handle_model_upload(file_obj, algo, env):
+    if file_obj is None:
+        return "Please select a file.", gr.update(), gr.update()
     try:
         import shutil
         file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
         filename = os.path.basename(file_path)
         target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
         os.makedirs(target_dir, exist_ok=True)
-        shutil.copy2(file_path, os.path.join(target_dir, filename))
-        return f"**Success:** Saved `{filename}` to `models/production/{env}/{algo}/`"
-    except Exception as e: return f"**Error:** {e}"
+        
+        target_path = os.path.join(target_dir, filename)
+        shutil.copy2(file_path, target_path)
+        
+        # Calculate relative path of saved file
+        rel_path = os.path.relpath(target_path, config.PROJECT_ROOT).replace("\\", "/")
+        
+        # Scan updated files lists
+        z, p = get_model_files(algo)
+        
+        status = f"**Success:** Saved `{filename}` to `models/production/{env}/{algo}/`"
+        
+        # Auto-select the newly uploaded file based on its extension
+        if filename.endswith(".zip"):
+            return status, gr.update(choices=z, value=rel_path), gr.update(choices=p)
+        elif filename.endswith(".pkl"):
+            return status, gr.update(choices=z), gr.update(choices=p, value=rel_path)
+            
+        return status, gr.update(choices=z), gr.update(choices=p)
+    except Exception as e:
+        return f"**Error:** {e}", gr.update(), gr.update()
 
 def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, max_concurrent, resume, envs_per_worker):
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_pbt.py"), 
@@ -947,18 +966,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             p2_algo.change(update_match_ui, inputs=[p2_algo], outputs=[p2_model_group, p2_zip, p2_pkl])
 
             # Link matchup uploaders
-            p1_zip_upload.upload(handle_upload, inputs=[p1_zip_upload, p1_algo, p1_env], outputs=[match_upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
-            )
-            p1_pkl_upload.upload(handle_upload, inputs=[p1_pkl_upload, p1_algo, p1_env], outputs=[match_upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[p1_algo], outputs=[p1_zip, p1_pkl]
-            )
-            p2_zip_upload.upload(handle_upload, inputs=[p2_zip_upload, p2_algo, p2_env], outputs=[match_upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
-            )
-            p2_pkl_upload.upload(handle_upload, inputs=[p2_pkl_upload, p2_algo, p2_env], outputs=[match_upload_status]).then(
-                lambda algo: get_model_files(algo), inputs=[p2_algo], outputs=[p2_zip, p2_pkl]
-            )
+            p1_zip_upload.upload(handle_model_upload, inputs=[p1_zip_upload, p1_algo, p1_env], outputs=[match_upload_status, p1_zip, p1_pkl])
+            p1_pkl_upload.upload(handle_model_upload, inputs=[p1_pkl_upload, p1_algo, p1_env], outputs=[match_upload_status, p1_zip, p1_pkl])
+            p2_zip_upload.upload(handle_model_upload, inputs=[p2_zip_upload, p2_algo, p2_env], outputs=[match_upload_status, p2_zip, p2_pkl])
+            p2_pkl_upload.upload(handle_model_upload, inputs=[p2_pkl_upload, p2_algo, p2_env], outputs=[match_upload_status, p2_zip, p2_pkl])
 
             launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, match_profile_checkbox], outputs=[match_logs])
 
@@ -1008,12 +1019,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     env_sel.change(get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
 
     # Link uploaders (Training Tab)
-    ext_zip_upload.upload(handle_upload, inputs=[ext_zip_upload, algo_sel, env_sel], outputs=[upload_status]).then(
-        lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
-    )
-    ext_pkl_upload.upload(handle_upload, inputs=[ext_pkl_upload, algo_sel, env_sel], outputs=[upload_status]).then(
-        lambda algo: get_model_files(algo), inputs=[algo_sel], outputs=[train_zip_drop, train_pkl_drop]
-    )
+    ext_zip_upload.upload(handle_model_upload, inputs=[ext_zip_upload, algo_sel, env_sel], outputs=[upload_status, train_zip_drop, train_pkl_drop])
+    ext_pkl_upload.upload(handle_model_upload, inputs=[ext_pkl_upload, algo_sel, env_sel], outputs=[upload_status, train_zip_drop, train_pkl_drop])
 
     upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
 

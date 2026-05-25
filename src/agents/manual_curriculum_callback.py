@@ -237,6 +237,9 @@ class ManualCurriculumCallback(BaseCallback):
 
     def _on_training_start(self) -> None:
         """Called by SB3 after init_callback — model and training_env are now set."""
+        # Align all callback step counters with the model's starting timesteps to prevent frozen hooks
+        self.last_eval_step = self.num_timesteps
+        self.last_save_step = self.num_timesteps
         self._save_phase_state()  # ← safe here: num_timesteps is now correct
 
 

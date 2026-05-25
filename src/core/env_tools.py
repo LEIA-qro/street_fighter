@@ -1,6 +1,8 @@
-import os, time, multiprocessing, gc
+import os, time, multiprocessing, gc, atexit
 
 import core.config as config
+
+_failsafe_executed = False
 
 def SFv2_make_env(rank, **kwargs):
     from stable_baselines3.common.monitor import Monitor
@@ -30,6 +32,8 @@ def SFv2_make_env(rank, **kwargs):
     return _init
 
 def failsafe_env(env=None, model=None):
+    global _failsafe_executed
+    
     if env is not None:
         try:
             env.close()
@@ -43,11 +47,14 @@ def failsafe_env(env=None, model=None):
         except Exception:
             pass
 
+    # Idempotent execution gate: Only run the global sniper, GC, and VRAM purge once per exit session
+    if _failsafe_executed and env is None:
+        return
+    _failsafe_executed = True
+
     print("[ENV] Executing Failsafe: Clearing VRAM and GC...")
-    # NOTE: Global taskkill of EmuHawk is removed to prevent cascade failures in PBT/Parallel training.
-    # Individual environment teardown (via env.close()) handles its own subprocess termination.
     
-    # 1. The Thread Sniper (Only kills children of THIS process)
+    # 1. The Thread Sniper (Only kills child processes of THIS Python process)
     active_children = multiprocessing.active_children()
     if active_children:
         for child in active_children:
@@ -56,7 +63,36 @@ def failsafe_env(env=None, model=None):
             except Exception:
                 pass
     
-    # 2. The VRAM Purge
+    # 2. Windows Workspace Sniper (Terminates orphaned grandchild EmuHawk.exe processes of this project)
+    try:
+        import subprocess
+        import json
+        
+        # Use PowerShell to list all EmuHawk.exe processes and their command lines in JSON format
+        cmd = [
+            "powershell", "-NoProfile", "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'EmuHawk.exe'\" | "
+            "Select-Object ProcessId, CommandLine | ConvertTo-Json -Compress"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout.strip())
+            processes = data if isinstance(data, list) else [data]
+            
+            # Use the config directory name or project root path as our unique project fingerprint
+            target_token = "street_fighter"
+            
+            for proc in processes:
+                pid = proc.get("ProcessId")
+                cmdline = proc.get("CommandLine") or ""
+                if pid and target_token.lower() in cmdline.lower():
+                    print(f"[Cleanup] Sniper-killing orphaned EmuHawk.exe process (PID: {pid})...")
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+    except Exception as e:
+        pass
+    
+    # 3. The VRAM Purge
     gc.collect()
     try:
         import torch
@@ -67,4 +103,7 @@ def failsafe_env(env=None, model=None):
         
     time.sleep(1)
     print("[ENV] Failsafe complete.")
+
+# Register failsafe_env to run automatically at exit on any process that imports env_tools
+atexit.register(failsafe_env)
 

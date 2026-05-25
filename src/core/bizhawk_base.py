@@ -78,7 +78,7 @@ class BizHawkBaseEnv(gym.Env):
         
         # CONDITIONAL TIMEOUT: Strict failsafe for training, Infinite patience for testing
         if self.trainable:
-            self.conn.settimeout(180.0) 
+            self.conn.settimeout(5.0)  # Safe but aggressive failsafe to prevent lock-step training hangs
         else:
             self.conn.settimeout(None) # Wait forever while human navigates menus
             

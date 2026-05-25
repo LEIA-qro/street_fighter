@@ -84,7 +84,14 @@ local state_file_path = python_config.PROJECT_ROOT .. "\\.agent_state"
 
 -- Helper to check if the agent should be running (PLAY) or idle (PAUSE)
 local is_running = false -- Default to false for match tests
+local frame_counter = 0
 local function check_state()
+    frame_counter = frame_counter + 1
+    -- Throttle disk reads to once every 30 frames to eliminate high-frequency I/O micro-stutters
+    if frame_counter % 30 ~= 0 and is_running ~= nil then
+        return is_running
+    end
+    
     local f = io.open(state_file_path, "r")
     if f ~= nil then
         local state = f:read("*all")
@@ -170,9 +177,28 @@ while true do
         
         -- Strict Spinlock: Wait for Python's response before advancing
         local response = ""
+        local wait_start_time = os.time() -- Record the exact time we started waiting
+        local TIMEOUT_LIMIT = 30 -- Maximum seconds to wait before assuming Python is dead
         
         while response == "" or response == nil do
             response = comm.socketServerResponse()
+            
+            -- THE DEAD MAN'S SWITCH
+            -- If current time minus start time exceeds our limit, trigger the failsafe
+            if os.difftime(os.time(), wait_start_time) > TIMEOUT_LIMIT then
+                console.log("CRITICAL ERROR: No response from Python for " .. TIMEOUT_LIMIT .. " seconds.")
+                console.log("Triggering Dead Man's Switch. Shutting down emulator...")
+                
+                -- Restore safe defaults before crashing
+                client.setwindowsize(2)        
+                emu.displayvsync(false)        
+                emu.limitframerate(true)       
+                client.displaymessages(true)   
+                client.SetSoundOn(true)        
+                
+                client.exit() -- Force close BizHawk
+                return        -- Kill the Lua script
+            end
         end
 
         -- Remove the newline character for clean processing
