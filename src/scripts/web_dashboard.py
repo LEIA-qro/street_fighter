@@ -176,6 +176,14 @@ def stop_active_process():
             print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
             
         state.active_process = None
+        
+        # Trigger project process sniper to catch any orphaned EmuHawk.exe grandchildren
+        try:
+            from core.env_tools import failsafe_env
+            failsafe_env()
+        except Exception:
+            pass
+            
         return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
     
     from core.env_tools import failsafe_env

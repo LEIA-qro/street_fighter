@@ -55,6 +55,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.combo_counter = 0
         self.frames_since_last_hit = 0
         self.corrupt_payload_count = 0
+        self.sticky_direction = None
+        self.sticky_counter = 0
 
     def set_training_states(self, new_states):
         """Receives broadcast from the Main Process and updates local memory."""
@@ -78,6 +80,32 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         try:
             # 1. Convert action and Send Action via Parent Method
             action_string = self._action_to_string(action)
+
+            # --- STICKY MOVEMENT LOGIC ---
+            action_list = list(action_string)
+            
+            is_attacking = any(b == '1' for b in action_list[4:10])
+            agent_left = action_list[2] == '1'
+            agent_right = action_list[3] == '1'
+            
+            if is_attacking or (self.sticky_direction == 'L' and agent_right) or (self.sticky_direction == 'R' and agent_left):
+                self.sticky_counter = 0
+                self.sticky_direction = None
+                
+            if self.sticky_counter > 0:
+                if self.sticky_direction == 'L': action_list[2] = '1'
+                if self.sticky_direction == 'R': action_list[3] = '1'
+                self.sticky_counter -= 1
+            else:
+                if agent_left:
+                    self.sticky_direction = 'L'
+                    self.sticky_counter = 2
+                elif agent_right:
+                    self.sticky_direction = 'R'
+                    self.sticky_counter = 2
+                    
+            action_string = "".join(action_list)
+            # -----------------------------
 
             full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
             self.send_command(full_command)
@@ -135,7 +163,9 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             # Landing a hit resets the decay
             self.footsie_steps = 0
 
-            if self.frames_since_last_hit <= COMBO_WINDOW:
+            if self.frames_since_last_hit == 0:
+                pass # Continuous damage on consecutive frames, do not increment combo
+            elif self.frames_since_last_hit <= COMBO_WINDOW:
                 self.combo_counter += 1
             else:
                 self.combo_counter = 1
@@ -212,6 +242,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.prev_rel_dist = float(observation[9])
                 self.combo_counter = 0
                 self.frames_since_last_hit = 0
+                self.sticky_counter = 0
+                self.sticky_direction = None
 
                 self.frames.clear()
                 for _ in range(config.NUM_FRAMES): self.frames.append(observation)

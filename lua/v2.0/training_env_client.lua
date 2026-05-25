@@ -141,6 +141,12 @@ while true do
     -- Remove the newline character for clean processing
     response = string.gsub(response, "\n", "")
 
+    -- Extract the actual payload by stripping the '{len} ' prefix sent by Python
+    local payload_str = string.match(response, "^%d+%s+(.*)$")
+    if payload_str then
+        response = payload_str
+    end
+
     -- Check for special RESET command from Python
     if response == "EXIT" then
         console.log("Received EXIT command. Restoring defaults and shutting down...")
@@ -176,9 +182,18 @@ while true do
         if string.sub(response, 8, 8) == "1" then input["P1 X"] = true end
         if string.sub(response, 9, 9) == "1" then input["P1 Y"] = true end
         if string.sub(response, 10, 10) == "1" then input["P1 Z"] = true end
+        
+        if string.sub(response, 11, 11) == "1" then input["P2 Up"] = true end
+        if string.sub(response, 12, 12) == "1" then input["P2 Down"] = true end
+        if string.sub(response, 13, 13) == "1" then input["P2 Left"] = true end
+        if string.sub(response, 14, 14) == "1" then input["P2 Right"] = true end
+        if string.sub(response, 15, 15) == "1" then input["P2 A"] = true end
+        if string.sub(response, 16, 16) == "1" then input["P2 B"] = true end
+        if string.sub(response, 17, 17) == "1" then input["P2 C"] = true end
+        if string.sub(response, 18, 18) == "1" then input["P2 X"] = true end
+        if string.sub(response, 19, 19) == "1" then input["P2 Y"] = true end
+        if string.sub(response, 20, 20) == "1" then input["P2 Z"] = true end
         -- We sleep the Start and Mode buttons to avoid the agent accidentally pausing or opening the menu
-        -- if string.sub(response, 11, 11) == "1" then input["P1 Start"] = true end
-        -- if string.sub(response, 12, 12) == "1" then input["P1 Mode"] = true end
         
         -- ACTION REPEAT: Hold the input and advance multiple frames
         for i = 1, FRAME_SKIP do
