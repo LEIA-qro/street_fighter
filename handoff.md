@@ -1,52 +1,46 @@
-# Project Handoff: Street Fighter II RL (Dynamic Naming, Self-Play League, & Stability)
+# Project Handoff: Street Fighter II RL (Documentation Overhaul & Matchup Process Failsafes)
 
 ## 📝 Project Summary
-This project implements a high-performance Reinforcement Learning pipeline for Street Fighter II' SCE on Genesis (Ryu specialist). It employs a custom, lock-step TCP bridge between Stable Baselines3 (PPO, DQN, SAC) and BizHawk. The current phase establishes massive stability improvements, centralized state scanning/upload interfaces, and a premium dynamic model checkpoint naming scheme inside all training callbacks.
+This project implements a high-performance Reinforcement Learning pipeline for Street Fighter II' SCE on Genesis (Ryu specialist). It employs a custom, lock-step TCP bridge between Stable Baselines3 (PPO, DQN, SAC) and BizHawk. The current phase establishes a complete production-grade documentation overhaul, rigorous algorithmic/systems justifications, and absolute process containment to eliminate zombie grandchild emulators during interactive matchup testing.
 
 ---
 
 ## 🎯 Goal
-*   **Establish a robust, highly descriptive, dynamic model checkpoint naming convention** across all curriculum and self-play league callbacks to track training performance inline.
-*   **Maintain crash recovery reliability** by keeping emergency saves static, preventing recovery failures.
-*   **Centralize state pool settings, dynamic PvP state uploads, and matchup selectors** inside the Gradio Web Control Center.
+*   **Production-Grade Documentation Overhaul:** Overwrite the root `README.md` (master specify and developer manual) and `doc/README.md` (algorithmic/systems justification guide) to align perfectly with the active codebase, completely omitting theoretical concepts (such as `eggroll`).
+*   **Orphaned Process Containment:** Investigate and resolve the process leak where clicking "Terminate Match" in the Gradio dashboard leaves orphaned `EmuHawk.exe` grandchild processes spinning in the background.
 
 ---
 
 ## 🚀 Current State
-The codebase is structurally clean, high-performance, and completely verified:
-1.  **Dynamic Naming System**: `ManualCurriculumCallback` (in `manual_curriculum_callback.py`) and `LeagueMatchmakingCallback` (in `train_league.py`) now dynamically format saved checkpoints:
-    - *Best Win Rate:* `{algo}_{env_version}_{model_name}_{state}_WR{winRate}pct_{steps}`
-    - *Best Reward:* `{algo}_{env_version}_{model_name}_{state}_Rew{reward}_{steps}`
-    - *Periodic Checkpoints:* `{algo}_{env_version}_{model_name}_{state}_WR{winRate}pct_ckpt_{steps}`
-    - *Final Saves:* `{algo}_{env_version}_{model_name}_{state}_final_WR{winRate}pct_{steps}`
-2.  **Launcher Metadata Extraction**: Agent dispatchers (PPO, DQN, SAC in `agent.py`) and `resume.py` extract environment version, algorithm, and custom model name metadata dynamically from their directory paths and forward them into the callbacks without breaking method signatures.
-3.  **Handoff Persistence**: `state_name` (e.g. `ryu_only` or `custom`) is now serialized within `curriculum_state.json` so special override phases survive resumes.
-4.  **League Win Rate Calculation**: `LeagueMatchmakingCallback` computes the main agent's overall rolling win rate dynamically across all registered opponent pools and saves milestone checkpoints reflecting the matchup mode:
-    `{algo}_{env_version}_{model_name}_{matchup_mode}_WR{winRate}pct_ckpt_{steps}`
-5.  **Premium Savestate Uploads**: The Gradio web dashboard dynamically scans the `states/` directory for `.State` files, supports inline savestate uploads, and auto-refreshes selectors.
-6.  **Symmetric relative controls**: Environment wrappers implement translation-invariant left/right relative button mappings to resolve Player 2's starting side bias.
-7.  **Blackwell GPU Verification**: Virtual environment is fully updated to PyTorch `2.11.0+cu128` (CUDA 12.8), verifying native GPU calculation on the active RTX 5070 Ti.
+The codebase is clean, high-performance, and fully containment-secured:
+1.  **Overhauled `README.md` (Master Spec):** Up-to-date directory layout map, exhaustive **Gradio Web Control Center** configuration/running guide (including live curriculum HTML visualizer, model uploader, and matchup testers), dependencies setup, and comprehensive CLI execution commands (`train.py`, `resume.py`, `tune.py`, `test_agent_v2.py`, `test_ai_vs_ai_v2.py`).
+2.  **Overhauled `doc/README.md` (Justification Guide):** Deep-dive mathematical and bare-metal systems justifications:
+    - *Lock-Step TCP Bridge:* Deterministic synchronization protocol, 10ms Lua timeouts, 5.0s Python socket timeouts, and stream buffer slicing to prevent partial packet corruptions.
+    - *Motorola 68000 WRAM Mapping:* Big-Endian memory reads (`read_u16_be`) and critical **Data Leakage Defenses** (excluding player button inputs `0x81E2` from P1 observations to prevent policy network identity loops).
+    - *Observation Stack:* 2216-dim observation space ($554 \times 4$ frames) and HP safety clamps.
+    - *Category-Weighted Rehearsal Lottery:* Mathematical proof showing the weighted lottery (`past: 12`, `mastered: 24`, `active: 36`, `weakness: 60`, `new: 48`) yields a stable **41.7% active weakness selection probability** at Level 2 to target combat bottlenecks.
+    - *Gating Thresholds:* Statistical gating (`min_samples_per_state = 15`, `min_episodes_for_eval = 100`, `stability_threshold = 3`) to prevent promotion due to statistical noise.
+    - *Interactive Performance:* CPU unthrottling, audio disabling, display VSync turning off, and throttled disk operations to once every 30 frames inside matchup testing to eliminate micro-stutters.
+3.  **Matchup Termination process sniper:** Fixed the emulator leak by updating `stop_active_process()` inside `src/scripts/web_dashboard.py`. The supervisor dashboard now **always triggers the project process sniper (`failsafe_env()`)** synchronously at the end of process terminations. This guarantees that all orphaned `EmuHawk.exe` grandchild instances are swept and terminated, even if the parent test process exits abruptly.
 
 ---
 
-## ❌ Failed Attempts (Summarized & Unified)
-*   **Dynamic Crash Saves Port Collisions**: Swapping `_CRASH_SAVE` and `_EMERGENCY` to dynamic formats broke `train.py`'s supervisor which searches for static file tags. (Fixed by keeping crash/emergency files static).
-*   **Space Path Execution Failures**: Running commands in directories containing spaces (e.g., `Diego Perea`) failed in Windows shells. (Fixed by properly quoting paths, e.g., `python "C:\Path with spaces\test.py"`).
-*   **External Relative Root Path Shift**: Unit tests located in subdirectory paths incorrectly resolved the project root via `parents[5]`, causing imports to fail. (Fixed by injecting literal project root paths inside test headers).
-*   **Asynchronous Ray PBT Starvation**: Async Ray workers starved slots under concurrent caps. (Fixed by switching to synchronous PB2 Ray orchestration).
-*   **Direct Class Instantiation during Tests**: Directly instantiating environment objects spawned subprocesses and crashed on active ports. (Fixed by mocking target environment structures).
+## ❌ Failed Attempts (Summarized & Updated)
+*   **Lua Socket Reads in PAUSE Mode:** Attempting to exit BizHawk gracefully by sending an `"EXIT"` socket command failed because `match_test_env_client.lua` completely bypasses socket checks when the matchup is paused to allow manual human menu navigation. (Fixed by triggering the dashboard process sniper failsafe).
+*   **SIGBREAK Cleanup Bypass:** Terminating parent runner processes via Windows console events sometimes exits Python abruptly before executing `finally: env.close()` blocks, leaving the emulator orphaned. (Fixed by direct dashboard process sniper calls).
+*   **Dynamic Crash Saves Port Collisions:** Swapping `_CRASH_SAVE` and `_EMERGENCY` to dynamic formats broke supervisor scripts that search for static tags. (Fixed by keeping crash/emergency files static).
+*   **Space Path Execution Failures:** Running scripts in directories containing spaces (e.g. `Diego Perea`) failed in Windows shells. (Fixed by quoting paths).
 
 ---
 
 ## 📂 Files Actively Edited
-*   `src/agents/manual_curriculum_callback.py` (Parameters, dynamic filenames, `state_name` serialization).
-*   `src/scripts/train_league.py` (`LeagueMatchmakingCallback` rolling win rates and dynamic milestone saves).
-*   `src/agents/ppo/agent.py`, `src/agents/dqn/agent.py`, & `src/agents/sac/agent.py` (Metadata forwarding and dynamic final saves).
-*   `src/scripts/resume.py` (Resumption path parsing and dynamic final saves).
-*   `scratch/test_dynamic_naming.py` (Dynamic filename formatting test suite).
+*   `README.md` (Overhauled master developer manual)
+*   `doc/README.md` (Overhauled algorithmic and systems justification guide)
+*   `src/scripts/web_dashboard.py` (Overhauled matchup termination process sniper failsafe)
+*   `handoff.md` (This project handoff file)
 
 ---
 
 ## ⏭️ Next Steps
-1.  **Curriculum Progression Check**: Launch a brief curriculum training run (e.g. 5,000 steps) via the Gradio control center and verify that checkpoints are written under `models/production/v3/ppo/` with correct winrate parameters.
-2.  **PvP Matchmaking Run**: Validate that the dynamic league checkpoints successfully expand the active matchmaking pool and load onto vectorized workers without latency spikes.
+1.  **Matchup Process Containment Verification:** Launch the Gradio Web Control Center (`python src/scripts/web_dashboard.py`), open the Matchup Test tab, start a matchup, and then click "Terminate Match" to visually verify that EmuHawk exits cleanly and CPU/VRAM usage drops back to idle immediately.
+2.  **Advanced Projectile Vector Tracking:** Extend the Gymnasium observation space wrapper in `envs/sf2_v3.py` to refine projectile state mapping (e.g. tracking vector trajectories) to further improve Ryu's defensive play against projectile spammers.

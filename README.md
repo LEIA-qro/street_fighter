@@ -1,356 +1,219 @@
-# Reinforcement Learning – Street Fighter
+# Street Fighter II Reinforcement Learning (RL) Pipeline
 
-[![Python](https://img.shields.io/badge/python-3.13.12-blue.svg)](https://www.python.org/)
+[![Python 3.13.12](https://img.shields.io/badge/python-3.13.12-blue.svg)](https://www.python.org/downloads/release/python-31312/)
+[![Lua 5.4.6](https://img.shields.io/badge/lua-5.4.6-orange.svg)](https://www.lua.org/)
+[![Emulator BizHawk 2.8](https://img.shields.io/badge/emulator-BizHawk_2.8-red.svg)](https://tasvideos.org/Bizhawk/PreviousReleaseHistory)
+[![Stable-Baselines3](https://img.shields.io/badge/RL_Framework-Stable--Baselines3-green.svg)](https://stable-baselines3.readthedocs.io/)
 
-
-_Windows Setup guide (English)_
-
----
-
-## Project overview
-
-This repository contains code and experiments for Reinforcement Learning agents applied to a Street Fighter II' - Special Champion Edition (USA) environment. The project is designed to run with **Python 3.13.12** & **Lua 5.4.6** inside an isolated virtual environment using **BizHawk 2.8** to guarantee compatibility.
-
-The project aims to make an easy and straightforward implementation of Reinforcement Learning via Python, there already exists an already implemented alternative to this project, you can find it here: [Build a Street Fighter AI Model with Python | Gaming Reinforcement Learning Full Course](https://www.youtube.com/watch?v=rzbFhu6So5U)
-
-This is great for understanding the basics of the project, but it relies heavily on **gym retro**, a very old library that has multiple difficulties with different configurations and in-game changes. Therefore this project creates a custom **RL pipeline** with robust **lock-step TCP bridge** between **Python** and **Bizhawk**, enabling a production-grade approach to reinforcement learning, with the sole purpose of achieving a manual curriculum based architecture.
-
-This allows to have an absolute control over every variable of the training.
-
-### How Does it works?
-
-(1) Python launches BizHawk -> (2) Lua reads RAM -> (3) TCP sends game state -> (4) Python computes action -> (5) Lua injects inputs.
-
-To check more about the functionality of the project check the [documentation](doc#high-level-summary).
+A production-grade, highly optimized Reinforcement Learning (RL) pipeline for *Street Fighter II' - Special Champion Edition (USA)* on the Sega Genesis. Using a custom **lock-step TCP bridge** to replace the out-of-date `gym-retro` library, this system enables training autonomous specialists (e.g., Ryu) through an automated curriculum. The project features hyperparameter tuning via **Optuna**, self-play/league play modes, and a robust multi-process manager that runs up to 12 parallel emulators with automatic crash recovery.
 
 ---
 
-## Video Demonstration
+## System Architecture Overview
 
-[![Watch here on Youtube](https://img.youtube.com/vi/Hes7ECdo3y0/maxresdefault.jpg)](https://www.youtube.com/watch?v=Hes7ECdo3y0)
+The core innovation is a synchronized, lock-step communication bridge. Instead of relying on fragile hooks or multi-threaded timing, the system utilizes a strict **1-send / 1-receive** communication cycle.
 
----
+```
+┌────────────────────────────────┐                 ┌───────────────────────────────┐
+│     BizHawk Emulator (Lua)     │                 │     Python RL Server (SB3)    │
+│  1. Read big-endian WRAM data  │                 │  1. Receive observation vector │
+│  2. Send structured string     ├─[ TCP Socket ]─>│  2. Compute policy action     │
+│  3. Spinlock / Block execution │                 │  3. Format & send input keys  │
+│  4. Read socket & inject keys  │<─[ TCP Socket ]─┤  4. Rollout updates / SGD     │
+└────────────────────────────────┘                 └───────────────────────────────┘
+```
 
-## Prerequisites
-
-### Install Python 3.13.12
-
-> Note. It could work in any version, but this project was built using [Python 3.13.12](https://www.python.org/downloads/release/python-31312/) to ensure full compatibility and avoid unwanted problems.
-
-Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/).
-
-<!--
-### Install Lua 5.4.6
-
-Install [Lua](https://www.lua.org/download.html)
--->
-
-### Install Bizhawk 2.8 (Very Important)
-
-Install [Bizhawk 2.8 from web](https://tasvideos.org/Bizhawk/PreviousReleaseHistory)
-
-Install [Bizhawk 2.8 from Github](https://github.com/TASEmulators/BizHawk/releases/tag/2.8)
+Every frame step is deterministic. The emulator blocks until Python transmits the controller state, preventing data drift or skipped frames during heavy backpropagation spikes.
 
 ---
 
-## Virtual environment (venv)
+## 📂 Modern Directory Layout
 
-> Using a virtual environment is heavily recommended for this project.
+The codebase enforces a **strict isolation architecture** to decouple the emulator interface, gymnasium environment wrappers, agent logic, and scripting runners.
 
-### Using Visual Studio Code
+```
+street_fighter/
+├── roms/                    # Read-only. Sega Genesis game ROMs (never modify)
+├── states/                  # Savestates (.State files) mapped to curriculum difficulty levels 1-8
+├── logs/                    # Training metrics, tensorboard run files, and tuning summaries
+├── models/                  # Production milestones and checkpoints (.zip and vecnorm .pkl)
+│   └── production/          # Model checkpoint directory structured by [env_version]/[algo]/
+├── lua/                     # Lua scripting engine matching BizHawk environment
+│   └── v2.0/                # Active lock-step client loops
+│       ├── training_env_client.lua   # Headless emulator loop optimized for training
+│       ├── match_test_env_client.lua  # Interactive loop with throttled disk I/O for testing
+│       └── generated_config.lua      # Configured dynamically by Python (do not edit)
+└── src/                     # Core Python codebase
+    ├── core/                # Emulator lifecycle, socket bridge, selective normalizer, and global config
+    │   ├── config.py             # Active directory definitions, states list, and hyperparameters
+    │   ├── bizhawk_base.py       # Bare-metal TCP server socket and payload parsing
+    │   ├── env_tools.py          # Process snipers, clean teardown registration, and VRAM purging
+    │   └── selective_norm.py     # Custom running statistics normalizer for observations
+    ├── envs/                # Gymnasium environment implementations (Zero RL knowledge)
+    │   ├── base_env.py           # Base Gym wrapper mapping observations and rewards
+    │   ├── sf2_v1.py             # Early experimental observation spaces
+    │   ├── sf2_v2.py             # Enhanced 554-dim/stacked reward tracking
+    │   └── sf2_v3.py             # Fully-integrated current Gymnasium environment
+    ├── agents/              # Core RL algorithms and callback systems
+    │   ├── ppo/                  # PPO-specific modular agent logic
+    │   ├── sac/                  # SAC-specific modular agent logic
+    │   ├── dqn/                  # DQN-specific modular agent logic
+    │   ├── base_agent.py         # Abstract base class enforcing Train/Resume/Tune/Test interface
+    │   ├── manual_curriculum_callback.py  # Manual training progression checkpoints
+    │   └── auto_curriculum_callback.py    # Rehearsal lottery, gating, and micro-step evaluator
+    └── scripts/             # Execution CLI and Gradio Web Dashboard
+        ├── train.py              # CLI training initializer
+        ├── resume.py             # CLI model resuming and curriculum recoverer
+        ├── tune.py               # CLI Optuna optimization runner
+        ├── test_agent_v2.py      # Interactive matchup tester (P1 agent vs CPU or Human)
+        ├── test_ai_vs_ai_v2.py   # Agent vs Agent matchup battles
+        └── web_dashboard.py      # Gradio Web Control Center (Visual management suite)
+```
 
-<details>
-  <ol>
-    <li>Install <strong>Python Environments</strong> extension in VS Code</li>
-    <li>In Environment Manager >> Create Environment >> Use Python 3.13.12</li>
-  </ol>
-</details>
+---
 
-### Other Alternatives
+## 🖥️ Gradio Web Control Center
 
-<details>
-  From your project folder run:
-  
-  <details>
-    <summary>
-      If python is not in PATH:
-    </summary>
-  
-    
-    bash
-    py -3.13.12 -m venv venv
-    
-  
-  </details>
-  
-  <details>
-    <summary>
-      If python is available in PATH:
-    </summary>
-    
-    bash
-    python3.13.12 -m venv venv
-    
-  
-  </details>
-  
-  > This should create a folder named `venv` containing the isolated environment.
-  
-  <br>
-</details>
+The project features a premium, centralized control dashboard built on Gradio. This web interface consolidates training execution, real-time logging, hyperparameter overrides, curriculum monitoring, matchup testing, and model uploads into a unified, visual application.
 
+### Launching the Dashboard
 
-
-### Activating the virtual environment
-
-<details>
-  <strong>PowerShell</strong>:
+Ensure your virtual environment is active, then execute:
 
 ```powershell
-.\venv\Scripts\Activate
-```
-  
-  **Warning**
-  > PowerShell may block script execution by default.  
-  > If you see an error about `ExecutionPolicy`, either switch to **CMD** (below)  
-  > or run PowerShell as administrator (this might be more flexible, but for simplicity use CMD):
-
-  <strong>Command Prompt (CMD)</strong>:
-
-```cmd
-venv\Scripts\activate
-```
-	
-When active, one should see the prompt prefixed with `(venv)`:
-
-```
-(venv) C:\Users\User\project>
+python src/scripts/web_dashboard.py
 ```
 
-To **deactivate** the `venv` simply type:
+The server will initialize on **`http://127.0.0.1:7860`**. Open this URL in any web browser.
 
-```bash
-deactivate
-```
-  
-</details>
+### Key Features and Panels
 
-
-
+| Panel Tab | Description | Features Included |
+| :--- | :--- | :--- |
+| **🚀 Single Training & Tuning** | Configure, initialize, and optimize training models or Optuna trials. | - Swap algorithms dynamically (PPO, SAC, DQN)<br>- Toggle **Auto-Curriculum Learning**<br>- Adjust device, learning rates, entropy, and timesteps |
+| **📊 League & PBT Training** | Conduct multi-agent training pipelines (self-play). | - Population-Based Training controls<br>- League pool manager and matchup mode selectors |
+| **⚔️ Matchup Testing** | Evaluate trained models in real-time inside BizHawk. | - Load custom `.zip` and `.pkl` configurations for Player 1 and Player 2<br>- Select Player 1 Mode (Agent vs CPU, Agent vs Human, or AI vs AI)<br>- Real-time agent status toggle and performance profiling |
+| **📈 Live Curriculum Status** | Graphical status card updated every 5 seconds. | - Table showing all 96 states across levels 1-8<br>- Live rolling win rate and episode count per state<br>- Visual highlight of current Level, Active States, and introduced Weakness states |
+| **⚙️ Global Config** | Centralized server and emulator optimization controls. | - Adjust the number of parallel BizHawk instances (`N_ENVS`) <br>- Toggle Emulator Input Display and Visual Rendering overlays |
+| **📥 Model Uploader** | Drag-and-drop system for model integration. | - Automatically parses file extensions (`.zip` for networks, `.pkl` for normalizers)<br>- Saves files under correct paths and automatically auto-selects them in active selectors |
 
 ---
 
-## Dependencies
+## Prerequisites & Installation
 
-<ul>
-  <li>stable_baselines3</li>
-  <li>gymnasium</li>
-  <li>torch</li>
-  <li>optuna</li>
-  <li>numpy</li>
-  <li>pandas</li>
-  <li>tensorboard</li>
-</ul>
+This project is built to run natively on **Windows 10/11** using **BizHawk 2.8**.
 
-To install the dependencies, in a new terminal, go to the project folder _(it is recommended to have a venv activated)_, and run the following:
-```
-pip install stable_baselines3 gymnasium torch optuna numpy pandas tensorboard
+### 1. System Requirements & Emulators
+*   **Python:** Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/).
+*   **BizHawk Emulator:** Download [BizHawk 2.8](https://github.com/TASEmulators/BizHawk/releases/tag/2.8). Extract the emulator to your local filesystem.
+*   **ROM File:** Obtain *Street Fighter II' - Special Champion Edition (USA)* in Genesis ROM format (`.md` or `.bin`). Name the file precisely `Street Fighter II' - Special Champion Edition (USA).md` and place it in the `roms/` directory.
+
+### 2. Isolated Workspace Setup
+For optimal organization, **clone or move this `street_fighter` project directory inside your main BizHawk folder**. This allows the scripts to dynamically map relative directories safely.
+
+### 3. Virtual Environment (venv) Setup
+Initialize the isolated environment from the `street_fighter/` root directory:
+
+```powershell
+# Create the environment
+python -m venv .venv
+
+# Activate the environment
+.venv\Scripts\Activate.ps1
 ```
 
-<!--
-Alternatively you can run:
+Confirm that your terminal prompt is now prefixed with `(.venv)`.
+
+### 4. Dependency Installation
+Install all production requirements directly:
+
+```powershell
+pip install stable_baselines3 gymnasium torch optuna numpy pandas tensorboard gradio
 ```
-pip install  requirements.txt
+
+Verify GPU availability for PyTorch training:
+
+```powershell
+python verify_gpu.py
 ```
--->
 
 ---
 
-## Getting Started
+## Developer CLI Guide
 
-### Testing
+For scripting, automation, or remote environments, all systems can be operated directly through terminal commands.
 
-> Note. You can Skip this part and go directly to __Training__, if you suspect something is wrong, or want to debug then proceed.
+### 1. Launch Training from Scratch
+To start a new Ryu training specialist using standard hyperparameter configurations:
 
-#### Checking  if __Bixhawk__ and __Python__ are connected.
-
-Run `test_telemetry2.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
-
-When running, _Bizhawk_ and a _Lua Console_ should pop up, the Python script is configured to start the Lua Script automatically, because it is set to making random actions, it is advised to untoggle or pause the Lua script to facilitate navigation inside the ROM, you can do this by double clicking on it or clicking the Toggle Script button.
-After this, load or start a match, it can be any character, and right before the match start, activate or toggle the Lua script.
-You should be able to see the player 1, doing random actions.
-
-If this is the case, the TCP bridge between Bizhawk and Python is working. You can close Bizkawk.
-
-If this is not the case, ensure you have correctly placed the project directory inside the Bizhawk folder. Also you can manualy load the correct BIZHAWK_PATH, ROM_PATH, and LUA_SCRIPT_PATH variables to the Python script, match your local setup before running this test.
-Alternatively, check if all of the versions required for the project are sound. `Python 3.13.12`, `Lua 5.4.6` and `BizHawk 2.8`. Specially `Bizhawk 2.8`, Python and Lua have not been tested in other versions, but because the project was made with this specific versions, using others might cause trouble.
-
-#### Checking  if `stable_baselines3` & `gymnasium` are working.
-
-Run `random_test.py`. You can find this script in the [`code_testing/env_test`](code_testing/env_test) folder. 
-
-When running, _Bizhawk_ and a _Lua Console_ should pop up, creating one instance of a "training env", you should be able to see how the agent is making random actions, the ROM is unthrotled, meaning is running at the highest performance, and the match should autostart every time either the agent wins or loses. This is how training will happen, but with more instances. If you prefer to not unthrotle your envs, you can check how to change the performance in the [documentation](doc/README.md#optimization-maximizing-throughput).
-
-If this is the case then, you have all set to start.
-
-If this is not the case, check if you have correctly installed the dependencies. 
-
-### Training
-
-Training a model is the sole purpose of this project. The way the code is built is to train a model based on the character RYU, this can be changed, check the documentation if you wish to train the model with another character or another configuration.
-
-There are only four training scripts:
-
-<ul>
-  <li><code>train_production_PPO_v2.py</code></li>
-  <li><code>resume_production_v2.py</code></li>
-  <li><code>train_optuna.py</code></li>
-  <li><code>transfer_optuna.py</code></li>  
-</ul>
-
-> Note. <code>transfer_optuna.py</code> is currently under development
-
-#### `train_production_PPO_v2.py`
-
-You can find this script inside [`src/training`](src/training) folder. 
-
-This script initializes a model, creates it from scratch. Uses the hyperparameters set in `config.py`.
-
-Check the documentation ([`doc`](doc#train_production_ppo_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
-
-#### `resume_production_v2.py`
-
-You can find this script inside [`src/training`](src/training) folder. 
-
-This script, allows you to continue the training of an already existing model, loads the normalization stats and the neural network from `config.py`.
-
-Check the documentation ([`doc`](doc#resume_production_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
-
-#### `train_optuna.py`
-
-You can find this script inside [`src/training`](src/training) folder. 
-
-One of the most important scripts, this script allows _optuna_ to find the best hyperparameters of the model, without this the model could be capable of training, but would not be training in the most optimized and efficient way, slowing down the convergence , and in some cases, making it impossible to converge if the hyperparameter are not well tuned.
-
-Check the documentation ([`doc`](doc#train_optunapy) folder) for further explanation on how the code works and how to configure it according to your needs.
-
-#### `transfer_optuna.py`
-
-> Currently under development
-
-You will be able to find this script inside [`src/training`](src/training) folder.  
-
-This script is intentioned to be used for a curriculum training, allows to load an already existing model into an optuna study, works for hyperparameter tunning, not changing the already existing architecture of the model _(n_steps and batch_size)_, just changing _the search space_ being the _learning rate_, _ent coef_ and the _clip range_.
-
-Check the documentation ([`doc`](doc#transfer_optunapy) folder) for further explanation on how the code works and how to configure it according to your needs.
-
----
-## Checking How good is the model
-
-To check how good is the model we handle different metrics.
-
-You can check all of them running in the Terminal of the project:
-
-```Terminal
-tensorboard --logdir=logs\
+```powershell
+python src/scripts/train.py --algo ppo --model_name ryu_specialist --timesteps 10000000 --device cuda
 ```
 
-### The most important metrics
+Add `--auto_curriculum` to enable the dynamic rehearsal lottery and gating callback:
 
-`ep_len_mean`: The episode leangth mean indicates how long in average the episodes are lasting every value represents a frame, for example if the episode length mean is of 1500, this means that in average the matches are lasting 150 seconds, since a second is 40 frames and we are using a FRAME SKIPING of 4, it means that 1500 * 4 / 40 = 150
+```powershell
+python src/scripts/train.py --algo ppo --model_name ryu_specialist --timesteps 10000000 --device cuda --auto_curriculum
+```
 
-`ep_rew_mean`: Episode reward mean, this indicates what the reward average of the episodes is, it has a complete correlation with the REWARD function, it tells us how good the model is performing in relation with the REWARD function.
+### 2. Resume Previous Training Run
+Resume training a saved model, safely picking up checkpoints, normalization parameters, and the active curriculum phase:
 
-If the `ep_len_mean` is low and the `ep_rew_mean` is high, it means that the model is succesfully beating every oponent. But if the `ep_len_mean` is low and the `ep_rew_mean` is also very low, this means the model is getting his ass kicked.
+```powershell
+python src/scripts/resume.py --algo ppo --model_name ryu_specialist --device cuda --auto_curriculum
+```
 
-**Callback Metricks**: Here we have the metric of `win_rate`, which as the name suggests, means how many games out of a episode window, set to 250 episodes in `config.py`, is wining. This checks the last 250 episodes and sees how many of them has won, therefore making a percentage called win rate. The higher the win rate the better.
+### 3. Hyperparameter Tuning via Optuna
+Run parallel Optuna trials across 12 EmuHawk instances to find the mathematically optimal policy parameters:
 
+```powershell
+python src/scripts/tune.py --algo ppo --timesteps 500000 --trials 50 --device cuda
+```
 
-Check the remaining metrics in [documentation](doc#metrics).
+### 4. Interactive Matchup Testing
+Launch a model in interactive mode to test its capabilities against CPU opponents, run profiling, or play against it yourself:
 
+```powershell
+python src/scripts/test_agent_v2.py --algo ppo --load_zip models/production/v3/ppo/ppo_model.zip --load_pkl models/production/v3/ppo/ppo_model_vecnorm.pkl --player 1 --opponent_type cpu --device cuda
+```
+*Options:*
+*   `--player 1` or `2`: Assigns the agent's controller side.
+*   `--opponent_type`: `cpu` (runs the emulator's campaign AI) or `human` (binds keys to Player 2 inputs).
 
-### Testing AI Models
+### 5. AI vs AI Matchup Battles
+Load two separate models to fight against each other to evaluate policy strengths, exploit weaknesses, or test versions:
 
-Once you have a trained Model, you can test it with the following:
-
-<ul>
-  <li>
-    <code>test_agent_v2.py</code>
-  </li>
-  <li>
-    <code>test_ai_vs_ai_v2.py</code>
-  </li>
-</ul>
-
-#### `test_agent_v2.py`
-
-You can find this script in the [`testing`](src/testing) folder. 
-
-Allows you to play against the model, uses the model set in `config.py`, you can either select in the Python script if you want the model to be player 1 or 2.
-Alternatively you can also put the model to play against the other cpu oponents and see how far in the chalengers campaign can it go.
-
-Check the documentation ([`doc`](doc#test_agent_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
-
-#### `test_ai_vs_ai_v2.py`
-
-You can find this script in the [`testing`](src/testing) folder. 
-
-This Python script allows you to load two different or same models to battle against each other. Uses the models set in `config.py`.
-Load a Player vs Player battle, select the characters and toggle or activate the Lua script.
-
-Check the documentation ([`doc`](doc#test_ai_vs_ai_v2py) folder) for further explanation on how the code works and how to configure it according to your needs.
+```powershell
+python src/scripts/test_ai_vs_ai_v2.py --p1_algo ppo --p1_zip models/production/v3/ppo/p1.zip --p2_algo ppo --p2_zip models/production/v3/ppo/p2.zip --device cuda
+```
 
 ---
-## Creating a custom Model
 
-There are different ways to create a custom model:
+## Monitoring & Visualizing Training
 
-<ul>
-  <li>
-    Change the <strong>REWARD</strong> function inside <a href=src/env_sf2_v2.py>env_sf2_v2.py</a>. This affects the overall behavior of the model. 
-  </li>
+Use TensorBoard to monitor rewards, actor/critic losses, explained variance, entropy, and evaluation metrics:
 
-  <li>
-    Change the <strong>Observation Space</strong> or the <strong>data passed to the model</strong>. Example: Passing extra information to the model, Lua gathers the data from the ram values of the ROM and passes it to Python bia the TCP bridge. 
-  </li>
+```powershell
+tensorboard --logdir=logs/
+```
 
-> [Note] Be carefull when editing the Lua script.
+Open `http://localhost:6006/` in your browser.
 
-  <li>
-    Changing the <strong>trained character</strong>, specializing the model with another Character. This is the most fun customization, since you can fully select which character you want your model to specialize, it is far better to make an specialist agent than a globaly good agent, since the model is better and faster trained when specializing it. To do this, open Bizhawk without any script, load the ROM, and create a savestate for every new batle with that character. Check The <a href=doc#changing-the-trained-character>documentation</a> for full guide.
-  </li>
-</ul>
-
+### Key Metrics to Track:
+*   `ep_len_mean`: Average length of matches (in steps). A step represents a frame skipping block of 4.
+*   `ep_rew_mean`: Rolling average of rewards. Positive trajectories signify superior spatial awareness and damage output.
+*   `win_rate`: Rolling win rate (window size = 250 rounds) indicating performance against current curriculum opponents.
+*   `train/approx_kl`: Divergence between the old and new policies. Stabilizing near `0.03` is optimal.
 
 ---
-## Future Implementations
 
-<ul>
-  <li>
-    Enhancing the Obs space, the actual model struggles heavily with projectiles. Even with projectile tracking it still has a big trouble understanding why avoiding or protecting from a projectile is a good idea.
-  </li>
+## Failsafes and Systems Engineering
 
-  <li>
-    Enhancing the REWARD function, it is very hard to get the best REWARD function while avoiding the coward's local optimum, or REWARD hacking, the current REWARD function works, but there can be a posible better REWARD function that could accelerate convergence of the model.
-  </li>
-
-  <li>
-    Including a UI and a compiled version of the project, currently everything runs with scripts and can be messy to explore and understand.
-  </li>
-</ul>
+Training multiple simultaneous instances of emulation is resource-intensive. The pipeline implements three core failsafes to guarantee stability:
+1.  **Multi-Process Thread Sniper:** Terminating Python training forces a cleanup callback via `atexit`. It triggers a PowerShell command query (`Get-CimInstance Win32_Process`) that automatically sniper-terminates grandchild `EmuHawk.exe` instances matching this specific project's path, completely avoiding zombie CPU hogs.
+2.  **RAM Delta Safety Clamping:** Raw RAM readings for HP are strictly clamped (threshold = 100 HP) inside `sf2_v3.py` to prevent emulator memory glitches from generating synthetic, corrupted gradient spikes.
+3.  **Graceful Stopping Signal:** Writing a `.stop_training` file in the project root triggers the active callbacks to serialize model states, dump the current curriculum registry to JSON, and execute a clean process exit without corrupting rollout buffers.
 
 ---
-## Extra
 
-For this project it was used a CPU Intel(R) Core(TM) Ultra 9 275HX. With a NVIDIA GeForce RTX 5070 Ti Laptop GPU
-
-
-
-	
-
-
-
-
-
-
-
+*For detailed explanations of the mathematical formulations, category lottery pool probability derivations, Big-Endian Motorola memory address layouts, and deep-dive algorithmic selections, refer to the [Architectural & Algorithmic Justification Guide](doc/README.md).*
