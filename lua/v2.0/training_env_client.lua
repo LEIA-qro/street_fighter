@@ -7,8 +7,6 @@ console.log("Starting Lock-Step Telemetry Script...")
 client.setwindowsize(1)         -- Reduce emulator window to save GPU resources. We won't be rendering anything, so this is purely for performance.
 client.invisibleemulation(true) -- Takes away any visual rendering overhead, which can significantly boost performance when running headless. client.invisibleemulation(false)
 emu.displayvsync(false)         -- Disables V-Sync to allow the emulator to run as fast as possible without being capped by the monitor's refresh rate.
--- client.speedmode(200) -- current speed is %200, change the argument for other configurations
-emu.limitframerate(false)       -- Remove any built-in frame rate limits to let the emulator run at maximum speed, which is crucial for faster RL training iterations.
 client.displaymessages(false)   -- Disables on-screen text rendering to save CPU cycles
 client.SetSoundOn(false)        -- Disables audio processing, which can be a significant CPU drain.
 
@@ -23,6 +21,13 @@ local STATES_DIR = python_config.STATES_DIR
 -- Change this flag to true if you want to visualize the emulator
 local activate_visualization = python_config.ACTIVATE_VISUALIZATION
 if activate_visualization == nil then activate_visualization = true end
+
+if python_config.ENABLE_THROTTLING then
+    emu.limitframerate(true)
+    client.speedmode(python_config.THROTTLE_SPEED or 200)
+else
+    emu.limitframerate(false)
+end
 
 -- Check if the server was initialized properly via the command line
 local port = comm.socketServerGetPort()

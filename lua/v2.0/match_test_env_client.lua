@@ -32,7 +32,7 @@ local function draw_model_labels()
     -- Draw Player 1 Label (Left)
     gui.text(10, 660, p1_label, 0xFFFFFFFF, "bottomleft")
     -- Draw Player 2 Label (Right)
-    gui.text(300, 660, p2_label, 0xFFFFFFFF, "bottomright")
+    gui.text(600, 660, p2_label, 0xFFFFFFFF, "bottomleft")
 end
 
 local function draw_inputs()
@@ -40,6 +40,13 @@ local function draw_inputs()
     
     for h = 1, 2 do
         local c = joypad.get(h)
+
+        if h == 2 then
+            id_xpos = 100
+        else
+            id_xpos = 8
+        end
+
         -- Check if controller is valid (has at least one standard key)
         if c['Up'] ~= nil or c['A'] ~= nil or c['Start'] ~= nil then
             local x = id_xpos + (h - 1) * 50

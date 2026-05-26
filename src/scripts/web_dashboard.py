@@ -348,14 +348,16 @@ def stop_match_process():
         pass
     return log_msg, "Agent State: **PAUSED** (Default)"
 
-def save_all_config(n_envs, win_rate, steps, port, input_display, activate_viz):
+def save_all_config(n_envs, win_rate, steps, port, input_display, activate_viz, enable_throttling, throttle_speed):
     updates = {
         "N_ENVS": int(n_envs),
         "WIN_RATE_THRESHOLD": win_rate,
         "STARTING_TOTAL_TIMESTEPS": int(steps),
         "PORT": int(port),
         "ENABLE_INPUT_DISPLAY": input_display,
-        "ACTIVATE_VISUALIZATION": activate_viz
+        "ACTIVATE_VISUALIZATION": activate_viz,
+        "ENABLE_THROTTLING": enable_throttling,
+        "THROTTLE_SPEED": int(throttle_speed)
     }
     success = True
     for k, v in updates.items():
@@ -994,6 +996,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     cfg_port = gr.Number(label="Base Socket Port", value=config.PORT, precision=0)
                     cfg_input_display = gr.Checkbox(label="Enable Input Display in Match Tests", value=getattr(config, 'ENABLE_INPUT_DISPLAY', True))
                     cfg_activate_visualization = gr.Checkbox(label="Enable Training Visualization", value=getattr(config, 'ACTIVATE_VISUALIZATION', True))
+                    cfg_enable_throttling = gr.Checkbox(label="Enable Emulator Speed Throttling (Limits CPU usage)", value=getattr(config, 'ENABLE_THROTTLING', False))
+                    cfg_throttle_speed = gr.Slider(label="Throttle Speed % (e.g. 100=Normal, 200=Double, 400=Quad)", minimum=50, maximum=1000, value=getattr(config, 'THROTTLE_SPEED', 200), step=10)
                     
                     save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
                     cfg_status = gr.Markdown("")
@@ -1003,7 +1007,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     state_upload = gr.File(label="Upload Custom Savestates (.State)", file_types=[".State"], file_count="multiple")
                     state_upload_status = gr.Markdown("")
             
-            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port, cfg_input_display, cfg_activate_visualization], outputs=[cfg_status])
+            save_cfg_btn.click(save_all_config, inputs=[cfg_n_envs, cfg_win_rate, cfg_steps, cfg_port, cfg_input_display, cfg_activate_visualization, cfg_enable_throttling, cfg_throttle_speed], outputs=[cfg_status])
 
     # --- GLOBAL EVENT HANDLERS ---
     
