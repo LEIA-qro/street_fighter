@@ -14,6 +14,8 @@ from gymnasium import spaces
 from core import config
 from envs.sf2_v2 import StreetFighterEnvV2, TOTAL_OBS_DIM
 from core.selective_norm import SelectiveVecNormalize
+from core.env_tools import failsafe_env
+from core.telemetry import write_telemetry, clean_telemetry
 
 directories = config.get_directory()
 
@@ -329,10 +331,21 @@ def test_ai_vs_ai():
             obs_p1_raw = parser_p1.parse(raw, is_reset=False)
             obs_p2_raw = parser_p2.parse(raw, is_reset=False)
 
+            # Stream duel telemetry focusing on Player 1 perspective
+            write_telemetry(
+                model_name=p1_name,
+                env_version=args.env_p1,
+                status="PLAYING",
+                model=model_p1,
+                obs=stacked_p1,
+                player=1
+            )
+
     except KeyboardInterrupt:
         print("\nAI vs AI session ended by user.")
 
     finally:
+        clean_telemetry()
         if profiler:
             profiler.disable()
             print("\n" + "="*60)

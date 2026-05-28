@@ -11,6 +11,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from core import config
 from envs.sf2_v2 import StreetFighterEnvV2
 from core.selective_norm import SelectiveVecNormalize
+from core.env_tools import failsafe_env
+from core.telemetry import write_telemetry, clean_telemetry
 
 def get_model_class(algo_name):
     if algo_name.lower() == "sac":
@@ -192,9 +194,21 @@ def test_agent():
 
             obs, reward, done, info = env.step(processed_action)
             
+            # Stream observations & activations to disk for the Dashboard
+            unnorm_obs = env.unnormalize_obs(obs)
+            write_telemetry(
+                model_name=model_name,
+                env_version=args.env,
+                status="PLAYING",
+                model=model,
+                obs=unnorm_obs,
+                player=args.player
+            )
+            
     except KeyboardInterrupt:
         print("\nInteractive session ended by user.")
     finally:
+        clean_telemetry()
         if profiler:
             profiler.disable()
             print("\n" + "="*60)

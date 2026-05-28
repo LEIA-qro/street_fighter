@@ -79,6 +79,17 @@ class SelectiveVecNormalize(VecEnvWrapper):
             
         return obs
 
+    def unnormalize_obs(self, obs: np.ndarray) -> np.ndarray:
+        """Reverse observation normalization for the continuous features."""
+        unnormed = obs.copy()
+        std = np.sqrt(self.running_var + 1e-8)
+        for i in range(self.n_frames):
+            start = i * self.total_dim_per_frame
+            cont  = unnormed[:, start : start + self.n_cont].astype(np.float64)
+            unnormed_cont = cont * std + self.running_mean
+            unnormed[:, start : start + self.n_cont] = unnormed_cont.astype(np.float32)
+        return unnormed
+
     def _normalize_reward(self, rews: np.ndarray, dones: np.ndarray) -> np.ndarray:
         """Discounted return running estimate (Welford online)."""
         # Note: Using a fixed 0.99 gamma for internal return estimation
