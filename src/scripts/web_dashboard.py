@@ -180,14 +180,21 @@ def stop_active_process():
         # Trigger project process sniper to catch any orphaned EmuHawk.exe grandchildren
         try:
             from core.env_tools import failsafe_env
-            failsafe_env()
+            failsafe_env(ignore_gate=True)
         except Exception:
             pass
             
-        return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
+        # Determine process type from args to customize termination message
+        cmd_str = " ".join(proc.args) if hasattr(proc, "args") and proc.args else ""
+        is_match = "test_agent" in cmd_str or "test_ai_vs_ai" in cmd_str
+            
+        if is_match:
+            return "🛑 Match test stopped successfully. No weights were modified."
+        else:
+            return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
     
     from core.env_tools import failsafe_env
-    threading.Thread(target=failsafe_env).start()
+    threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
     return "Global Failsafe triggered: Killing all EmuHawk instances."
 
 def update_config_var(key, value):
@@ -392,12 +399,22 @@ def handle_model_upload(file_obj, algo, env):
         return "Please select a file.", gr.update(), gr.update()
     try:
         import shutil
+        import json
         file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
         filename = os.path.basename(file_path)
         target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
         os.makedirs(target_dir, exist_ok=True)
         
         target_path = os.path.join(target_dir, filename)
+        
+        # If it's a JSON file, validate format first
+        if filename.endswith(".json"):
+            try:
+                with open(file_path, "r") as test_f:
+                    json.load(test_f)
+            except Exception as json_err:
+                return f"**Error: Invalid JSON format:** {json_err}", gr.update(), gr.update()
+
         shutil.copy2(file_path, target_path)
         
         # Calculate relative path of saved file
@@ -548,14 +565,39 @@ def get_league_pool_status_html():
     except Exception as e:
         return f"<div style='color: red; padding: 12px;'>Error reading pool analytics: {e}</div>"
 
+def get_auto_curriculum_file(algo, env):
+    """Resolves and returns the curriculum JSON file path for downloading."""
+    try:
+        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
+        model_name = getattr(config, "MODEL_NAME", None)
+        state_file = f"auto_curriculum_state_{model_name}.json" if model_name else "auto_curriculum_state.json"
+        state_path = os.path.join(target_dir, state_file)
+        
+        if not os.path.exists(state_path):
+            generic_path = os.path.join(target_dir, "auto_curriculum_state.json")
+            if os.path.exists(generic_path):
+                state_path = generic_path
+            else:
+                return gr.update(value=None, visible=False)
+        return gr.update(value=state_path, visible=True)
+    except Exception as e:
+        print(f"[Dashboard][Error] Failed to resolve auto-curriculum file: {e}")
+        return gr.update(value=None, visible=False)
+
 def get_auto_curriculum_status_html(algo, env):
     """Parses auto_curriculum_state.json and renders a premium live progress and analytics card."""
     try:
         target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
-        state_path = os.path.join(target_dir, "auto_curriculum_state.json")
+        model_name = getattr(config, "MODEL_NAME", None)
+        state_file = f"auto_curriculum_state_{model_name}.json" if model_name else "auto_curriculum_state.json"
+        state_path = os.path.join(target_dir, state_file)
         
         if not os.path.exists(state_path):
-            return """
+            generic_path = os.path.join(target_dir, "auto_curriculum_state.json")
+            if os.path.exists(generic_path):
+                state_path = generic_path
+            else:
+                return """
             <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
                 <h3 style='margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
                     📈 Auto-Curriculum Analytics
@@ -713,6 +755,265 @@ def handle_league_state_upload(file_obj):
     except Exception as e:
         return gr.update(), f"❌ Upload error: {e}"
 
+def get_live_telemetry_html():
+    import json
+    import os
+    from core import config
+    
+    target_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json")
+    
+    # Render Premium Standby UI if file is missing or stale
+    if not os.path.exists(target_path):
+        return """
+        <div style='background: #101626; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 48px; text-align: center; font-family: system-ui, sans-serif; color: #fff;'>
+            <h3 style='margin: 0 0 8px 0; color: #3b82f6; font-size: 1.4rem;'>🔮 Standby Mode: Telemetry Offline</h3>
+            <p style='color: #94a3b8; font-size: 0.95rem; margin: 0;'>Launch an interactive <strong>Match Test</strong> from the matchup panel to stream live agent observations and network activations.</p>
+        </div>
+        """
+        
+    try:
+        with open(target_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        return f"<div style='color: red; padding: 12px;'>Error reading telemetry data: {e}</div>"
+
+    model_name = data.get("model_name", "Unknown")
+    env_version = data.get("env_version", "v2")
+    status = data.get("status", "PLAYING")
+    value_est = data.get("value_estimate", 0.0)
+    dist = data.get("policy_distributions", {})
+    frames = data.get("frames", [])
+    
+    # Build 2x2 stacked frames grid
+    frames_html = ""
+    for idx, f in enumerate(frames):
+        # SB3 stacks in oldest-to-newest. We reversed list so frames[0] is the current frame
+        # Let's render frame index cleanly
+        if idx == 0:
+            card_title = "Frame t (Latest / Active)"
+            card_class = "frame-card active-frame"
+            border_color_style = "border-color: rgba(59, 130, 246, 0.45);"
+        elif idx == 1:
+            card_title = "Frame t-1"
+            card_class = "frame-card"
+            border_color_style = ""
+        elif idx == 2:
+            card_title = "Frame t-2"
+            card_class = "frame-card"
+            border_color_style = ""
+        else:
+            card_title = "Frame t-3 (Oldest)"
+            card_class = "frame-card"
+            border_color_style = ""
+
+        p1_hp = f.get("p1_hp", 176)
+        p2_hp = f.get("p2_hp", 176)
+        p1_hp_pct = int((p1_hp / 176.0) * 100)
+        p2_hp_pct = int((p2_hp / 176.0) * 100)
+
+        # Stage coordinates translation logic
+        # Left & Right coordinates are scaled to fit in a 100% width display representing screen width 500
+        # Center coordinate of Ryu P1 starts around 150px, Ken starts 350px.
+        rel_x = f.get("rel_x", 80)
+        p1_corner_dist = f.get("p1_corner_dist", 120)
+        p1_proj = f.get("p1_proj", -1)
+        p2_proj = f.get("p2_proj", -1)
+        
+        # Position fighters relative to arena boundaries
+        p1_left_pos = p1_corner_dist
+        p2_left_pos = p1_corner_dist + rel_x
+        
+        # Scale coordinates into percentage sizes of the 100% vector container (width: 500 maximum)
+        scale = 100.0 / 500.0
+        p1_pct = max(2, min(95, int(p1_left_pos * scale)))
+        p2_pct = max(2, min(95, int(p2_left_pos * scale)))
+        
+        proj1_html = ""
+        if p1_proj > 0:
+            p1_proj_pct = max(2, min(95, int(p1_proj * scale)))
+            proj1_html = f"<div class='projectile p1-proj' style='position: absolute; bottom: 48px; width: 12px; height: 12px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 12px #3b82f6, 0 0 6px #fff; left: {p1_proj_pct}%'></div>"
+
+        proj2_html = ""
+        if p2_proj > 0:
+            p2_proj_pct = max(2, min(95, int(p2_proj * scale)))
+            proj2_html = f"<div class='projectile p2-proj' style='position: absolute; bottom: 48px; width: 12px; height: 12px; border-radius: 50%; background: #f87171; box-shadow: 0 0 12px #ef4444, 0 0 6px #fff; left: {p2_proj_pct}%'></div>"
+
+        frames_html += f"""
+        <div class='{card_class}' style='background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.06); {border_color_style} border-radius: 14px; padding: 20px; position: relative;'>
+            <div class='frame-label' style='font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; font-weight: 800; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 6px;'>{card_title}</div>
+            
+            <div class='hp-bar-container' style='display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; font-weight: bold;'>
+                <span>AI HP ({p1_hp})</span>
+                <span>OPP HP ({p2_hp})</span>
+            </div>
+            <div style='display: flex; justify-content: space-between; margin-bottom: 8px;'>
+                <div class='hp-bar' style='width: 46%; height: 8px; background: #111827; border-radius: 4px; overflow: hidden;'><div class='hp-fill p1' style='height:100%; width: {p1_hp_pct}%; background: linear-gradient(90deg, #2563eb, #3b82f6);'></div></div>
+                <div class='hp-bar' style='width: 46%; height: 8px; background: #111827; border-radius: 4px; overflow: hidden;'><div class='hp-fill p2' style='height:100%; width: {p2_hp_pct}%; background: linear-gradient(90deg, #dc2626, #ef4444);'></div></div>
+            </div>
+
+            <!-- Arena Vector View -->
+            <div class='arena-view' style='width: 100%; height: 140px; background: #04060b; border-radius: 10px; position: relative; border: 1px solid rgba(255, 255, 255, 0.08); margin: 12px 0; overflow: hidden;'>
+                <div class='corner-line left' style='position: absolute; top: 0; bottom: 24px; width: 3px; left: 12px; border-left: 2px dashed rgba(59, 130, 246, 0.4);'></div>
+                <div class='corner-line right' style='position: absolute; top: 0; bottom: 24px; width: 3px; right: 12px; border-right: 2px dashed rgba(239, 68, 68, 0.4);'></div>
+                <!-- Ryu P1 (AI) -->
+                <div class='fighter p1' style='position: absolute; bottom: 24px; width: 26px; height: 60px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; left: {p1_pct}%; background: linear-gradient(180deg, rgba(59, 130, 246, 0.85), rgba(29, 78, 216, 0.85)); border: 1.5px solid #60a5fa; color: #fff;'>AI</div>
+                <!-- Ken P2 (OPP) -->
+                <div class='fighter p2' style='position: absolute; bottom: 24px; width: 26px; height: 60px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; left: {p2_pct}%; background: linear-gradient(180deg, rgba(239, 68, 68, 0.85), rgba(185, 28, 28, 0.85)); border: 1.5px solid #f87171; color: #fff;'>OPP</div>
+                {proj1_html}
+                {proj2_html}
+                <div class='arena-floor' style='position: absolute; bottom: 0; left: 0; width: 100%; height: 24px; background: repeating-linear-gradient(45deg, #131a2b, #131a2b 12px, #080b13 12px, #080b13 24px); border-top: 2px solid rgba(255, 255, 255, 0.12);'></div>
+            </div>
+
+            <!-- ALL POSSIBLE OBSERVATION FEATURE VALUES -->
+            <div class='detailed-obs-grid' style='display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.75rem; text-align: left; margin-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 12px;'>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>P1 (AI) HP</span><span class='obs-val' style='color: #60a5fa; font-weight: bold;'>{p1_hp}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>P2 (OPP) HP</span><span class='obs-val' style='color: #f87171; font-weight: bold;'>{p2_hp}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>Relative X</span><span class='obs-val' style='color: #fff;'>{rel_x} px</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>Relative Y</span><span class='obs-val' style='color: #fff;'>{f.get("rel_y", 0)} px</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>AI Wall Dist</span><span class='obs-val' style='color: #fff;'>{p1_corner_dist} px</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>AI Proj X</span><span class='obs-val' style='color: #fff;'>{p1_proj if p1_proj > 0 else 'None'}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>OPP Proj X</span><span class='obs-val' style='color: #fff;'>{p2_proj if p2_proj > 0 else 'None'}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>AI Velocity X</span><span class='obs-val' style='color: #fff;'>{f.get("p1_vel_x", 0)} px/f</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>OPP Velocity X</span><span class='obs-val' style='color: #fff;'>{f.get("p2_vel_x", 0)} px/f</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>Absolute Dist</span><span class='obs-val' style='color: #fff;'>{f.get("rel_dist", 0)} px</span></div>
+                
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>AI Action ID</span><span class='obs-val' style='color: #60a5fa;'>{f.get("p1_action_name", "N/A")}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>OPP Action ID</span><span class='obs-val' style='color: #f87171;'>{f.get("p2_action_name", "N/A")}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>AI Char ID</span><span class='obs-val' style='color: #60a5fa;'>{f.get("p1_char_name", "N/A")}</span></div>
+                <div class='obs-item' style='display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px;'><span class='obs-label' style='color: #94a3b8;'>OPP Char ID</span><span class='obs-val' style='color: #f87171;'>{f.get("p2_char_name", "N/A")}</span></div>
+            </div>
+        </div>
+        """
+
+    # Build Neural Activation Panels
+    activations_html = ""
+
+    # Value Gauge render
+    val_clamped = max(-50.0, min(60.0, value_est))
+    val_pct = int(((val_clamped + 50.0) / 110.0) * 100)
+    
+    val_class = "positive" if value_est >= 0.0 else "negative"
+    val_sign = "+" if value_est >= 0.0 else ""
+    val_style_color = "#22c55e" if value_est >= 0.0 else "#ef4444"
+
+    value_gauge_html = f"""
+    <div class='value-gauge-container' style='background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 12px; padding: 18px; text-align: center; margin-top: 12px;'>
+        <div class='value-header' style='display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 8px;'>
+            <span>🧠 Value Function Estimate</span>
+            <span class='char-badge' style='background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3); color: #86efac; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700;'>Critic Head</span>
+        </div>
+        <div class='value-display {val_class}' style='font-size: 1.6rem; font-weight: 900; color: {val_style_color}; font-family: monospace; margin-bottom: 12px;'>{val_sign}{value_est:.4f}</div>
+        <div class='gauge-track' style='width: 100%; height: 12px; background: linear-gradient(90deg, #ef4444 0%, #1e293b 50%, #22c55e 100%); border-radius: 6px; position: relative; border: 1px solid rgba(255, 255, 255, 0.08);'>
+            <div class='gauge-pointer' style='position: absolute; top: -4px; width: 6px; height: 20px; background-color: #ffffff; border: 1px solid #000; border-radius: 3px; box-shadow: 0 0 8px #ffffff; left: {val_pct}%;'></div>
+        </div>
+        <div class='gauge-labels' style='display: flex; justify-content: space-between; font-size: 0.65rem; font-weight: bold; color: #94a3b8; margin-top: 6px;'>
+            <span style='color: #ef4444;'>-50.0 (Danger)</span>
+            <span>0.0</span>
+            <span style='color: #22c55e;'>+60.0 (Advantage)</span>
+        </div>
+    </div>
+    """
+
+    # Probability Bars rendering
+    if env_version == "v3" and "directions" in dist:
+        dir_names = ["Neutral (0)", "Up (1)", "Down (2)", "Left / Retreat (3)", "Right / Advance (4)", "Up-Left (5)", "Up-Right (6)", "Down-Left (7)", "Down-Right (8)"]
+        dir_bars = ""
+        for idx, p in enumerate(dist["directions"]):
+            pct = int(p * 100)
+            label_color = "color: #60a5fa; font-weight: bold;" if p == max(dist["directions"]) else ""
+            dir_bars += f"""
+            <div class='probability-bar-row' style='margin-bottom: 10px;'>
+                <div class='bar-label-row' style='display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; {label_color}'><span>{dir_names[idx]}</span><span>{pct}%</span></div>
+                <div class='bar-bg' style='width: 100%; height: 8px; background: #0c0f17; border-radius: 4px; overflow: hidden;'><div class='bar-fill' style='height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); width: {pct}%'></div></div>
+            </div>
+            """
+
+        btn_names = ["Idle / Wait (0)", "A - Light Kick (1)", "B - Med Kick (2)", "C - Hard Kick (3)", "X - Light Punch (4)", "Y - Med Punch (5)", "Z - Hard Punch (6)"]
+        btn_bars = ""
+        for idx, p in enumerate(dist["buttons"]):
+            pct = int(p * 100)
+            label_color = "color: #60a5fa; font-weight: bold;" if p == max(dist["buttons"]) else ""
+            btn_bars += f"""
+            <div class='probability-bar-row' style='margin-bottom: 10px;'>
+                <div class='bar-label-row' style='display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; {label_color}'><span>{btn_names[idx]}</span><span>{pct}%</span></div>
+                <div class='bar-bg' style='width: 100%; height: 8px; background: #0c0f17; border-radius: 4px; overflow: hidden;'><div class='bar-fill' style='height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); width: {pct}%'></div></div>
+            </div>
+            """
+
+        activations_html += f"""
+        <div class='probability-group' style='background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px;'>
+            <h4 style='margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: flex; justify-content: space-between;'>
+                <span>🕹️ Direction Select (Discrete)</span>
+                <span class='char-badge' style='background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;'>MultiDiscrete[0]</span>
+            </h4>
+            {dir_bars}
+        </div>
+        <div class='probability-group' style='background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px;'>
+            <h4 style='margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: flex; justify-content: space-between;'>
+                <span>🎯 Action Button (Discrete)</span>
+                <span class='char-badge' style='background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;'>MultiDiscrete[1]</span>
+            </h4>
+            {btn_bars}
+        </div>
+        """
+    elif env_version == "v2" and "buttons" in dist:
+        btn_names = ["Up", "Down", "Left", "Right", "A (LK)", "B (MK)", "C (HK)", "X (LP)", "Y (MP)", "Z (HP)"]
+        bin_bars = ""
+        for idx, p in enumerate(dist["buttons"]):
+            pct = int(p * 100)
+            bin_bars += f"""
+            <div class='probability-bar-row' style='margin-bottom: 10px;'>
+                <div class='bar-label-row' style='display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 600; margin-bottom: 4px;'><span>{btn_names[idx]} Bit</span><span>{pct}% Confidence</span></div>
+                <div class='bar-bg' style='width: 100%; height: 8px; background: #0c0f17; border-radius: 4px; overflow: hidden;'><div class='bar-fill' style='height: 100%; background: linear-gradient(90deg, #3b82f6, #60a5fa); width: {pct}%'></div></div>
+            </div>
+            """
+        activations_html += f"""
+        <div class='probability-group' style='background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px;'>
+            <h4 style='margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: flex; justify-content: space-between;'>
+                <span>🕹️ 10-Bit Button Probabilities</span>
+                <span class='char-badge' style='background: rgba(59, 130, 246, 0.15); color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem;'>MultiBinary[10]</span>
+            </h4>
+            {bin_bars}
+        </div>
+        """
+    else:
+        activations_html += """
+        <div class='probability-group' style='background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center; color: #94a3b8;'>
+            No policy activations available for this environment version or algorithm.
+        </div>
+        """
+
+    active_player = data.get("player", 1)
+
+    html = f"""
+    <div style='background-color: #080b13; font-family: "Outfit", "Inter", sans-serif; color: #fff;'>
+        <div style='margin-bottom: 20px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); padding: 14px 18px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;'>
+            <div>
+                <span style='font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em;'>Active Model:</span>
+                <span style='font-size: 1rem; font-weight: bold; margin-left: 8px; color: #3b82f6;'>{model_name} (Player {active_player})</span>
+            </div>
+            <div style='font-size: 0.85rem; color: #94a3b8;'>Environment: <strong style='color:#fff;'>SF2 {env_version.upper()}</strong></div>
+        </div>
+
+        <div style='display: grid; grid-template-columns: 2.5fr 1fr; gap: 24px;'>
+            <!-- Stacked Frames (Left) -->
+            <div>
+                <div class='frames-grid' style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;'>
+                    {frames_html}
+                </div>
+            </div>
+            
+            <!-- Brain / Activation Panel (Right) -->
+            <div style='background: #101626; border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 16px; padding: 24px; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 20px;'>
+                <h3 style='margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;'>🧠 Actor/Critic Head Distributions</h3>
+                {activations_html}
+                {value_gauge_html}
+            </div>
+        </div>
+    </div>
+    """
+    return html
+
 # --- UI Construction ---
 
 zips_init, pkls_init = get_model_files("ppo")
@@ -746,6 +1047,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             with gr.Row():
                                 ext_zip_upload = gr.File(label="Upload Model (.zip)", file_types=[".zip"])
                                 ext_pkl_upload = gr.File(label="Upload Normalization (.pkl)", file_types=[".pkl"])
+                                ext_json_upload = gr.File(label="Upload Curriculum State (.json)", file_types=[".json"])
                             upload_status = gr.Markdown("")
                             
                             with gr.Row():
@@ -768,6 +1070,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             gr.Markdown("---")
                             with gr.Row():
                                 refresh_curr_btn = gr.Button("🔄 Refresh Auto-Curriculum Stats", variant="secondary")
+                                download_curr_btn = gr.Button("📥 Download Auto-Curriculum Analytics", variant="secondary")
+                            download_curr_file = gr.File(label="Downloadable Curriculum State File", visible=False, interactive=False)
                             auto_curr_card = gr.HTML(value=get_auto_curriculum_status_html("ppo", "v2"))
                         
                         # Section B: Optuna
@@ -986,6 +1290,17 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
 
+        # --- TAB 2.5: TELEMETRY ---
+        with gr.Tab("🔮 Observation Telemetry"):
+            gr.Markdown("### Real-time Agent Observations & Network Activations")
+            gr.Markdown("This live dashboard prints stacked chronological frames, relative bounding boxes on stage, actor log-probabilities, and state value gauges during active match tests.")
+            
+            telemetry_html = gr.HTML(value=get_live_telemetry_html())
+            
+            # Poll every 100ms
+            telemetry_timer = gr.Timer(value=0.1, active=True)
+            telemetry_timer.tick(get_live_telemetry_html, outputs=[telemetry_html])
+
         # --- TAB 3: CONFIG ---
         with gr.Tab("⚙️ Core Config Editor"):
             with gr.Row():
@@ -996,8 +1311,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     cfg_port = gr.Number(label="Base Socket Port", value=config.PORT, precision=0)
                     cfg_input_display = gr.Checkbox(label="Enable Input Display in Match Tests", value=getattr(config, 'ENABLE_INPUT_DISPLAY', True))
                     cfg_activate_visualization = gr.Checkbox(label="Enable Training Visualization", value=getattr(config, 'ACTIVATE_VISUALIZATION', True))
-                    cfg_enable_throttling = gr.Checkbox(label="Enable Emulator Speed Throttling (Limits CPU usage)", value=getattr(config, 'ENABLE_THROTTLING', False))
-                    cfg_throttle_speed = gr.Slider(label="Throttle Speed % (e.g. 100=Normal, 200=Double, 400=Quad)", minimum=50, maximum=1000, value=getattr(config, 'THROTTLE_SPEED', 200), step=10)
+                    cfg_enable_throttling = gr.Checkbox(label="Enable Emulator Speed Throttling (Limits CPU - Applies to Training Only)", value=getattr(config, 'ENABLE_THROTTLING', False))
+                    cfg_throttle_speed = gr.Slider(label="Training Throttle Speed % (e.g. 100=Normal, 200=Double - Applies to Training Only)", minimum=50, maximum=1000, value=getattr(config, 'THROTTLE_SPEED', 200), step=10)
                     
                     save_cfg_btn = gr.Button("💾 Save Configuration", variant="primary")
                     cfg_status = gr.Markdown("")
@@ -1033,6 +1348,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     # Link uploaders (Training Tab)
     ext_zip_upload.upload(handle_model_upload, inputs=[ext_zip_upload, algo_sel, env_sel], outputs=[upload_status, train_zip_drop, train_pkl_drop])
     ext_pkl_upload.upload(handle_model_upload, inputs=[ext_pkl_upload, algo_sel, env_sel], outputs=[upload_status, train_zip_drop, train_pkl_drop])
+    ext_json_upload.upload(handle_model_upload, inputs=[ext_json_upload, algo_sel, env_sel], outputs=[upload_status, train_zip_drop, train_pkl_drop])
 
     upload_json.upload(load_hyperparams_from_json, inputs=[upload_json], outputs=[train_lr, train_ent, train_clip, readonly_params])
 
@@ -1069,6 +1385,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     stop_btn.click(stop_active_process, outputs=[stop_status])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     refresh_curr_btn.click(get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
+    download_curr_btn.click(get_auto_curriculum_file, inputs=[algo_sel, env_sel], outputs=[download_curr_file])
     tb_main_btn.click(launch_tb, outputs=[gr.Textbox(visible=False)])
 
     # League Tab Event Bindings
