@@ -289,7 +289,8 @@ class AutoCurriculumCallback(BaseCallback):
                 state: list(buf) for state, buf in self.state_win_buffers.items() if len(buf) > 0
             }
         }
-        path = os.path.join(self.save_path, "auto_curriculum_state.json")
+        filename = f"auto_curriculum_state_{self.model_name}.json" if self.model_name else "auto_curriculum_state.json"
+        path = os.path.join(self.save_path, filename)
         temp_path = path + ".tmp"
         try:
             with open(temp_path, "w") as f:
@@ -304,7 +305,15 @@ class AutoCurriculumCallback(BaseCallback):
 
     def _load_and_restore_state(self):
         """Load curriculum state from disk if it exists, restoring all metrics and buffers."""
-        path = os.path.join(self.save_path, "auto_curriculum_state.json")
+        filename = f"auto_curriculum_state_{self.model_name}.json" if self.model_name else "auto_curriculum_state.json"
+        path = os.path.join(self.save_path, filename)
+        
+        # Fallback to old generic file if model-specific doesn't exist
+        if not os.path.exists(path):
+            generic_path = os.path.join(self.save_path, "auto_curriculum_state.json")
+            if os.path.exists(generic_path):
+                path = generic_path
+
         if os.path.exists(path):
             try:
                 with open(path, "r") as f:
@@ -333,9 +342,19 @@ class AutoCurriculumCallback(BaseCallback):
                 print(f"[AutoCurriculum][WARN] Failed to self-restore state from disk: {e}")
 
     @classmethod
-    def load_state(cls, save_path: str) -> dict:
+    def load_state(cls, save_path: str, model_name: str = None) -> dict:
         """Load curriculum state from disk, fallback gracefully to Level 1 defaults if missing."""
-        path = os.path.join(save_path, "auto_curriculum_state.json")
+        if not model_name:
+            model_name = getattr(config, "MODEL_NAME", None)
+            
+        filename = f"auto_curriculum_state_{model_name}.json" if model_name else "auto_curriculum_state.json"
+        path = os.path.join(save_path, filename)
+        
+        if not os.path.exists(path):
+            generic_path = os.path.join(save_path, "auto_curriculum_state.json")
+            if os.path.exists(generic_path):
+                path = generic_path
+
         if os.path.exists(path):
             with open(path, "r") as f:
                 raw = json.load(f)

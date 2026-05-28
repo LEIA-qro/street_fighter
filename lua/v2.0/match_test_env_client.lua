@@ -5,6 +5,7 @@ console.log("Starting Lock-Step Telemetry Script...")
 -- RESTORING HARDWARE OPTIMIZATIONS 
 -- ==========================================
 emu.limitframerate(true)
+client.speedmode(100)           -- Force standard 100% speed regardless of training speed
 client.setwindowsize(4)         
 client.invisibleemulation(false) 
 emu.displayvsync(false)        

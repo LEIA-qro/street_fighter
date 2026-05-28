@@ -113,8 +113,13 @@ def main():
             time.sleep(10)
 
             # Read progress from curriculum_state.json or auto_curriculum_state.json if available
-            state_file_name = "auto_curriculum_state.json" if args.auto_curriculum else "curriculum_state.json"
+            state_file_name = f"auto_curriculum_state_{config.MODEL_NAME}.json" if args.auto_curriculum else "curriculum_state.json"
             state_path = os.path.join(save_dir, state_file_name)
+            if args.auto_curriculum and not os.path.exists(state_path):
+                fallback_path = os.path.join(save_dir, "auto_curriculum_state.json")
+                if os.path.exists(fallback_path):
+                    state_path = fallback_path
+            
             if os.path.exists(state_path):
                 import json
                 try:

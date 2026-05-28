@@ -226,10 +226,15 @@ class SACAgent(BaseAgent):
             
             print("[Training] Press Ctrl + C to stop the training. ")
 
+            reset_timesteps = True
+            if load_zip and load_zip != "None":
+                reset_timesteps = False
+
             model.learn(
                 total_timesteps=steps, 
                 callback=callback,
-                tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}"
+                tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}",
+                reset_num_timesteps=reset_timesteps
             )
             
             # Dynamic Final Save

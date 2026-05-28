@@ -31,7 +31,7 @@ def SFv2_make_env(rank, **kwargs):
         return Monitor(env, filename=os.path.join(log_dir, "monitor.csv"))
     return _init
 
-def failsafe_env(env=None, model=None):
+def failsafe_env(env=None, model=None, ignore_gate=False):
     global _failsafe_executed
     
     if env is not None:
@@ -48,9 +48,10 @@ def failsafe_env(env=None, model=None):
             pass
 
     # Idempotent execution gate: Only run the global sniper, GC, and VRAM purge once per exit session
-    if _failsafe_executed and env is None:
-        return
-    _failsafe_executed = True
+    if not ignore_gate:
+        if _failsafe_executed and env is None:
+            return
+        _failsafe_executed = True
 
     print("[ENV] Executing Failsafe: Clearing VRAM and GC...")
     

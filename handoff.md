@@ -1,46 +1,49 @@
-# Project Handoff: Street Fighter II RL (Documentation Overhaul & Matchup Process Failsafes)
+# Project Handoff: Street Fighter II RL (TensorBoard Step Continuation & Curriculum Analytics Isolation)
 
 ## 📝 Project Summary
-This project implements a high-performance Reinforcement Learning pipeline for Street Fighter II' SCE on Genesis (Ryu specialist). It employs a custom, lock-step TCP bridge between Stable Baselines3 (PPO, DQN, SAC) and BizHawk. The current phase establishes a complete production-grade documentation overhaul, rigorous algorithmic/systems justifications, and absolute process containment to eliminate zombie grandchild emulators during interactive matchup testing.
+This project implements a high-performance Reinforcement Learning pipeline for Street Fighter II' SCE on Genesis (Ryu specialist). It employs a custom, lock-step TCP bridge between Stable Baselines3 (PPO, DQN, SAC) and BizHawk. The current phase establishes perfect continuation of TensorBoard steps upon model resumptions, isolates curriculum state tracking on a per-model basis to prevent progress collision/dilution, and implements robust uploader/downloader tools in the web control center.
 
 ---
 
-## 🎯 Goal
-*   **Production-Grade Documentation Overhaul:** Overwrite the root `README.md` (master specify and developer manual) and `doc/README.md` (algorithmic/systems justification guide) to align perfectly with the active codebase, completely omitting theoretical concepts (such as `eggroll`).
-*   **Orphaned Process Containment:** Investigate and resolve the process leak where clicking "Terminate Match" in the Gradio dashboard leaves orphaned `EmuHawk.exe` grandchild processes spinning in the background.
+## 🎯 Goals We Are Working Toward
+*   **TensorBoard Step Continuation**: Resolve step counters resetting to 0 when loading existing model checkpoints or during auto-recovery retry loops by setting `reset_num_timesteps=False` in SB3's `model.learn()`.
+*   **Model-Specific Curriculum Analytics**: Save and read curriculum state logs as `auto_curriculum_state_{model_name}.json` instead of a generic shared file to prevent cross-model directory state collisions.
+*   **Gradio State Migration Tools**: Integrate interactive `.json` state uploaders (with robust validation) and a downloader button directly under the auto-curriculum analytics card.
+*   **Backward Compatibility**: Ensure all modifications fall back gracefully to the generic `auto_curriculum_state.json` if a model-specific file does not exist.
 
 ---
 
-## 🚀 Current State
-The codebase is clean, high-performance, and fully containment-secured:
-1.  **Overhauled `README.md` (Master Spec):** Up-to-date directory layout map, exhaustive **Gradio Web Control Center** configuration/running guide (including live curriculum HTML visualizer, model uploader, and matchup testers), dependencies setup, and comprehensive CLI execution commands (`train.py`, `resume.py`, `tune.py`, `test_agent_v2.py`, `test_ai_vs_ai_v2.py`).
-2.  **Overhauled `doc/README.md` (Justification Guide):** Deep-dive mathematical and bare-metal systems justifications:
-    - *Lock-Step TCP Bridge:* Deterministic synchronization protocol, 10ms Lua timeouts, 5.0s Python socket timeouts, and stream buffer slicing to prevent partial packet corruptions.
-    - *Motorola 68000 WRAM Mapping:* Big-Endian memory reads (`read_u16_be`) and critical **Data Leakage Defenses** (excluding player button inputs `0x81E2` from P1 observations to prevent policy network identity loops).
-    - *Observation Stack:* 2216-dim observation space ($554 \times 4$ frames) and HP safety clamps.
-    - *Category-Weighted Rehearsal Lottery:* Mathematical proof showing the weighted lottery (`past: 12`, `mastered: 24`, `active: 36`, `weakness: 60`, `new: 48`) yields a stable **41.7% active weakness selection probability** at Level 2 to target combat bottlenecks.
-    - *Gating Thresholds:* Statistical gating (`min_samples_per_state = 15`, `min_episodes_for_eval = 100`, `stability_threshold = 3`) to prevent promotion due to statistical noise.
-    - *Interactive Performance:* CPU unthrottling, audio disabling, display VSync turning off, and throttled disk operations to once every 30 frames inside matchup testing to eliminate micro-stutters.
-3.  **Matchup Termination process sniper:** Fixed the emulator leak by updating `stop_active_process()` inside `src/scripts/web_dashboard.py`. The supervisor dashboard now **always triggers the project process sniper (`failsafe_env()`)** synchronously at the end of process terminations. This guarantees that all orphaned `EmuHawk.exe` grandchild instances are swept and terminated, even if the parent test process exits abruptly.
+## 🚀 Current State of the Code
+The codebase is clean, robustly structured, and compiles cleanly with zero warnings:
+1.  **Continuous TensorBoard Steps**: The `train` methods in all agent types (`ppo/agent.py`, `dqn/agent.py`, `sac/agent.py`) dynamically check if a pre-existing checkpoint is loaded and pass `reset_num_timesteps=False` to `model.learn()` accordingly.
+2.  **Telemetry Isolation**: `AutoCurriculumCallback` serializes states into model-specific JSON files. A robust fallback resolves and loads the generic `auto_curriculum_state.json` if the model-specific version is missing.
+3.  **Robust Recovery**: The training script `train.py` correctly handles the model-specific files with the same fallback behavior inside its error-recovery retry loop.
+4.  **Web Control Center**:
+    - **Uploader**: Added a `.json` uploader next to the model zip/pkl uploaders with format validation.
+    - **Downloader**: Integrated a `"Download Auto-Curriculum Analytics"` button and file download component, making curriculum progress fully exportable and migratable.
 
 ---
 
-## ❌ Failed Attempts (Summarized & Updated)
-*   **Lua Socket Reads in PAUSE Mode:** Attempting to exit BizHawk gracefully by sending an `"EXIT"` socket command failed because `match_test_env_client.lua` completely bypasses socket checks when the matchup is paused to allow manual human menu navigation. (Fixed by triggering the dashboard process sniper failsafe).
-*   **SIGBREAK Cleanup Bypass:** Terminating parent runner processes via Windows console events sometimes exits Python abruptly before executing `finally: env.close()` blocks, leaving the emulator orphaned. (Fixed by direct dashboard process sniper calls).
-*   **Dynamic Crash Saves Port Collisions:** Swapping `_CRASH_SAVE` and `_EMERGENCY` to dynamic formats broke supervisor scripts that search for static tags. (Fixed by keeping crash/emergency files static).
-*   **Space Path Execution Failures:** Running scripts in directories containing spaces (e.g. `Diego Perea`) failed in Windows shells. (Fixed by quoting paths).
+## ❌ Everything We've Tried That Failed
+*   **Standard SB3 Resumptions**: Letting `model.learn()` use the default `reset_num_timesteps=True` reset rollout steps to 0, causing disjointed step graphs in TensorBoard.
+*   **Shared State Overwriting**: Previously, all models under the same algorithm/env subdirectory wrote to `auto_curriculum_state.json`, leading to state overwrites and resetting curriculum analytics cards.
+*   **Unvalidated JSON Uploads**: Uploading raw, corrupted `.json` files could crash the Python dashboard at load-time. (Fixed by adding a try-except validation block that parses the file with `json.load()` before writing to the target directory).
+*   **Windows Subprocess Spaces**: Parent runner execution occasionally failed on user paths containing spaces; resolved via strict quote escaping.
 
 ---
 
 ## 📂 Files Actively Edited
-*   `README.md` (Overhauled master developer manual)
-*   `doc/README.md` (Overhauled algorithmic and systems justification guide)
-*   `src/scripts/web_dashboard.py` (Overhauled matchup termination process sniper failsafe)
+*   `src/agents/ppo/agent.py` (Added `reset_num_timesteps` continuation logic)
+*   `src/agents/dqn/agent.py` (Added `reset_num_timesteps` continuation logic)
+*   `src/agents/sac/agent.py` (Added `reset_num_timesteps` continuation logic)
+*   `src/agents/auto_curriculum_callback.py` (Isolated model-specific JSON states with fallback)
+*   `src/scripts/train.py` (Updated recovery loop state parsing)
+*   `src/scripts/web_dashboard.py` (Added uploader/downloader UI components, events, and validation)
 *   `handoff.md` (This project handoff file)
 
 ---
 
 ## ⏭️ Next Steps
-1.  **Matchup Process Containment Verification:** Launch the Gradio Web Control Center (`python src/scripts/web_dashboard.py`), open the Matchup Test tab, start a matchup, and then click "Terminate Match" to visually verify that EmuHawk exits cleanly and CPU/VRAM usage drops back to idle immediately.
-2.  **Advanced Projectile Vector Tracking:** Extend the Gymnasium observation space wrapper in `envs/sf2_v3.py` to refine projectile state mapping (e.g. tracking vector trajectories) to further improve Ryu's defensive play against projectile spammers.
+1.  **Dashboard Telemetry Verification**: Launch the Gradio Web Control Center (`python src/scripts/web_dashboard.py`), toggle `"Enable Auto-Curriculum"`, start a training run, and verify that a file named `auto_curriculum_state_{MODEL_NAME}.json` is created.
+2.  **Verify TensorBoard Step Continuity**: Resubmitting or resuming a model should show a continuous step line in TensorBoard rather than restarting the x-axis from 0.
+3.  **Verify JSON Uploader/Downloader**: Test downloading the curriculum state file, modifying/backing it up, and uploading it back via the new interface.

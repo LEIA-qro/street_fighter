@@ -84,26 +84,35 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             # --- STICKY MOVEMENT LOGIC ---
             action_list = list(action_string)
             
-            is_attacking = any(b == '1' for b in action_list[4:10])
             agent_left = action_list[2] == '1'
             agent_right = action_list[3] == '1'
+            agent_crouch = action_list[1] == '1'
             
-            if is_attacking or (self.sticky_direction == 'L' and agent_right) or (self.sticky_direction == 'R' and agent_left):
+            # Cancel stickiness if the agent is crouching or inputs the opposite direction
+            opposite_input = (self.sticky_direction == 'L' and agent_right) or (self.sticky_direction == 'R' and agent_left)
+            
+            if agent_crouch or opposite_input:
                 self.sticky_counter = 0
                 self.sticky_direction = None
                 
             if self.sticky_counter > 0:
-                if self.sticky_direction == 'L': action_list[2] = '1'
-                if self.sticky_direction == 'R': action_list[3] = '1'
+                if self.sticky_direction == 'L':
+                    action_list[2] = '1'
+                    action_list[3] = '0'  # Prevent conflicting Left+Right inputs
+                elif self.sticky_direction == 'R':
+                    action_list[3] = '1'
+                    action_list[2] = '0'  # Prevent conflicting Left+Right inputs
                 self.sticky_counter -= 1
             else:
-                if agent_left:
-                    self.sticky_direction = 'L'
-                    self.sticky_counter = 2
-                elif agent_right:
-                    self.sticky_direction = 'R'
-                    self.sticky_counter = 2
-                    
+                # Initiate stickiness on fresh directional inputs, provided we are not crouching
+                if not agent_crouch:
+                    if agent_left:
+                        self.sticky_direction = 'L'
+                        self.sticky_counter = 2
+                    elif agent_right:
+                        self.sticky_direction = 'R'
+                        self.sticky_counter = 2
+                        
             action_string = "".join(action_list)
             # -----------------------------
 
@@ -137,7 +146,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self._steps += 1
 
         COMBO_WINDOW = 6  # steps — a hit within 6 steps of the last extends the combo
-        DAMAGE_TAKEN_PENALTY = 0.70
+        DAMAGE_TAKEN_PENALTY = 0.77
         FOOTSIE_RANGE_MAX    = 80     # 0x834C value — within effective fighting range
         FOOTSIE_BASE_REWARD  = 0.05
 
@@ -185,7 +194,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
             reward = -(DAMAGE_TAKEN_PENALTY * float(damage_taken)) - 0.015 + dist_reward
 
-        if current_enemy_hp <= 0: reward += 50.0
+        if current_enemy_hp <= 0: reward += 65.0
         if current_my_hp <= 0: reward -= 50.0  # To avoid a tie
 
         self.prev_my_hp, self.prev_enemy_hp = current_my_hp, current_enemy_hp
