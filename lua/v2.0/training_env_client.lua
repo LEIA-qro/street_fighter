@@ -7,8 +7,6 @@ console.log("Starting Lock-Step Telemetry Script...")
 client.setwindowsize(1)         -- Reduce emulator window to save GPU resources. We won't be rendering anything, so this is purely for performance.
 client.invisibleemulation(true) -- Takes away any visual rendering overhead, which can significantly boost performance when running headless. client.invisibleemulation(false)
 emu.displayvsync(false)         -- Disables V-Sync to allow the emulator to run as fast as possible without being capped by the monitor's refresh rate.
--- client.speedmode(200) -- current speed is %200, change the argument for other configurations
-emu.limitframerate(false)       -- Remove any built-in frame rate limits to let the emulator run at maximum speed, which is crucial for faster RL training iterations.
 client.displaymessages(false)   -- Disables on-screen text rendering to save CPU cycles
 client.SetSoundOn(false)        -- Disables audio processing, which can be a significant CPU drain.
 
@@ -21,7 +19,15 @@ local python_config = require("generated_config")
 local STATES_DIR = python_config.STATES_DIR
 
 -- Change this flag to true if you want to visualize the emulator
-local activate_visualization = true
+local activate_visualization = python_config.ACTIVATE_VISUALIZATION
+if activate_visualization == nil then activate_visualization = true end
+
+if python_config.ENABLE_THROTTLING then
+    emu.limitframerate(true)
+    client.speedmode(python_config.THROTTLE_SPEED or 200)
+else
+    emu.limitframerate(false)
+end
 
 -- Check if the server was initialized properly via the command line
 local port = comm.socketServerGetPort()
@@ -33,6 +39,7 @@ end
 if (port == "9999" or port == 9999) and activate_visualization then
     client.setwindowsize(2)
     client.invisibleemulation(false)
+    client.displaymessages(true)
 end
 
 console.log("Listening on port: " .. port)
@@ -45,6 +52,22 @@ local step_count = 0 -- Tracks agent steps for debugging
 -- Initialize Previous Projectile Variables outside the loop
 local prev_p1_proj_x = 0
 local prev_p2_proj_x = 0
+
+-- Match State Tracking
+local current_match_state = "None"
+
+local function get_state_display_name(path)
+    if path == nil then return "Loading..." end
+    -- Extract filename from path (handling both backslash and forward slash)
+    local name = path:match("^.+\\(.+)$") or path:match("^.+/(.+)$") or path
+    return string.gsub(name, "%.State$", "")
+end
+
+local function draw_match_state()
+    if activate_visualization then
+        gui.text(10, 10, "Match: " .. current_match_state, 0xFFFF00FF, "topleft")
+    end
+end
 
 while true do
     -- Read RAM
@@ -83,20 +106,21 @@ while true do
     -- Using read_u8 because Character IDs are standard 8-bit integers
     local p1_char_id = mainmemory.read_u8(0x81DA)
     local p2_char_id = mainmemory.read_u8(0x845A)
+    local rel_dist = mainmemory.read_u8(0x834C)
 
-    -- Format Payload (Now 10 dimensions) & Send
-    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
+    -- Format Payload (Now 13 dimensions) & Send
+    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
         p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
         p1_action_id, p2_action_id, 
         active_p1_proj_x, active_p2_proj_x,
-        p1_char_id, p2_char_id)
+        p1_char_id, p2_char_id, rel_dist)
     
     comm.socketServerSend(payload)
     
     -- Strict Spinlock: Wait for Python's response before advancing
     local response = ""
     local wait_start_time = os.time() -- Record the exact time we started waiting
-    local TIMEOUT_LIMIT = 180 -- Maximum seconds to wait before assuming Python is dead
+    local TIMEOUT_LIMIT = 600 -- Maximum seconds to wait before assuming Python is dead
     
     while response == "" or response == nil do
         response = comm.socketServerResponse()
@@ -122,6 +146,12 @@ while true do
     -- Remove the newline character for clean processing
     response = string.gsub(response, "\n", "")
 
+    -- Extract the actual payload by stripping the '{len} ' prefix sent by Python
+    local payload_str = string.match(response, "^%d+%s+(.*)$")
+    if payload_str then
+        response = payload_str
+    end
+
     -- Check for special RESET command from Python
     if response == "EXIT" then
         console.log("Received EXIT command. Restoring defaults and shutting down...")
@@ -138,8 +168,10 @@ while true do
         local state_file_path = string.sub(response, 7) -- Extract the state name after "RESET "
         console.log("Received RESET command. Loading New Random State... ")
         savestate.load(state_file_path)
+        current_match_state = get_state_display_name(state_file_path)
         
         -- Skip input injection and frame advance, yield control to the newly loaded state
+        draw_match_state()
         emu.frameadvance() 
     else
         -- Normal Step: Inject Inputs
@@ -155,13 +187,23 @@ while true do
         if string.sub(response, 8, 8) == "1" then input["P1 X"] = true end
         if string.sub(response, 9, 9) == "1" then input["P1 Y"] = true end
         if string.sub(response, 10, 10) == "1" then input["P1 Z"] = true end
+        
+        if string.sub(response, 11, 11) == "1" then input["P2 Up"] = true end
+        if string.sub(response, 12, 12) == "1" then input["P2 Down"] = true end
+        if string.sub(response, 13, 13) == "1" then input["P2 Left"] = true end
+        if string.sub(response, 14, 14) == "1" then input["P2 Right"] = true end
+        if string.sub(response, 15, 15) == "1" then input["P2 A"] = true end
+        if string.sub(response, 16, 16) == "1" then input["P2 B"] = true end
+        if string.sub(response, 17, 17) == "1" then input["P2 C"] = true end
+        if string.sub(response, 18, 18) == "1" then input["P2 X"] = true end
+        if string.sub(response, 19, 19) == "1" then input["P2 Y"] = true end
+        if string.sub(response, 20, 20) == "1" then input["P2 Z"] = true end
         -- We sleep the Start and Mode buttons to avoid the agent accidentally pausing or opening the menu
-        -- if string.sub(response, 11, 11) == "1" then input["P1 Start"] = true end
-        -- if string.sub(response, 12, 12) == "1" then input["P1 Mode"] = true end
         
         -- ACTION REPEAT: Hold the input and advance multiple frames
         for i = 1, FRAME_SKIP do
             joypad.set(input)
+            draw_match_state()
             emu.frameadvance()
         end
     end
