@@ -9,10 +9,9 @@ sys.path.append(os.path.join(project_root, "src"))
 print(f"[TEST] Parent Directory: {parent_dir}")
 print(f"[TEST] Project Root: {project_root}")"""
 
-
-from env_sf2_v2 import StreetFighterEnvV2
-from env_tools import failsafe_env
-import config
+from envs.sf2_v2 import StreetFighterEnvV2  
+from core.env_tools import failsafe_env
+import core.config as config
 
 
 def random_test_telemetry():
