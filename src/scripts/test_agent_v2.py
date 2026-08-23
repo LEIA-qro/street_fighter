@@ -1,6 +1,13 @@
-import os, sys, argparse, random
+import os, sys, argparse, random, time
 from typing import Any
 import numpy as np
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -10,7 +17,7 @@ from stable_baselines3 import PPO, SAC, DQN
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 from core import config
-from envs.sf2_v2 import StreetFighterEnvV2
+from envs.sf2_v2 import StreetFighterEnvV2, TOTAL_OBS_DIM
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from core.telemetry import write_telemetry, clean_telemetry
@@ -167,7 +174,26 @@ def test_agent():
     model = load_model_safely(args.algo, model_load_path, device)
     
     print(f"\nFIGHT! (The {args.algo.upper()} AI engine is now running in the background)")
-    obs = env.reset()
+    if args.infinite_match:
+        if args.opponent_type == "human":
+            initial_state_file = "RYU_RYU_R1_PvP.State"
+        else:
+            cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
+            initial_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
+
+        initial_state_path = os.path.join(config.STATES_DIR, initial_state_file)
+        print(f"[Infinite Match] Cold-starting in active state: {initial_state_file}", flush=True)
+        base_env = env.envs[0]
+        base_env.send_command(f"RESET {initial_state_path}\n")
+        reset_payload = base_env.receive_payload()
+        observation = base_env._parse_payload(reset_payload, is_reset=True)
+        base_env.frames.clear()
+        for _ in range(config.NUM_FRAMES):
+            base_env.frames.append(observation)
+        obs_raw = base_env._get_obs()[np.newaxis, :]
+        obs = env.normalize_obs(obs_raw, update=False)
+    else:
+        obs = env.reset()
     
     # Optional Profiling setup
     profiler = None
@@ -175,11 +201,14 @@ def test_agent():
         import cProfile, pstats
         profiler = cProfile.Profile()
         profiler.enable()
-        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
+        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.", flush=True)
 
     match_count = 1
     ai_wins = 0
     opp_wins = 0
+    round_started = False
+    ko_time = None
+    round_winner_msg = None
 
     try:
         while True:
@@ -230,68 +259,70 @@ def test_agent():
                 player=args.player
             )
 
-            # Check KO for infinite matchups
-            p1_hp = unnorm_obs[0, 0]
-            p2_hp = unnorm_obs[0, 1]
+            # Check KO for infinite matchups (exact RAM readings via step info with latest frame fallback)
+            latest_idx = (config.NUM_FRAMES - 1) * TOTAL_OBS_DIM
+            if isinstance(info, (list, tuple)) and len(info) > 0 and isinstance(info[0], dict) and "my_hp" in info[0]:
+                ai_hp = int(info[0]["my_hp"])
+                opp_hp = int(info[0]["enemy_hp"])
+            else:
+                ai_hp = int(round(float(unnorm_obs[0, latest_idx + 0])))
+                opp_hp = int(round(float(unnorm_obs[0, latest_idx + 1])))
 
-            if args.infinite_match and (p1_hp <= 0 or p2_hp <= 0):
-                ai_won = (args.player == 1 and p1_hp > 0) or (args.player == 2 and p2_hp > 0)
-                opp_won = (args.player == 1 and p2_hp > 0) or (args.player == 2 and p1_hp > 0)
-                if ai_won:
-                    ai_wins += 1
-                    winner_msg = f"🏆 AI ({model_name}) WINS!"
-                elif opp_won:
-                    opp_wins += 1
-                    winner_msg = f"🏆 Opponent ({opp_name}) WINS!"
-                else:
-                    winner_msg = "🤝 DOUBLE K.O. (Draw)!"
+            if args.infinite_match:
+                # Mark round as active once both fighters have positive health
+                if not round_started and ai_hp > 0 and opp_hp > 0:
+                    round_started = True
+                    ko_time = None
+                    round_winner_msg = None
 
-                print(f"\n{'='*50}", flush=True)
-                print(f"[ROUND {match_count} OVER] {winner_msg}", flush=True)
-                print(f"[SCOREBOARD] AI ({model_name}): {ai_wins} | Opponent ({opp_name}): {opp_wins}", flush=True)
-                print(f"[Rematch] Starting next round in {args.rematch_delay:.1f}s...", flush=True)
-                print(f"{'='*50}\n", flush=True)
+                # Detect KO once round is active
+                if round_started and (ai_hp <= 0 or opp_hp <= 0):
+                    if ko_time is None:
+                        ko_time = time.time()
+                        if ai_hp > 0 and opp_hp <= 0:
+                            ai_wins += 1
+                            round_winner_msg = f"[WINNER] AI ({model_name}) WINS!"
+                        elif opp_hp > 0 and ai_hp <= 0:
+                            opp_wins += 1
+                            round_winner_msg = f"[WINNER] Opponent ({opp_name}) WINS!"
+                        else:
+                            round_winner_msg = "[DRAW] DOUBLE K.O. (Draw)!"
 
-                # Advance neutral delay frames so the victory animation plays
-                delay_steps = max(1, int((args.rematch_delay * 60) / 4))
-                if args.env == "v3":
-                    neutral_act = np.array([[0, 0]], dtype=np.int64)
-                elif args.algo.lower() == "sac":
-                    neutral_act = np.array([np.zeros(config.ACTION_DIM, dtype=np.float32)])
-                elif args.algo.lower() == "dqn":
-                    neutral_act = np.array([0], dtype=np.int64)
-                else:
-                    neutral_act = np.zeros((1, config.ACTION_DIM), dtype=np.int8)
+                    # Check if rematch delay has elapsed before sending RESET
+                    if time.time() - ko_time >= args.rematch_delay:
+                        print(f"\n{'='*50}", flush=True)
+                        print(f"[ROUND {match_count} OVER] {round_winner_msg}", flush=True)
+                        print(f"[SCOREBOARD] AI ({model_name}): {ai_wins} | Opponent ({opp_name}): {opp_wins}", flush=True)
+                        print(f"[Rematch] Loading new round...", flush=True)
+                        print(f"{'='*50}\n", flush=True)
 
-                for _ in range(delay_steps):
-                    if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
-                        break
-                    obs, _, _, _ = env.step(neutral_act)
+                        # Select rematch state
+                        if args.opponent_type == "human":
+                            rematch_state_file = "RYU_RYU_R1_PvP.State"
+                        else:
+                            # Random CPU state
+                            cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
+                            rematch_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
 
-                # Select rematch state
-                if args.opponent_type == "human":
-                    rematch_state_file = "PLAYER_VS_PLAYER.State"
-                else:
-                    # Random CPU state
-                    cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
-                    rematch_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
+                        print(f"[Rematch] Loading state: {rematch_state_file}", flush=True)
+                        full_state_path = os.path.join(config.STATES_DIR, rematch_state_file)
+                        
+                        # Send RESET command directly via underlying base env
+                        base_env = env.envs[0]
+                        base_env.send_command(f"RESET {full_state_path}\n")
+                        reset_payload = base_env.receive_payload()
+                        observation = base_env._parse_payload(reset_payload, is_reset=True)
+                        base_env.frames.clear()
+                        for _ in range(config.NUM_FRAMES):
+                            base_env.frames.append(observation)
+                        obs_raw = base_env._get_obs()[np.newaxis, :]
+                        obs = env.normalize_obs(obs_raw, update=False)
 
-                print(f"[Rematch] Loading state: {rematch_state_file}", flush=True)
-                full_state_path = os.path.join(config.STATES_DIR, rematch_state_file)
-                
-                # Send RESET command directly via underlying base env
-                base_env = env.envs[0]
-                base_env.send_command(f"RESET {full_state_path}\n")
-                reset_payload = base_env.receive_payload()
-                observation = base_env._parse_payload(reset_payload, is_reset=True)
-                base_env.frames.clear()
-                for _ in range(config.NUM_FRAMES):
-                    base_env.frames.append(observation)
-                obs_raw = base_env._get_obs()[np.newaxis, :]
-                obs = env.normalize_obs(obs_raw, update=False)
-
-                match_count += 1
-                continue
+                        match_count += 1
+                        round_started = False
+                        ko_time = None
+                        round_winner_msg = None
+                        continue
             
     except KeyboardInterrupt:
         print("\nInteractive session ended by user.", flush=True)

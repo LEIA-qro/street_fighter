@@ -202,8 +202,11 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         terminated = bool(current_my_hp <= 0 or current_enemy_hp <= 0) if self.trainable else False
         truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
-        # Emit win/loss outcome in info so Monitor records it
-        info = {}
+        # Emit win/loss outcome and health in info
+        info = {
+            "my_hp": current_my_hp,
+            "enemy_hp": current_enemy_hp,
+        }
         if terminated or truncated:
             info["win"] = 1 if current_enemy_hp <= 0 and current_my_hp > 0 else 0
             if hasattr(self, "current_state_file"):

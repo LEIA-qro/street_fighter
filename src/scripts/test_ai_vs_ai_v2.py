@@ -1,6 +1,13 @@
-import os, sys, argparse
+import os, sys, argparse, time
 from typing import Any
 from collections import deque
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -156,6 +163,7 @@ def test_ai_vs_ai():
     parser.add_argument("--env_p2",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
+    parser.add_argument("--device_p2", type=str, default="auto")
     parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
     parser.add_argument("--infinite_match", action="store_true", help="Automatically reset and start rematches on KO")
     parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
@@ -301,7 +309,14 @@ def test_ai_vs_ai():
     print("Press Ctrl + C to end the session and close the emulator.")
 
     # ── 6. Cold-start: prime frame buffers on first payload ──
-    first_payload = master_env.receive_payload()
+    if args.infinite_match:
+        initial_state_path = os.path.join(config.STATES_DIR, "RYU_RYU_R1_PvP.State")
+        print(f"[Infinite Match] Cold-starting in active duel state: {initial_state_path}", flush=True)
+        master_env.send_command(f"RESET {initial_state_path}\n")
+        first_payload = master_env.receive_payload()
+    else:
+        first_payload = master_env.receive_payload()
+
     obs_p1_raw = parser_p1.parse(first_payload, is_reset=True)
     obs_p2_raw = parser_p2.parse(first_payload, is_reset=True)
     buf_p1.reset(obs_p1_raw)
@@ -313,11 +328,14 @@ def test_ai_vs_ai():
         import cProfile, pstats
         profiler = cProfile.Profile()
         profiler.enable()
-        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
+        print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.", flush=True)
 
     match_count = 1
     p1_wins = 0
     p2_wins = 0
+    round_started = False
+    ko_time = None
+    round_winner_msg = None
 
     try:
         while True:
@@ -330,50 +348,55 @@ def test_ai_vs_ai():
             stacked_p1 = buf_p1.push(obs_p1_raw)  # Updated by previous iteration
             stacked_p2 = buf_p2.push(obs_p2_raw)
 
-            # Check KO for infinite matchups
-            p1_hp = int(stacked_p1[0])
-            p2_hp = int(stacked_p1[1])
+            # Check KO for infinite matchups on current frame
+            latest_idx = (config.NUM_FRAMES - 1) * TOTAL_OBS_DIM
+            p1_hp = int(stacked_p1[latest_idx + 0])
+            p2_hp = int(stacked_p1[latest_idx + 1])
 
-            if args.infinite_match and (p1_hp <= 0 or p2_hp <= 0):
-                if p1_hp > 0 and p2_hp <= 0:
-                    p1_wins += 1
-                    winner_msg = f"🏆 {p1_name} (Player 1) WINS!"
-                elif p2_hp > 0 and p1_hp <= 0:
-                    p2_wins += 1
-                    winner_msg = f"🏆 {p2_name} (Player 2) WINS!"
-                else:
-                    winner_msg = "🤝 DOUBLE K.O. (Draw)!"
+            if args.infinite_match:
+                # Mark round as active once both fighters have positive health
+                if not round_started and p1_hp > 0 and p2_hp > 0:
+                    round_started = True
+                    ko_time = None
+                    round_winner_msg = None
 
-                print(f"\n{'='*50}", flush=True)
-                print(f"[ROUND {match_count} OVER] {winner_msg}", flush=True)
-                print(f"[SCOREBOARD] {p1_name}: {p1_wins} | {p2_name}: {p2_wins}", flush=True)
-                print(f"[Rematch] Starting next round in {args.rematch_delay:.1f}s...", flush=True)
-                print(f"{'='*50}\n", flush=True)
+                # Detect KO once round is active
+                if round_started and (p1_hp <= 0 or p2_hp <= 0):
+                    if ko_time is None:
+                        ko_time = time.time()
+                        if p1_hp > 0 and p2_hp <= 0:
+                            p1_wins += 1
+                            round_winner_msg = f"[WINNER] {p1_name} (Player 1) WINS!"
+                        elif p2_hp > 0 and p1_hp <= 0:
+                            p2_wins += 1
+                            round_winner_msg = f"[WINNER] {p2_name} (Player 2) WINS!"
+                        else:
+                            round_winner_msg = "[DRAW] DOUBLE K.O. (Draw)!"
 
-                # Advance neutral frames for delay duration so the victory animation plays
-                delay_steps = max(1, int((args.rematch_delay * 60) / 4))
-                neutral_cmd = "00000000000000000000\n"
-                for _ in range(delay_steps):
-                    if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
-                        break
-                    master_env.send_command(neutral_cmd)
-                    raw_delay = master_env.receive_payload()
-                    if not raw_delay:
-                        break
+                    # Check if rematch delay has elapsed before sending RESET
+                    if time.time() - ko_time >= args.rematch_delay:
+                        print(f"\n{'='*50}", flush=True)
+                        print(f"[ROUND {match_count} OVER] {round_winner_msg}", flush=True)
+                        print(f"[SCOREBOARD] {p1_name}: {p1_wins} | {p2_name}: {p2_wins}", flush=True)
+                        print(f"[Rematch] Loading new round...", flush=True)
+                        print(f"{'='*50}\n", flush=True)
 
-                # Trigger Lua RESET to PLAYER_VS_PLAYER.State
-                reset_state_path = os.path.join(config.STATES_DIR, "PLAYER_VS_PLAYER.State")
-                master_env.send_command(f"RESET {reset_state_path}\n")
+                        # Trigger Lua RESET to RYU_RYU_R1_PvP.State
+                        reset_state_path = os.path.join(config.STATES_DIR, "RYU_RYU_R1_PvP.State")
+                        master_env.send_command(f"RESET {reset_state_path}\n")
 
-                # Receive new post-reset state and re-prime buffers
-                reset_payload = master_env.receive_payload()
-                obs_p1_raw = parser_p1.parse(reset_payload, is_reset=True)
-                obs_p2_raw = parser_p2.parse(reset_payload, is_reset=True)
-                buf_p1.reset(obs_p1_raw)
-                buf_p2.reset(obs_p2_raw)
+                        # Receive new post-reset state and re-prime buffers
+                        reset_payload = master_env.receive_payload()
+                        obs_p1_raw = parser_p1.parse(reset_payload, is_reset=True)
+                        obs_p2_raw = parser_p2.parse(reset_payload, is_reset=True)
+                        buf_p1.reset(obs_p1_raw)
+                        buf_p2.reset(obs_p2_raw)
 
-                match_count += 1
-                continue
+                        match_count += 1
+                        round_started = False
+                        ko_time = None
+                        round_winner_msg = None
+                        continue
 
             # Normalize: SelectiveVecNormalize expects (n_envs, obs_dim)
             norm_p1 = vec_norm_p1.normalize_obs(stacked_p1[np.newaxis, :].copy(), update=False)

@@ -111,6 +111,7 @@ def stream_logs(cmd):
     try:
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
 
         state.active_process = subprocess.Popen(
             cmd, 
@@ -361,10 +362,11 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
     p2_is_ai = p2_algo in ai_algos
 
     if p1_is_ai or p2_is_ai:
-        # Initialize the agent state to PAUSE for interactive control
+        # Initialize the agent state: PLAY if infinite matchup, PAUSE for interactive menu navigation
         state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+        initial_mode = "PLAY" if infinite_match_enabled else "PAUSE"
         with open(state_file, "w") as f:
-            f.write("PAUSE")
+            f.write(initial_mode)
 
     if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
@@ -1427,6 +1429,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
             p1_algo.change(update_match_ui, inputs=[p1_algo], outputs=[p1_model_group, p1_zip, p1_pkl])
             p2_algo.change(update_match_ui, inputs=[p2_algo], outputs=[p2_model_group, p2_zip, p2_pkl])
+
+            def update_infinite_match_status(is_infinite):
+                if is_infinite:
+                    return "Agent State: **PLAYING** (Auto)"
+                return "Agent State: **PAUSED** (Default)"
+
+            infinite_match_checkbox.change(update_infinite_match_status, inputs=[infinite_match_checkbox], outputs=[agent_state_status])
 
             # Link matchup uploaders
             p1_zip_upload.upload(handle_model_upload, inputs=[p1_zip_upload, p1_algo, p1_env], outputs=[match_upload_status, p1_zip, p1_pkl])
