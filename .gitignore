@@ -13,7 +13,6 @@ src\agents\sac\__pycache__/
 src\scripts\__pycache__/
 
 /logs
-/models
 /old_logs
 /Old
 
@@ -44,3 +43,5 @@ GEMINI.md
 code_testing/test_telemetry_dashboard.py
 /docs
 code_testing/test_telemetry_dashboard.py
+/models/production
+/models/tuning
