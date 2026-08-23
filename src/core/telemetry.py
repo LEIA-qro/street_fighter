@@ -9,10 +9,44 @@ CHAR_NAMES = {
 }
 
 ACTION_NAMES = {
-    0: "Idle", 1: "Crouch", 2: "Walk Right", 3: "Walk Left", 4: "Jump Neutral",
-    5: "Jump Forward", 6: "Jump Backward", 8: "Light Punch", 12: "Crouch Punch",
-    16: "Med Punch", 24: "Hard Punch", 32: "Light Kick", 40: "Crouch Kick",
-    48: "Fireball (Hadouken)", 56: "Dragon Punch (Shoryuken)", 64: "Hurricane Kick (Tatsumaki)"
+    0: "Idle / Neutral",
+    1: "Crouch",
+    2: "Walk",
+    3: "Walk Backward / Block",
+    4: "Jump Neutral",
+    5: "Jump Forward",
+    6: "Jump Backward",
+    7: "Crouch Light Punch",
+    8: "Standing Light Punch",
+    9: "Standing Med Punch",
+    10: "Standing Hard Punch",
+    11: "Crouch Med Punch",
+    12: "Crouch Hard Punch",
+    14: "Jump Light Punch",
+    15: "Standing Light Kick",
+    16: "Standing Med Kick",
+    17: "Standing Hard Kick",
+    18: "Standing Close Hard Kick",
+    19: "Standing Roundhouse Kick",
+    24: "Crouch Hard Kick (Sweep)",
+    25: "Jump Hard Kick",
+    26: "Jump Diagonal Hard Kick",
+    27: "Jump Light Kick",
+    30: "Jump Forward Hard Kick",
+    32: "Light Kick",
+    36: "Standing Fierce Punch",
+    40: "Crouch Kick",
+    46: "Jump Fierce Punch",
+    47: "Fireball (Startup)",
+    48: "Fireball (Hadouken)",
+    56: "Dragon Punch (Shoryuken)",
+    64: "Hurricane Kick (Tatsumaki)",
+    70: "Hitstun (Light)",
+    72: "Hitstun (Heavy)",
+    74: "Blockstun",
+    80: "Knockdown / Fall",
+    82: "Knocked Down (Grounded)",
+    84: "Wakeup / Getup",
 }
 
 _write_step_counter = 0
@@ -160,7 +194,12 @@ def write_telemetry(
 
     try:
         with open(temp_path, "w") as f:
-            json.dump(payload, f, indent=4)
+            json.dump(payload, f, indent=2)
         os.replace(temp_path, target_path)
-    except OSError:
-        pass
+    except (OSError, PermissionError):
+        # File currently locked by Gradio dashboard reader on Windows
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass

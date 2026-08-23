@@ -11,7 +11,18 @@ from stable_baselines3.common.monitor import Monitor
 from core import config
 from core.selective_norm import SelectiveVecNormalize
 from agents.manual_curriculum_callback import ManualCurriculumCallback
-from core.env_tools import failsafe_env, SFv2_make_env
+from core.env_tools import failsafe_env, SFv2_make_env, prevent_sleep
+
+# Register SIGBREAK handler on Windows to catch CTRL_BREAK as KeyboardInterrupt
+import signal
+def _sigbreak_handler(sig, frame):
+    raise KeyboardInterrupt
+
+if hasattr(signal, "SIGBREAK"):
+    try:
+        signal.signal(signal.SIGBREAK, _sigbreak_handler)
+    except Exception:
+        pass
 
 directories = config.get_directory()
 
@@ -28,6 +39,7 @@ def resume_training(model_path, vec_path,
       {"success": True,  "reason": "interrupted"}
       {"success": False, "reason": "crash"}
     """
+    prevent_sleep()
     if callback_class is None:
         callback_class = ManualCurriculumCallback
     
@@ -182,8 +194,15 @@ def resume_training(model_path, vec_path,
         )
         
         # Save Final Grandmaster (Dynamic Final Save)
-        winrate_pct = int(round(callback._win_rate() * 100))
-        state_tag = callback.state_name if callback.state_name is not None else f"phase{callback.current_phase}"
+        win_rate_val = callback._win_rate() if hasattr(callback, "_win_rate") else 0.0
+        winrate_pct = int(round(win_rate_val * 100))
+        if hasattr(callback, "current_level"):
+            state_tag = callback.state_name if callback.state_name is not None else f"lvl{callback.current_level}"
+            if len(getattr(callback, "introduced_states", [])) > 0 and callback.state_name is None:
+                state_tag = f"lvl{callback.current_level}_plus{len(callback.introduced_states)}"
+        else:
+            state_tag = callback.state_name if callback.state_name is not None else f"phase{getattr(callback, 'current_phase', 0)}"
+        
         final_base = f"{algo_part}_{env_part}_{config.MODEL_NAME}_{state_tag}_final_WR{winrate_pct}pct_{callback.num_timesteps}steps"
         
         model.save(os.path.join(directories["production"], final_base))
@@ -201,6 +220,11 @@ def resume_training(model_path, vec_path,
         print(f"\n[CRITICAL ERROR] Training crashed: {e}")
         if model is not None: model.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE"))
         if env is not None: env.save(os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl"))
+        if 'callback' in locals():
+            if hasattr(callback, "_save_curriculum_state"):
+                callback._save_curriculum_state(force=True)
+            elif hasattr(callback, "_save_phase_state"):
+                callback._save_phase_state()
         return {"success": False, "reason": "crash"}
 
         

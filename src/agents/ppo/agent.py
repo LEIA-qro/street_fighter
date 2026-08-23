@@ -175,8 +175,15 @@ class PPOAgent(BaseAgent):
             )
             
             # Dynamic Final Save
-            winrate_pct = int(round(callback._win_rate() * 100))
-            state_tag = callback.state_name if callback.state_name is not None else f"phase{callback.current_phase}"
+            win_rate_val = callback._win_rate() if hasattr(callback, "_win_rate") else 0.0
+            winrate_pct = int(round(win_rate_val * 100))
+            if hasattr(callback, "current_level"):
+                state_tag = callback.state_name if callback.state_name is not None else f"lvl{callback.current_level}"
+                if len(getattr(callback, "introduced_states", [])) > 0 and callback.state_name is None:
+                    state_tag = f"lvl{callback.current_level}_plus{len(callback.introduced_states)}"
+            else:
+                state_tag = callback.state_name if callback.state_name is not None else f"phase{getattr(callback, 'current_phase', 0)}"
+            
             final_base = f"{algo_part}_{env_part}_{config.MODEL_NAME}_{state_tag}_final_WR{winrate_pct}pct_{callback.num_timesteps}steps"
             
             model.save(os.path.join(save_dir, final_base))
@@ -185,9 +192,20 @@ class PPOAgent(BaseAgent):
             print(f"\nProduction Training Complete! Saved final model as: {final_base}")
             
         except KeyboardInterrupt:
-            print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user.")
-            if model is not None: model.save(os.path.join(save_dir, config.MODEL_NAME + "_EMERGENCY"))
-            if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl"))
+            print("\n[MANUAL OVERRIDE] Training forcefully interrupted by user. Saving Emergency Checkpoint...")
+            if model is not None:
+                emergency_base = os.path.join(save_dir, config.MODEL_NAME + "_EMERGENCY")
+                model.save(emergency_base)
+                print(f"[MANUAL OVERRIDE] Saved model weights -> {emergency_base}.zip")
+            if env is not None and hasattr(env, "save"):
+                vec_emergency = os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_EMERGENCY.pkl")
+                env.save(vec_emergency)
+                print(f"[MANUAL OVERRIDE] Saved normalizer stats -> {vec_emergency}")
+            if 'callback' in locals():
+                if hasattr(callback, "_save_curriculum_state"):
+                    callback._save_curriculum_state(force=True)
+                elif hasattr(callback, "_save_phase_state"):
+                    callback._save_phase_state()
             raise
 
         except Exception as e:
@@ -196,7 +214,11 @@ class PPOAgent(BaseAgent):
                 model.save(os.path.join(save_dir, config.MODEL_NAME + "_CRASH_SAVE"))
                 time.sleep(2) # Buffer for OS to finish disk write
             if env is not None and hasattr(env, "save"): env.save(os.path.join(save_dir, config.MODEL_NAME + "_vecnormalize_CRASH_SAVE.pkl"))
-            if 'callback' in locals(): callback._save_phase_state()
+            if 'callback' in locals():
+                if hasattr(callback, "_save_curriculum_state"):
+                    callback._save_curriculum_state(force=True)
+                elif hasattr(callback, "_save_phase_state"):
+                    callback._save_phase_state()
             raise e
 
         finally:

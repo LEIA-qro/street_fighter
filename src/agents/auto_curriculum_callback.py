@@ -16,7 +16,7 @@ import numpy as np
 from collections import deque
 from typing import Dict, List, Any, Set, Tuple
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.utils import get_schedule
+from stable_baselines3.common.utils import ConstantSchedule, get_schedule_fn
 
 import core.config as config
 
@@ -79,6 +79,25 @@ class AutoCurriculumCallback(BaseCallback):
 
         # Self-restore previous training state if resuming/restarting
         self._load_and_restore_state()
+
+    @property
+    def current_phase(self) -> int:
+        """Compatibility property for callers expecting manual phase indexing (maps to current_level)."""
+        return self.current_level
+
+    def _win_rate(self) -> float:
+        """Calculate and return the current global rolling win rate across all active state buffers."""
+        global_wins = 0
+        global_episodes = 0
+        for state, buf in self.state_win_buffers.items():
+            if isinstance(buf, deque) and not state.startswith("best_"):
+                global_wins += sum(buf)
+                global_episodes += len(buf)
+        return (global_wins / global_episodes) if global_episodes > 0 else 0.0
+
+    def _save_phase_state(self) -> None:
+        """Alias for _save_curriculum_state to guarantee interface compatibility with ManualCurriculumCallback."""
+        self._save_curriculum_state(force=True)
 
     def _get_base_filename(self, metric_tag: str) -> str:
         """Construct the dynamic base filename: {algo}_{env}_{customName}_{state}_{metricTag}_{steps}"""
@@ -250,7 +269,9 @@ class AutoCurriculumCallback(BaseCallback):
         # 1. Learning Rate
         if "lr" in params:
             lr = params["lr"]
-            self.model.learning_rate = get_schedule(lr)
+            self.model.learning_rate = (
+                ConstantSchedule(float(lr)) if isinstance(lr, (int, float)) else get_schedule_fn(lr)
+            )
             for pg in self.model.policy.optimizer.param_groups:
                 pg["lr"] = lr
 
@@ -261,7 +282,9 @@ class AutoCurriculumCallback(BaseCallback):
         # 3. Clip Range (PPO)
         if "clip" in params and hasattr(self.model, "clip_range"):
             clip = params["clip"]
-            self.model.clip_range = get_schedule(clip)
+            self.model.clip_range = (
+                ConstantSchedule(float(clip)) if isinstance(clip, (int, float)) else get_schedule_fn(clip)
+            )
 
         # 4. Tau (SAC)
         if "tau" in params and hasattr(self.model, "tau"):
@@ -361,6 +384,15 @@ class AutoCurriculumCallback(BaseCallback):
             generic_path = os.path.join(save_path, "auto_curriculum_state.json")
             if os.path.exists(generic_path):
                 path = generic_path
+            elif os.path.isdir(save_path):
+                # Discover any existing curriculum state file in the save directory
+                candidates = [
+                    os.path.join(save_path, f)
+                    for f in os.listdir(save_path)
+                    if f.startswith("auto_curriculum_state") and f.endswith(".json")
+                ]
+                if candidates:
+                    path = candidates[0]
 
         if os.path.exists(path):
             with open(path, "r") as f:
@@ -495,8 +527,7 @@ class AutoCurriculumCallback(BaseCallback):
         # Check for graceful file-based stop signal
         stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
         if os.path.exists(stop_file):
-            if self.verbose:
-                print("\n[AutoCurriculum] Graceful file-based stop signal detected!")
+            print("\n[AutoCurriculum] Graceful stop signal detected! Triggering Emergency Checkpoint save...")
             try:
                 os.remove(stop_file)
             except Exception:

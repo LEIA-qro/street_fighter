@@ -1,4 +1,4 @@
-import os, sys, argparse
+import os, sys, argparse, random
 from typing import Any
 import numpy as np
 
@@ -14,6 +14,16 @@ from envs.sf2_v2 import StreetFighterEnvV2
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from core.telemetry import write_telemetry, clean_telemetry
+
+import signal
+def _sigbreak_handler(sig, frame):
+    raise KeyboardInterrupt
+
+if hasattr(signal, "SIGBREAK"):
+    try:
+        signal.signal(signal.SIGBREAK, _sigbreak_handler)
+    except Exception:
+        pass
 
 def get_model_class(algo_name):
     if algo_name.lower() == "sac":
@@ -43,6 +53,8 @@ def test_agent():
     parser.add_argument("--opponent_type", type=str, choices=["human", "cpu"], default="human")
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
+    parser.add_argument("--infinite_match", action="store_true", help="Automatically reset and start rematches on KO")
+    parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
     args = parser.parse_args()
 
     # Auto-detect algorithm override based on path to prevent mismatch errors
@@ -165,11 +177,15 @@ def test_agent():
         profiler.enable()
         print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
 
+    match_count = 1
+    ai_wins = 0
+    opp_wins = 0
+
     try:
         while True:
             # Check for graceful stop signal from Dashboard
             if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
-                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...")
+                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...", flush=True)
                 break
 
             action, _states = model.predict(obs, deterministic=False) 
@@ -213,9 +229,72 @@ def test_agent():
                 obs=unnorm_obs,
                 player=args.player
             )
+
+            # Check KO for infinite matchups
+            p1_hp = unnorm_obs[0, 0]
+            p2_hp = unnorm_obs[0, 1]
+
+            if args.infinite_match and (p1_hp <= 0 or p2_hp <= 0):
+                ai_won = (args.player == 1 and p1_hp > 0) or (args.player == 2 and p2_hp > 0)
+                opp_won = (args.player == 1 and p2_hp > 0) or (args.player == 2 and p1_hp > 0)
+                if ai_won:
+                    ai_wins += 1
+                    winner_msg = f"🏆 AI ({model_name}) WINS!"
+                elif opp_won:
+                    opp_wins += 1
+                    winner_msg = f"🏆 Opponent ({opp_name}) WINS!"
+                else:
+                    winner_msg = "🤝 DOUBLE K.O. (Draw)!"
+
+                print(f"\n{'='*50}", flush=True)
+                print(f"[ROUND {match_count} OVER] {winner_msg}", flush=True)
+                print(f"[SCOREBOARD] AI ({model_name}): {ai_wins} | Opponent ({opp_name}): {opp_wins}", flush=True)
+                print(f"[Rematch] Starting next round in {args.rematch_delay:.1f}s...", flush=True)
+                print(f"{'='*50}\n", flush=True)
+
+                # Advance neutral delay frames so the victory animation plays
+                delay_steps = max(1, int((args.rematch_delay * 60) / 4))
+                if args.env == "v3":
+                    neutral_act = np.array([[0, 0]], dtype=np.int64)
+                elif args.algo.lower() == "sac":
+                    neutral_act = np.array([np.zeros(config.ACTION_DIM, dtype=np.float32)])
+                elif args.algo.lower() == "dqn":
+                    neutral_act = np.array([0], dtype=np.int64)
+                else:
+                    neutral_act = np.zeros((1, config.ACTION_DIM), dtype=np.int8)
+
+                for _ in range(delay_steps):
+                    if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
+                        break
+                    obs, _, _, _ = env.step(neutral_act)
+
+                # Select rematch state
+                if args.opponent_type == "human":
+                    rematch_state_file = "PLAYER_VS_PLAYER.State"
+                else:
+                    # Random CPU state
+                    cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
+                    rematch_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
+
+                print(f"[Rematch] Loading state: {rematch_state_file}", flush=True)
+                full_state_path = os.path.join(config.STATES_DIR, rematch_state_file)
+                
+                # Send RESET command directly via underlying base env
+                base_env = env.envs[0]
+                base_env.send_command(f"RESET {full_state_path}\n")
+                reset_payload = base_env.receive_payload()
+                observation = base_env._parse_payload(reset_payload, is_reset=True)
+                base_env.frames.clear()
+                for _ in range(config.NUM_FRAMES):
+                    base_env.frames.append(observation)
+                obs_raw = base_env._get_obs()[np.newaxis, :]
+                obs = env.normalize_obs(obs_raw, update=False)
+
+                match_count += 1
+                continue
             
     except KeyboardInterrupt:
-        print("\nInteractive session ended by user.")
+        print("\nInteractive session ended by user.", flush=True)
     finally:
         clean_telemetry()
         if profiler:

@@ -34,7 +34,7 @@ TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "traini
 MATCH_TEST_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "match_test_env_client.lua")
 INPUT_DISPLAY_LUA_PATH = os.path.join(LUA_DIR, "Input_Display.lua")
 ENABLE_INPUT_DISPLAY = True
-ACTIVATE_VISUALIZATION = True
+ACTIVATE_VISUALIZATION = False
 ENABLE_THROTTLING = False
 THROTTLE_SPEED = 250
 
@@ -111,7 +111,7 @@ TESTING_ZIP_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_BEST_WI
 TESTING_PKL_FILE_P2 = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnorm_BEST_WINRATE.pkl"
 
 # Model Training Config
-MODEL_NAME = "autocurrTest21" # PPO_MC_sf2_ryu_specialistV2_1_1
+MODEL_NAME = "autocurrTest27" # PPO_MC_sf2_ryu_specialistV2_1_1
 TRAINING_ZIP_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_EMERGENCY.zip"
 TRAINING_PKL_FILE = "models/production/PPO_MC_sf2_ryu_specialistV2_1_1_vecnormalize_EMERGENCY.pkl"
 
@@ -127,7 +127,7 @@ RESUME_PRODUCTION_TIMESTEPS = 6_000_000 # For resume production
 SAVE_FREQ_STEPS = 1_000_000
 
 # Number of parallel BizHawk instances for Optuna trials
-N_ENVS = 10
+N_ENVS = 16
 
 
 # ===========================================================

@@ -3,10 +3,22 @@ from pathlib import Path
 import sys; sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from core import config
-from core.env_tools import SFv2_make_env, failsafe_env
+from core.env_tools import SFv2_make_env, failsafe_env, prevent_sleep
+
+# Register SIGBREAK handler on Windows to catch CTRL_BREAK as KeyboardInterrupt
+import signal
+def _sigbreak_handler(sig, frame):
+    raise KeyboardInterrupt
+
+if hasattr(signal, "SIGBREAK"):
+    try:
+        signal.signal(signal.SIGBREAK, _sigbreak_handler)
+    except Exception:
+        pass
 
 def main():
     config.generate_lua_config()
+    prevent_sleep()
 
     # GPU Verification
     import torch

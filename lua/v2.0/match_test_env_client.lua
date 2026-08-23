@@ -132,6 +132,7 @@ while true do
     is_running = check_state()
 
     if not is_running then
+        gui.clearGraphics()
         draw_inputs()
         draw_model_labels()
         emu.frameadvance()
@@ -186,7 +187,7 @@ while true do
         -- Strict Spinlock: Wait for Python's response before advancing
         local response = ""
         local wait_start_time = os.time() -- Record the exact time we started waiting
-        local TIMEOUT_LIMIT = 30 -- Maximum seconds to wait before assuming Python is dead
+        local TIMEOUT_LIMIT = 120 -- Generous 120s limit for interactive menu navigation / profiling
         
         while response == "" or response == nil do
             response = comm.socketServerResponse()
@@ -212,6 +213,12 @@ while true do
         -- Remove the newline character for clean processing
         response = string.gsub(response, "\n", "")
 
+        -- Extract the actual payload by stripping the '{len} ' prefix sent by Python
+        local payload_str = string.match(response, "^%d+%s+(.*)$")
+        if payload_str then
+            response = payload_str
+        end
+
         -- Check for special RESET command from Python
         if response == "EXIT" then
             console.log("Received EXIT command. Restoring defaults and shutting down...")
@@ -229,7 +236,9 @@ while true do
             savestate.load(state_file_path)
             
             -- Skip input injection and frame advance, yield control to the newly loaded state
+            gui.clearGraphics()
             draw_inputs()
+            draw_model_labels()
             emu.frameadvance() 
         else
             -- Normal Step: Inject Inputs via 20-Bit Protocol
@@ -278,6 +287,7 @@ while true do
             for i = 1, FRAME_SKIP do
                 if p1_controlled then joypad.set(p1_input, 1) end
                 if p2_controlled then joypad.set(p2_input, 2) end
+                gui.clearGraphics()
                 draw_inputs()
                 draw_model_labels()
                 emu.frameadvance()
@@ -291,6 +301,12 @@ while true do
             end
         end
         
+        -- Periodic memory and console buffer cleanup
+        if step_count % 5000 == 0 then
+            console.clear()
+            collectgarbage("collect")
+        end
+
         -- Advance exactly one frame
         step_count = step_count + 1
     end

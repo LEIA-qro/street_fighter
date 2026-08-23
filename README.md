@@ -9,6 +9,51 @@ A production-grade, highly optimized Reinforcement Learning (RL) pipeline for *S
 
 ---
 
+
+## Prerequisites & Installation
+
+This project is built to run natively on **Windows 10/11** using [**BizHawk 2.8**](https://tasvideos.org/Bizhawk/PreviousReleaseHistory).
+
+### 1. System Requirements & Emulators
+*   **Python:** Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/) alternatively it should work in any Python 3.10+ version. 
+*   **BizHawk Emulator:** Download [BizHawk 2.8](https://github.com/TASEmulators/BizHawk/releases/tag/2.8). Extract the emulator to your local filesystem.
+*   **ROM File:** Obtain *Street Fighter II' - Special Champion Edition (USA)* in Genesis ROM format (`.md` or `.bin`). Name the file precisely `Street Fighter II' - Special Champion Edition (USA).md` and place it in the `roms/` directory.
+
+### 2. Isolated Workspace Setup
+For optimal organization, **clone or move this `street_fighter` project directory inside your main BizHawk folder**. This allows the scripts to dynamically map relative directories safely.
+
+### 3. Virtual Environment (venv) Setup
+Initialize the isolated environment from the `street_fighter/` root directory:
+
+```powershell
+# Create the environment
+python -m venv .venv
+
+# Activate the environment
+.venv\Scripts\Activate.ps1
+```
+
+Confirm that your terminal prompt is now prefixed with `(.venv)`.
+
+### 4. Dependency Installation
+Install all production requirements directly:
+
+```powershell
+pip install -r requirements.txt
+```
+
+**You will also need** [**pytorch**](https://pytorch.org/get-started/locally/), search what version you need, it depends of your operating system and hardware.
+
+
+Verify GPU availability for PyTorch training:
+
+```powershell
+python verify_gpu.py
+```
+
+
+---
+
 ## System Architecture Overview
 
 The core innovation is a synchronized, lock-step communication bridge. Instead of relying on fragile hooks or multi-threaded timing, the system utilizes a strict **1-send / 1-receive** communication cycle.
@@ -16,7 +61,7 @@ The core innovation is a synchronized, lock-step communication bridge. Instead o
 ```
 ┌────────────────────────────────┐                 ┌───────────────────────────────┐
 │     BizHawk Emulator (Lua)     │                 │     Python RL Server (SB3)    │
-│  1. Read big-endian WRAM data  │                 │  1. Receive observation vector │
+│  1. Read big-endian WRAM data  │                 │  1. Receive observation vector│
 │  2. Send structured string     ├─[ TCP Socket ]─>│  2. Compute policy action     │
 │  3. Spinlock / Block execution │                 │  3. Format & send input keys  │
 │  4. Read socket & inject keys  │<─[ TCP Socket ]─┤  4. Rollout updates / SGD     │
@@ -74,7 +119,7 @@ street_fighter/
 
 ## 🖥️ Gradio Web Control Center
 
-The project features a premium, centralized control dashboard built on Gradio. This web interface consolidates training execution, real-time logging, hyperparameter overrides, curriculum monitoring, matchup testing, and model uploads into a unified, visual application.
+The project features a centralized control dashboard built on Gradio. This web interface consolidates training execution, real-time logging, hyperparameter overrides, curriculum monitoring, matchup testing, and model uploads into a unified, visual application.
 
 ### Launching the Dashboard
 
@@ -99,92 +144,39 @@ The server will initialize on **`http://127.0.0.1:7860`**. Open this URL in any 
 
 ---
 
-## Prerequisites & Installation
-
-This project is built to run natively on **Windows 10/11** using **BizHawk 2.8**.
-
-### 1. System Requirements & Emulators
-*   **Python:** Install [Python 3.13.12](https://www.python.org/downloads/release/python-31312/).
-*   **BizHawk Emulator:** Download [BizHawk 2.8](https://github.com/TASEmulators/BizHawk/releases/tag/2.8). Extract the emulator to your local filesystem.
-*   **ROM File:** Obtain *Street Fighter II' - Special Champion Edition (USA)* in Genesis ROM format (`.md` or `.bin`). Name the file precisely `Street Fighter II' - Special Champion Edition (USA).md` and place it in the `roms/` directory.
-
-### 2. Isolated Workspace Setup
-For optimal organization, **clone or move this `street_fighter` project directory inside your main BizHawk folder**. This allows the scripts to dynamically map relative directories safely.
-
-### 3. Virtual Environment (venv) Setup
-Initialize the isolated environment from the `street_fighter/` root directory:
-
-```powershell
-# Create the environment
-python -m venv .venv
-
-# Activate the environment
-.venv\Scripts\Activate.ps1
-```
-
-Confirm that your terminal prompt is now prefixed with `(.venv)`.
-
-### 4. Dependency Installation
-Install all production requirements directly:
-
-```powershell
-pip install stable_baselines3 gymnasium torch optuna numpy pandas tensorboard gradio
-```
-
-Verify GPU availability for PyTorch training:
-
-```powershell
-python verify_gpu.py
-```
-
----
-
 ## Developer CLI Guide
 
-For scripting, automation, or remote environments, all systems can be operated directly through terminal commands.
+For headless execution, automation, remote servers, or cluster scripts, all pipeline components can be run directly from the command line.
 
-### 1. Launch Training from Scratch
-To start a new Ryu training specialist using standard hyperparameter configurations:
+> [!TIP]
+> For the complete parameter reference, advanced flags, and detailed instructions for all training modes (Single Agent, Supervised Crash-Recovery, Optuna Tuning, Self-Play League, Adversarial Exploiters, Population-Based Training, and Matchup Testing), see the **[Developer CLI Guide](doc/DEVELOPER_CLI_GUIDE.md)**.
 
-```powershell
-python src/scripts/train.py --algo ppo --model_name ryu_specialist --timesteps 10000000 --device cuda
-```
-
-Add `--auto_curriculum` to enable the dynamic rehearsal lottery and gating callback:
+### Quick Command Reference
 
 ```powershell
-python src/scripts/train.py --algo ppo --model_name ryu_specialist --timesteps 10000000 --device cuda --auto_curriculum
-```
+# 1. Single Agent Training (with Auto-Curriculum)
+python src/scripts/train.py --algo ppo --env v2 --steps 10000000 --device cuda --auto_curriculum
 
-### 2. Resume Previous Training Run
-Resume training a saved model, safely picking up checkpoints, normalization parameters, and the active curriculum phase:
+# 2. Automated Crash-Recovery Supervisor
+python src/scripts/resume.py
 
-```powershell
-python src/scripts/resume.py --algo ppo --model_name ryu_specialist --device cuda --auto_curriculum
-```
+# 3. Hyperparameter Optimization via Optuna
+python src/scripts/tune.py --algo ppo --env v2 --trials 50 --timesteps 500000 --device cuda
 
-### 3. Hyperparameter Tuning via Optuna
-Run parallel Optuna trials across 12 EmuHawk instances to find the mathematically optimal policy parameters:
+# 4. Interactive Matchup Testing (vs CPU or Human)
+python src/scripts/test_agent_v2.py --algo ppo --env v2 --load_zip models/production/v2/ppo/ppo_model.zip --load_pkl models/production/v2/ppo/ppo_model_vecnorm.pkl --player 1 --opponent_type cpu --device cuda
 
-```powershell
-python src/scripts/tune.py --algo ppo --timesteps 500000 --trials 50 --device cuda
-```
+# 5. AI vs AI Dual Model Battle
+python src/scripts/test_ai_vs_ai_v2.py --algo_p1 ppo --load_zip_p1 models/production/v2/ppo/p1.zip --load_pkl_p1 models/production/v2/ppo/p1_vecnorm.pkl --algo_p2 dqn --load_zip_p2 models/production/v2/dqn/p2.zip --load_pkl_p2 models/production/v2/dqn/p2_vecnorm.pkl --device_p1 cuda --device_p2 cuda
 
-### 4. Interactive Matchup Testing
-Launch a model in interactive mode to test its capabilities against CPU opponents, run profiling, or play against it yourself:
+# 6. Self-Play League Training
+python src/scripts/train_league.py --env_version v2 --steps 5000000 --matchup_mode ryu_vs_ryu --device cuda
 
-```powershell
-python src/scripts/test_agent_v2.py --algo ppo --load_zip models/production/v3/ppo/ppo_model.zip --load_pkl models/production/v3/ppo/ppo_model_vecnorm.pkl --player 1 --opponent_type cpu --device cuda
-```
-*Options:*
-*   `--player 1` or `2`: Assigns the agent's controller side.
-*   `--opponent_type`: `cpu` (runs the emulator's campaign AI) or `human` (binds keys to Player 2 inputs).
+# 7. Adversarial Exploiter Training
+python src/scripts/train_exploiter.py --type rusher --env_version v2 --steps 1000000 --device cuda
 
-### 5. AI vs AI Matchup Battles
-Load two separate models to fight against each other to evaluate policy strengths, exploit weaknesses, or test versions:
-
-```powershell
-python src/scripts/test_ai_vs_ai_v2.py --p1_algo ppo --p1_zip models/production/v3/ppo/p1.zip --p2_algo ppo --p2_zip models/production/v3/ppo/p2.zip --device cuda
+# 8. Population-Based Training (PB2)
+python src/scripts/train_pbt.py --algo ppo --env v2 --population 10 --steps 5000000
 ```
 
 ---

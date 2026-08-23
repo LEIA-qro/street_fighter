@@ -68,16 +68,17 @@ class SelectiveVecNormalize(VecEnvWrapper):
         if update:
             self._update_stats(obs)
         std = np.sqrt(self.running_var + 1e-8)
+        norm_obs = obs.copy()
         
         for i in range(self.n_frames):
             start = i * self.total_dim_per_frame
-            cont  = obs[:, start : start + self.n_cont].astype(np.float64)
+            cont  = norm_obs[:, start : start + self.n_cont].astype(np.float64)
             normalized = (cont - self.running_mean) / std
-            obs[:, start : start + self.n_cont] = np.clip(
+            norm_obs[:, start : start + self.n_cont] = np.clip(
                 normalized, -self.clip, self.clip
             ).astype(np.float32)
             
-        return obs
+        return norm_obs
 
     def unnormalize_obs(self, obs: np.ndarray) -> np.ndarray:
         """Reverse observation normalization for the continuous features."""

@@ -94,18 +94,24 @@ def get_all_state_files():
     return ["None"] + names
 
 def stream_logs(cmd):
-    """Executes a command and yields output for Gradio."""
+    """Executes a command and yields output live for Gradio with unbuffered I/O."""
     if state.active_process:
         yield "Error: A process is already running!"
         return
 
     state.stop_event.clear()
+
+    # Ensure -u unbuffered flag is present if python command
+    if len(cmd) > 0 and "python" in os.path.basename(cmd[0]).lower() and "-u" not in cmd:
+        cmd = [cmd[0], "-u"] + cmd[1:]
+
     full_output = f"Executing: {' '.join(cmd)}\n{'-'*50}\n"
     yield full_output
 
     try:
-        # 1. Use CREATE_NEW_PROCESS_GROUP to allow sending CTRL_C_EVENT on Windows
-        # 2. shell=False is required to send signals directly to the process
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+
         state.active_process = subprocess.Popen(
             cmd, 
             stdout=subprocess.PIPE, 
@@ -113,14 +119,14 @@ def stream_logs(cmd):
             text=True, 
             bufsize=1, 
             shell=False,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            env=env
         )
         
-        # Local reference to prevent NoneType race condition during stop
         proc = state.active_process
         
-        for line in proc.stdout:
-            if state.stop_event.is_set():
+        for line in iter(proc.stdout.readline, ''):
+            if not line:
                 break
             full_output += line
             yield full_output
@@ -136,69 +142,123 @@ def stream_logs(cmd):
     finally:
         state.active_process = None
 
-def stop_active_process():
-    """Gracefully stops the active process by writing a stop trigger file and sending CTRL_BREAK, allowing a model save."""
-    if state.active_process:
-        proc = state.active_process
-        state.stop_event.set()
+def graceful_stop_process():
+    """Gracefully stops the active process by writing .stop_training and waiting for emergency model save."""
+    if not state.active_process:
+        from core.env_tools import failsafe_env
+        threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
+        return "No active process was running. Cleaned up any lingering emulator instances."
         
-        # 1. Write the file-based stop trigger to the project root
-        stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
-        try:
-            with open(stop_file, "w") as f:
-                f.write("STOP")
-            print(f"[Dashboard] Graceful stop file written to {stop_file}")
-        except Exception as e:
-            print(f"[Dashboard] Error writing stop trigger file: {e}")
+    proc = state.active_process
+    state.stop_event.set()
+    
+    # 1. Write the file-based stop trigger to the project root
+    stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
+    try:
+        with open(stop_file, "w") as f:
+            f.write("STOP")
+        print(f"[Dashboard] Graceful stop signal written to {stop_file}")
+    except Exception as e:
+        print(f"[Dashboard] Error writing stop trigger file: {e}")
 
-        # 2. Send CTRL_BREAK_EVENT as a backup signal (highly robust on Windows for process groups)
-        try:
-            print(f"[Dashboard] Sending backup Graceful Stop (CTRL_BREAK) to PID {proc.pid}...")
-            os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
-        except Exception as e:
-            print(f"[Dashboard] Signal error (ignored): {e}")
-            
-        # 3. Wait up to 15 seconds for the agent to finish its EMERGENCY save logic
-        for _ in range(15):
-            if proc.poll() is not None:
-                break
-            time.sleep(1)
-        
-        # Clean up the stop file if it wasn't already consumed by the callback
-        if os.path.exists(stop_file):
+    # 2. Poll and wait up to 30 seconds for the training process to consume the file and save _EMERGENCY.zip
+    emergency_saved = False
+    for elapsed in range(30):
+        if proc.poll() is not None:
+            break
+        # After 5 seconds, if the process is blocked on a long socket wait, send backup CTRL_BREAK
+        if elapsed == 5 and proc.poll() is None:
             try:
-                os.remove(stop_file)
-            except Exception:
-                pass
-            
-        # 4. Final Tree-Kill Failsafe: Ensure BizHawk and Lua are definitely dead
-        if proc.poll() is None:
-            print(f"[Dashboard] Process {proc.pid} timed out during stop. Force killing...")
-            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
-        else:
-            print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
-            
-        state.active_process = None
-        
-        # Trigger project process sniper to catch any orphaned EmuHawk.exe grandchildren
+                print(f"[Dashboard] Sending backup Graceful Stop signal (CTRL_BREAK) to PID {proc.pid}...")
+                os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
+            except Exception as e:
+                print(f"[Dashboard] Backup signal note: {e}")
+        time.sleep(1)
+    
+    # Clean up the stop file if still present
+    if os.path.exists(stop_file):
         try:
-            from core.env_tools import failsafe_env
-            failsafe_env(ignore_gate=True)
+            os.remove(stop_file)
         except Exception:
             pass
-            
-        # Determine process type from args to customize termination message
-        cmd_str = " ".join(proc.args) if hasattr(proc, "args") and proc.args else ""
-        is_match = "test_agent" in cmd_str or "test_ai_vs_ai" in cmd_str
-            
-        if is_match:
-            return "🛑 Match test stopped successfully. No weights were modified."
+        
+    # Check if this process was a match evaluation or model test (inference only)
+    cmd_str = " ".join(proc.args) if hasattr(proc, "args") and proc.args else ""
+    is_match_evaluation = "test_agent" in cmd_str or "test_ai_vs_ai" in cmd_str
+
+    # Check if emergency files exist on disk in candidate production directories (training runs only)
+    model_name = getattr(config, "MODEL_NAME", "model")
+    candidate_dirs = [
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v3", "ppo"),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v2", "ppo"),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v3", "sac"),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v2", "sac"),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v3", "dqn"),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v2", "dqn"),
+    ]
+    saved_file_name = None
+    if not is_match_evaluation:
+        for c_dir in candidate_dirs:
+            e_path = os.path.join(c_dir, f"{model_name}_EMERGENCY.zip")
+            if os.path.exists(e_path):
+                # Check if modified within the last 60 seconds
+                if time.time() - os.path.getmtime(e_path) < 60:
+                    saved_file_name = f"{model_name}_EMERGENCY.zip"
+                    emergency_saved = True
+                    break
+        
+    # 3. If still running after 30s timeout, force terminate
+    if proc.poll() is None:
+        print(f"[Dashboard] Process {proc.pid} timed out after 30s during graceful stop. Force terminating...")
+        subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+        msg = f"⚠️ Graceful stop timed out after 30s. Process {proc.pid} force terminated."
+    else:
+        print(f"[Dashboard] Process {proc.pid} gracefully stopped.")
+        if is_match_evaluation:
+            msg = "🛑 **Match Test Stopped**: Process exited cleanly. No model weights were modified."
+        elif emergency_saved:
+            msg = f"✅ **Graceful Stop Complete**: Emergency model successfully saved to disk as `{saved_file_name}`."
         else:
-            return "🛑 Process stopped. Weights should be saved in the production folder as '_EMERGENCY.zip'."
+            msg = f"🛑 **Process Stopped**: Process {proc.pid} exited. Check terminal output for checkpoint details."
+        
+    state.active_process = None
     
-    from core.env_tools import failsafe_env
-    threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
-    return "Global Failsafe triggered: Killing all EmuHawk instances."
+    # Trigger project process sniper to kill orphaned EmuHawk.exe grandchildren
+    try:
+        from core.env_tools import failsafe_env
+        failsafe_env(ignore_gate=True)
+    except Exception:
+        pass
+        
+    return msg
+
+def force_kill_process():
+    """Immediately force-kills all active Python and BizHawk processes without saving."""
+    state.stop_event.set()
+    pid_str = "None"
+    
+    if state.active_process:
+        proc = state.active_process
+        pid_str = str(proc.pid)
+        try:
+            print(f"[Dashboard] Force killing process tree for PID {proc.pid}...")
+            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+        except Exception as e:
+            print(f"[Dashboard] Error force-killing PID {proc.pid}: {e}")
+        state.active_process = None
+        
+    # Trigger global process sniper to terminate all BizHawk/EmuHawk processes and purge VRAM
+    try:
+        from core.env_tools import failsafe_env
+        threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
+    except Exception:
+        pass
+        
+    return f"⚡ **Force Kill Executed**: Terminated process (PID: {pid_str}) and all BizHawk emulator instances immediately without saving."
+
+def stop_active_process():
+    """Default stop handler (aliases to graceful_stop_process)."""
+    return graceful_stop_process()
 
 def update_config_var(key, value):
     """Updates a single variable in config.py using regex."""
@@ -295,7 +355,7 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled):
+def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled, infinite_match_enabled=False, rematch_delay=2.0):
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
@@ -328,6 +388,8 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
 
     if profile_enabled:
         cmd += ["--profile"]
+    if infinite_match_enabled:
+        cmd += ["--infinite_match", "--rematch_delay", str(float(rematch_delay))]
         
     for log in stream_logs(cmd):
         yield log
@@ -568,20 +630,43 @@ def get_league_pool_status_html():
     except Exception as e:
         return f"<div style='color: red; padding: 12px;'>Error reading pool analytics: {e}</div>"
 
+def _resolve_active_curriculum_path(algo, env):
+    """Dynamically resolves the newest active auto_curriculum_state JSON file by mtime."""
+    # Check selected env/algo directory first, then fallback across v3/v2
+    candidate_dirs = [
+        os.path.join(config.PROJECT_ROOT, "models", "production", env, algo),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v3", algo),
+        os.path.join(config.PROJECT_ROOT, "models", "production", "v2", algo),
+        os.path.join(config.PROJECT_ROOT, "models", "production", algo),
+    ]
+    
+    # Also check if config.MODEL_NAME points directly to a file
+    model_name = getattr(config, "MODEL_NAME", None)
+    
+    for c_dir in candidate_dirs:
+        if not os.path.exists(c_dir):
+            continue
+        
+        # 1. Search for all auto_curriculum_state JSON files
+        json_files = [
+            os.path.join(c_dir, f)
+            for f in os.listdir(c_dir)
+            if f.startswith("auto_curriculum_state") and f.endswith(".json")
+        ]
+        
+        if json_files:
+            # Sort by newest modification timestamp to automatically latch onto the live active run
+            json_files.sort(key=os.path.getmtime, reverse=True)
+            return json_files[0]
+            
+    return None
+
 def get_auto_curriculum_file(algo, env):
     """Resolves and returns the curriculum JSON file path for downloading."""
     try:
-        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
-        model_name = getattr(config, "MODEL_NAME", None)
-        state_file = f"auto_curriculum_state_{model_name}.json" if model_name else "auto_curriculum_state.json"
-        state_path = os.path.join(target_dir, state_file)
-        
-        if not os.path.exists(state_path):
-            generic_path = os.path.join(target_dir, "auto_curriculum_state.json")
-            if os.path.exists(generic_path):
-                state_path = generic_path
-            else:
-                return gr.update(value=None, visible=False)
+        state_path = _resolve_active_curriculum_path(algo, env)
+        if not state_path or not os.path.exists(state_path):
+            return gr.update(value=None, visible=False)
         return gr.update(value=state_path, visible=True)
     except Exception as e:
         print(f"[Dashboard][Error] Failed to resolve auto-curriculum file: {e}")
@@ -590,17 +675,10 @@ def get_auto_curriculum_file(algo, env):
 def get_auto_curriculum_status_html(algo, env):
     """Parses auto_curriculum_state.json and renders a premium live progress and analytics card."""
     try:
-        target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
-        model_name = getattr(config, "MODEL_NAME", None)
-        state_file = f"auto_curriculum_state_{model_name}.json" if model_name else "auto_curriculum_state.json"
-        state_path = os.path.join(target_dir, state_file)
+        state_path = _resolve_active_curriculum_path(algo, env)
         
-        if not os.path.exists(state_path):
-            generic_path = os.path.join(target_dir, "auto_curriculum_state.json")
-            if os.path.exists(generic_path):
-                state_path = generic_path
-            else:
-                return """
+        if not state_path or not os.path.exists(state_path):
+            return """
             <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
                 <h3 style='margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
                     📈 Auto-Curriculum Analytics
@@ -614,6 +692,12 @@ def get_auto_curriculum_status_html(algo, env):
         import json
         with open(state_path, "r") as f:
             state_data = json.load(f)
+            
+        # Extract model tag from file name
+        base_filename = os.path.basename(state_path)
+        model_display = base_filename.replace("auto_curriculum_state_", "").replace(".json", "")
+        if model_display == "auto_curriculum_state":
+            model_display = "Active"
             
         current_level = state_data.get("current_level", 1)
         stability_counter = state_data.get("stability_counter", 0)
@@ -633,9 +717,14 @@ def get_auto_curriculum_status_html(algo, env):
         
         html = f"""
         <div style='background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #fff;'>
-            <h3 style='margin-top: 0; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
-                📈 Auto-Curriculum Analytics
-            </h3>
+            <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;'>
+                <h3 style='margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.35rem; font-weight: 600; color: #3b82f6;'>
+                    📈 Auto-Curriculum Analytics
+                </h3>
+                <span style='font-size: 0.85rem; font-weight: 500; color: #94a3b8; background: rgba(59, 130, 246, 0.1); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);'>
+                    Tracking: <strong style='color: #60a5fa;'>{model_display}</strong>
+                </span>
+            </div>
             
             <div style='margin-bottom: 20px;'>
                 <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.9rem;'>
@@ -1171,7 +1260,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
                     gr.Markdown("---")
                     with gr.Row():
-                        stop_btn = gr.Button("🛑 Stop All Processes", variant="stop")
+                        graceful_stop_btn = gr.Button("🛑 Graceful Stop (Save Model)", variant="stop")
+                        force_kill_btn = gr.Button("⚡ Force Kill (No Save)", variant="secondary")
                         refresh_files_btn = gr.Button("🔄 Refresh Dropdown Models")
                     stop_status = gr.Markdown("")
 
@@ -1262,7 +1352,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     
                     with gr.Row():
                         refresh_league_btn = gr.Button("🔄 Refresh Pool Status & States")
-                        stop_league_btn = gr.Button("🛑 Stop Active League Runs", variant="stop")
+                        stop_league_btn = gr.Button("🛑 Graceful Stop League", variant="stop")
+                        kill_league_btn = gr.Button("⚡ Force Kill League", variant="secondary")
                         copy_league_logs_btn = gr.Button("📋 Copy League Logs", size="sm")
                         
                 # RIGHT COLUMN: Pool Analytics Card
@@ -1307,6 +1398,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     
                     with gr.Row():
                         match_profile_checkbox = gr.Checkbox(label="Enable Performance Profiling", value=False)
+                        infinite_match_checkbox = gr.Checkbox(label="🔄 Infinite Matchups (Auto-Rematch)", value=False)
+                        rematch_delay_slider = gr.Slider(label="Rematch Delay (seconds)", minimum=1.0, maximum=5.0, value=2.0, step=0.5)
+                    
+                    with gr.Row():
                         toggle_agent_btn = gr.Button("⏯️ Toggle Agent (Play/Pause)", variant="secondary")
                     
                     agent_state_status = gr.Markdown("Agent State: **PAUSED** (Default)")
@@ -1339,7 +1434,15 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             p2_zip_upload.upload(handle_model_upload, inputs=[p2_zip_upload, p2_algo, p2_env], outputs=[match_upload_status, p2_zip, p2_pkl])
             p2_pkl_upload.upload(handle_model_upload, inputs=[p2_pkl_upload, p2_algo, p2_env], outputs=[match_upload_status, p2_zip, p2_pkl])
 
-            launch_match_btn.click(run_matchup, inputs=[p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, match_profile_checkbox], outputs=[match_logs])
+            launch_match_btn.click(
+                run_matchup, 
+                inputs=[
+                    p1_algo, p1_env, p1_zip, p1_pkl, p1_device, 
+                    p2_algo, p2_env, p2_zip, p2_pkl, p2_device, 
+                    match_profile_checkbox, infinite_match_checkbox, rematch_delay_slider
+                ], 
+                outputs=[match_logs]
+            )
 
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
@@ -1436,7 +1539,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     copy_btn.click(None, inputs=[unified_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Logs copied to clipboard!'); return []; }")
     copy_match_btn.click(None, inputs=[match_logs], js="(text) => { navigator.clipboard.writeText(text); alert('Match logs copied to clipboard!'); return []; }")
 
-    stop_btn.click(stop_active_process, outputs=[stop_status])
+    graceful_stop_btn.click(graceful_stop_process, outputs=[stop_status])
+    force_kill_btn.click(force_kill_process, outputs=[stop_status])
     refresh_files_btn.click(refresh_dropdowns, outputs=[train_zip_drop, train_pkl_drop, tune_zip_drop, tune_pkl_drop, pbt_zip_drop, pbt_pkl_drop, p1_zip, p1_pkl, p2_zip, p2_pkl])
     refresh_curr_btn.click(get_auto_curriculum_status_html, inputs=[algo_sel, env_sel], outputs=[auto_curr_card])
     download_curr_btn.click(get_auto_curriculum_file, inputs=[algo_sel, env_sel], outputs=[download_curr_file])
@@ -1491,7 +1595,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     )
     
     stop_league_btn.click(
-        stop_active_process, 
+        graceful_stop_process, 
+        outputs=[league_logs]
+    )
+    kill_league_btn.click(
+        force_kill_process,
         outputs=[league_logs]
     )
     

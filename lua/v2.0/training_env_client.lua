@@ -166,7 +166,9 @@ while true do
         
     elseif string.sub(response, 1, 5) == "RESET" then
         local state_file_path = string.sub(response, 7) -- Extract the state name after "RESET "
-        console.log("Received RESET command. Loading New Random State... ")
+        if activate_visualization then
+            console.log("Received RESET command. Loading New Random State... ")
+        end
         savestate.load(state_file_path)
         current_match_state = get_state_display_name(state_file_path)
         
@@ -208,13 +210,18 @@ while true do
         end
     end
 
-    -- Debugging
-    if step_count % 240 == 0 then -- Responding every 16 seconds
+    -- Debugging (only in visual mode)
+    if activate_visualization and step_count % 240 == 0 then
         if response ~= nil and response ~= "" then
             console.log("Python Responding: " .. response)
         end
     end
     
+    -- Periodic console clearing to eliminate .NET memory fragmentation
+    if step_count % 10000 == 0 then
+        console.clear()
+    end
+    
     -- 4. Advance exactly one frame
     step_count = step_count + 1
-end
+end

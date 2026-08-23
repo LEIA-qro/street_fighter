@@ -18,6 +18,16 @@ from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from core.telemetry import write_telemetry, clean_telemetry
 
+import signal
+def _sigbreak_handler(sig, frame):
+    raise KeyboardInterrupt
+
+if hasattr(signal, "SIGBREAK"):
+    try:
+        signal.signal(signal.SIGBREAK, _sigbreak_handler)
+    except Exception:
+        pass
+
 directories = config.get_directory()
 
 class _MockEnv(gym.Env):
@@ -146,8 +156,9 @@ def test_ai_vs_ai():
     parser.add_argument("--env_p2",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip_p2", type=str, required=True)
     parser.add_argument("--load_pkl_p2", type=str, required=True)
-    parser.add_argument("--device_p2", type=str, default="auto")
     parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
+    parser.add_argument("--infinite_match", action="store_true", help="Automatically reset and start rematches on KO")
+    parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
     args = parser.parse_args()
 
     # Auto-detect algorithm override for P1
@@ -304,20 +315,69 @@ def test_ai_vs_ai():
         profiler.enable()
         print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.")
 
+    match_count = 1
+    p1_wins = 0
+    p2_wins = 0
+
     try:
         while True:
             # Check for graceful stop signal from Dashboard
             if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
-                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...")
+                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...", flush=True)
                 break
 
             # Stack observations -> (2216,) each
             stacked_p1 = buf_p1.push(obs_p1_raw)  # Updated by previous iteration
             stacked_p2 = buf_p2.push(obs_p2_raw)
 
+            # Check KO for infinite matchups
+            p1_hp = int(stacked_p1[0])
+            p2_hp = int(stacked_p1[1])
+
+            if args.infinite_match and (p1_hp <= 0 or p2_hp <= 0):
+                if p1_hp > 0 and p2_hp <= 0:
+                    p1_wins += 1
+                    winner_msg = f"🏆 {p1_name} (Player 1) WINS!"
+                elif p2_hp > 0 and p1_hp <= 0:
+                    p2_wins += 1
+                    winner_msg = f"🏆 {p2_name} (Player 2) WINS!"
+                else:
+                    winner_msg = "🤝 DOUBLE K.O. (Draw)!"
+
+                print(f"\n{'='*50}", flush=True)
+                print(f"[ROUND {match_count} OVER] {winner_msg}", flush=True)
+                print(f"[SCOREBOARD] {p1_name}: {p1_wins} | {p2_name}: {p2_wins}", flush=True)
+                print(f"[Rematch] Starting next round in {args.rematch_delay:.1f}s...", flush=True)
+                print(f"{'='*50}\n", flush=True)
+
+                # Advance neutral frames for delay duration so the victory animation plays
+                delay_steps = max(1, int((args.rematch_delay * 60) / 4))
+                neutral_cmd = "00000000000000000000\n"
+                for _ in range(delay_steps):
+                    if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
+                        break
+                    master_env.send_command(neutral_cmd)
+                    raw_delay = master_env.receive_payload()
+                    if not raw_delay:
+                        break
+
+                # Trigger Lua RESET to PLAYER_VS_PLAYER.State
+                reset_state_path = os.path.join(config.STATES_DIR, "PLAYER_VS_PLAYER.State")
+                master_env.send_command(f"RESET {reset_state_path}\n")
+
+                # Receive new post-reset state and re-prime buffers
+                reset_payload = master_env.receive_payload()
+                obs_p1_raw = parser_p1.parse(reset_payload, is_reset=True)
+                obs_p2_raw = parser_p2.parse(reset_payload, is_reset=True)
+                buf_p1.reset(obs_p1_raw)
+                buf_p2.reset(obs_p2_raw)
+
+                match_count += 1
+                continue
+
             # Normalize: SelectiveVecNormalize expects (n_envs, obs_dim)
-            norm_p1 = vec_norm_p1.normalize_obs(stacked_p1[np.newaxis, :])
-            norm_p2 = vec_norm_p2.normalize_obs(stacked_p2[np.newaxis, :])
+            norm_p1 = vec_norm_p1.normalize_obs(stacked_p1[np.newaxis, :].copy(), update=False)
+            norm_p2 = vec_norm_p2.normalize_obs(stacked_p2[np.newaxis, :].copy(), update=False)
 
             # Inference
             act_p1, _ = model_p1.predict(norm_p1, deterministic=False)
@@ -351,7 +411,7 @@ def test_ai_vs_ai():
             )
 
     except KeyboardInterrupt:
-        print("\nAI vs AI session ended by user.")
+        print("\nAI vs AI session ended by user.", flush=True)
 
     finally:
         clean_telemetry()

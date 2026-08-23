@@ -418,6 +418,7 @@ class ManualCurriculumCallback(BaseCallback):
         # Check for graceful file-based stop signal
         stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
         if os.path.exists(stop_file):
+            print("\n[Curriculum] Graceful stop signal detected! Triggering Emergency Checkpoint save...")
             try:
                 os.remove(stop_file)
             except Exception:

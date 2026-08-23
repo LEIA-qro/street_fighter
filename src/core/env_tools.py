@@ -103,7 +103,31 @@ def failsafe_env(env=None, model=None, ignore_gate=False):
         pass
         
     time.sleep(1)
+    allow_sleep()
     print("[ENV] Failsafe complete.")
+
+def prevent_sleep():
+    """Prevent Windows from going to sleep or entering standby while training is active."""
+    try:
+        import ctypes
+        # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
+        ES_CONTINUOUS = 0x80000000
+        ES_SYSTEM_REQUIRED = 0x00000001
+        ES_AWAYMODE_REQUIRED = 0x00000040
+        ctypes.windll.kernel32.SetThreadExecutionState(
+            ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED
+        )
+    except Exception:
+        pass
+
+def allow_sleep():
+    """Restore default Windows power standby management."""
+    try:
+        import ctypes
+        ES_CONTINUOUS = 0x80000000
+        ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+    except Exception:
+        pass
 
 # Register failsafe_env to run automatically at exit on any process that imports env_tools
 atexit.register(failsafe_env)
