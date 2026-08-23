@@ -11,6 +11,7 @@ SystemID GEN
 00804E	w	h	1	68K RAM	Position state of the player 1
 0081E2	w	h	1	68K RAM	Botton Pressed by Player 1
 008358	w	u	1	68K RAM	X coordinate of player 2
+008286	w	u	1	68K RAM	P2 Position X
 00828A	w	u	1	68K RAM	Distance between Foot ceiling player 2
 00835C	w	u	1	68K RAM	Distance between Chest ceiling player 2
 008360	w	u	1	68K RAM	Distance between Head ceiling player 2
@@ -30,4 +31,6 @@ SystemID GEN
 0082B4	w	h	1	68K RAM	if=2800 Player 2 proyectile thrown
 0081DA	w	u	1	68K RAM	Character Player 1
 00845A	w	u	1	68K RAM	Character Player 2
+0081DB	w	u	1	68K RAM	P1 Character ID
+00845B	w	u	1	68K RAM	P2 Character ID
 

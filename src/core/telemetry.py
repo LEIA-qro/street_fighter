@@ -5,7 +5,7 @@ from core import config
 
 CHAR_NAMES = {
     0: "Ryu", 1: "E.Honda", 2: "Blanka", 3: "Guile", 4: "Ken", 5: "Chun-Li",
-    6: "Zangief", 7: "Dhalsim", 8: "Balrog", 9: "Vega", 10: "Sagat", 11: "M.Bison"
+    6: "Zangief", 7: "Dhalsim", 8: "M.Bison", 9: "Sagat", 10: "Balrog", 11: "Vega"
 }
 
 ACTION_NAMES = {
@@ -15,13 +15,16 @@ ACTION_NAMES = {
     48: "Fireball (Hadouken)", 56: "Dragon Punch (Shoryuken)", 64: "Hurricane Kick (Tatsumaki)"
 }
 
-def clean_telemetry():
-    target_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json")
-    if os.path.exists(target_path):
-        try:
-            os.remove(target_path)
-        except OSError:
-            pass
+_write_step_counter = 0
+
+def clean_telemetry() -> None:
+    for filename in [".telemetry.json", ".telemetry.json.tmp"]:
+        target_path = os.path.join(config.PROJECT_ROOT, filename)
+        if os.path.exists(target_path):
+            try:
+                os.remove(target_path)
+            except OSError:
+                pass
 
 def decode_one_hot(array) -> int:
     idx = int(np.argmax(array))
@@ -29,8 +32,22 @@ def decode_one_hot(array) -> int:
         return idx
     return 0
 
-def write_telemetry(model_name: str, env_version: str, status: str, model, obs: np.ndarray, player: int = 1):
+def write_telemetry(
+    model_name: str,
+    env_version: str,
+    status: str,
+    model,
+    obs: np.ndarray,
+    player: int = 1
+) -> None:
+    global _write_step_counter
+    _write_step_counter += 1
+    # Throttle disk writes to every 2 steps (~30 FPS) to eliminate I/O lock contention
+    if _write_step_counter % 2 != 0:
+        return
+
     target_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json")
+    temp_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json.tmp")
     
     obs_flat = np.array(obs).flatten()
     
@@ -142,7 +159,8 @@ def write_telemetry(model_name: str, env_version: str, status: str, model, obs: 
     }
 
     try:
-        with open(target_path, "w") as f:
+        with open(temp_path, "w") as f:
             json.dump(payload, f, indent=4)
+        os.replace(temp_path, target_path)
     except OSError:
         pass

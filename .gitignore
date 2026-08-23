@@ -41,3 +41,5 @@ GEMINI.md
 /src/agents/league/__pycache__
 /code_testing/__pycache__
 /.superpowers
+code_testing/test_telemetry_dashboard.py
+/docs

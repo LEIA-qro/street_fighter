@@ -1,4 +1,5 @@
 import os, sys, argparse
+from typing import Any
 from collections import deque
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -242,9 +243,12 @@ def test_ai_vs_ai():
      # ── 5. Load models ──
     print(f"\nLoading Neural Networks...")
     
-    def load_model_safely(algo, path, player_name, device):
+    def load_model_safely(algo: str, path: str, player_name: str, device: str) -> Any:
         ModelClass = get_model_class(algo)
-        custom_objs = {}
+        custom_objs = {
+            "learning_rate": 0.0,
+            "clip_range": 0.0,
+        }
         if algo.lower() in ["dqn", "sac"]:
             custom_objs["buffer_size"] = 1  # Memory optimization: don't load the full replay buffer
             
@@ -302,6 +306,11 @@ def test_ai_vs_ai():
 
     try:
         while True:
+            # Check for graceful stop signal from Dashboard
+            if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
+                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...")
+                break
+
             # Stack observations -> (2216,) each
             stacked_p1 = buf_p1.push(obs_p1_raw)  # Updated by previous iteration
             stacked_p2 = buf_p2.push(obs_p2_raw)

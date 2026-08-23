@@ -154,7 +154,7 @@ class StreetFighterLeagueEnv(StreetFighterEnvV2):
                 self.opponent_model = PPO.load(
                     zip_path,
                     device="cpu",
-                    custom_objects={"buffer_size": 1}
+                    custom_objects={"buffer_size": 1, "learning_rate": 0.0, "clip_range": 0.0}
                 )
                 self.opponent_model.policy.eval()
                 for param in self.opponent_model.policy.parameters():

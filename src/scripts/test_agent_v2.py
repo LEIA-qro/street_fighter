@@ -1,4 +1,5 @@
 import os, sys, argparse
+from typing import Any
 import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -115,9 +116,12 @@ def test_agent():
     # 3. Load the Grandmaster Brain
     print(f"Loading neural network weights from {args.load_zip}...")
     
-    def load_model_safely(algo, path, device):
+    def load_model_safely(algo: str, path: str, device: str) -> Any:
         ModelClass = get_model_class(algo)
-        custom_objs = {}
+        custom_objs = {
+            "learning_rate": 0.0,
+            "clip_range": 0.0,
+        }
         if algo.lower() in ["dqn", "sac"]:
             custom_objs["buffer_size"] = 1  # Memory optimization
             
@@ -163,6 +167,11 @@ def test_agent():
 
     try:
         while True:
+            # Check for graceful stop signal from Dashboard
+            if os.path.exists(os.path.join(config.PROJECT_ROOT, ".stop_training")):
+                print("\n[Match] Stop signal received from dashboard. Exiting gracefully...")
+                break
+
             action, _states = model.predict(obs, deterministic=False) 
             
             # Process action depending on algo and environment version

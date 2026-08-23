@@ -126,7 +126,10 @@ def stream_logs(cmd):
             yield full_output
             
         proc.wait()
-        full_output += f"\n{'-'*50}\nProcess finished with exit code {proc.returncode}"
+        if state.stop_event.is_set():
+            full_output += f"\n{'-'*50}\n🛑 Process stopped by user."
+        else:
+            full_output += f"\n{'-'*50}\nProcess finished with exit code {proc.returncode}"
         yield full_output
     except Exception as e:
         yield full_output + f"\n[ERROR] {str(e)}"
@@ -755,15 +758,63 @@ def handle_league_state_upload(file_obj):
     except Exception as e:
         return gr.update(), f"❌ Upload error: {e}"
 
+def compute_fighter_visual_coords(rel_x: int, rel_y: int, corner_dist: int, arena_width: int = 500) -> tuple[float, int, float, int]:
+    """Computes faithful visual coordinates (percentages for X, pixels for Y) for P1 and P2.
+    
+    Uses smooth engagement-centered coordinate mapping (C-infinity continuous)
+    to eliminate visual threshold popping while preserving true relative distance.
+    
+    Returns:
+        (p1_x_pct, p1_y_px, p2_x_pct, p2_y_px)
+    """
+    # Vertical jump calculation (Floor = 24px, max jump elevation = 50px)
+    # rel_y = p2_y - p1_y. SF2 jump delta is typically 60-120 units.
+    y_scale = 50.0 / 120.0
+    floor_px = 24
+    
+    if rel_y > 0:
+        # P1 is airborne higher than P2
+        p1_y_px = int(floor_px + min(50.0, rel_y * y_scale))
+        p2_y_px = floor_px
+    elif rel_y < 0:
+        # P2 is airborne higher than P1
+        p1_y_px = floor_px
+        p2_y_px = int(floor_px + min(50.0, -rel_y * y_scale))
+    else:
+        p1_y_px = floor_px
+        p2_y_px = floor_px
+
+    # Engagement-Centered Horizontal Mapping:
+    # Midpoint of the combatants is anchored at arena center (250px / 50%).
+    # This guarantees smooth, continuous rendering with zero snapping or jitter.
+    half_dist = float(rel_x) / 2.0
+    p1_stage_x = 250.0 - half_dist
+    p2_stage_x = 250.0 + half_dist
+
+    # Scale to percentage with safe padding [4%, 96%]
+    scale = 100.0 / float(arena_width)
+    p1_x_pct = max(4.0, min(96.0, p1_stage_x * scale))
+    p2_x_pct = max(4.0, min(96.0, p2_stage_x * scale))
+
+    return p1_x_pct, p1_y_px, p2_x_pct, p2_y_px
+
+_cached_telemetry_html = None
+_cached_telemetry_time = 0.0
+
 def get_live_telemetry_html():
+    global _cached_telemetry_html, _cached_telemetry_time
     import json
     import os
+    import time
     from core import config
     
     target_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json")
+    now = time.time()
     
     # Render Premium Standby UI if file is missing or stale
     if not os.path.exists(target_path):
+        if _cached_telemetry_html and (now - _cached_telemetry_time) < 1.5:
+            return _cached_telemetry_html
         return """
         <div style='background: #101626; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 48px; text-align: center; font-family: system-ui, sans-serif; color: #fff;'>
             <h3 style='margin: 0 0 8px 0; color: #3b82f6; font-size: 1.4rem;'>🔮 Standby Mode: Telemetry Offline</h3>
@@ -772,9 +823,12 @@ def get_live_telemetry_html():
         """
         
     try:
-        with open(target_path, "r") as f:
+        with open(target_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
+        # If transient read collision occurs, seamlessly return recent cached HTML
+        if _cached_telemetry_html and (now - _cached_telemetry_time) < 2.0:
+            return _cached_telemetry_html
         return f"<div style='color: red; padding: 12px;'>Error reading telemetry data: {e}</div>"
 
     model_name = data.get("model_name", "Unknown")
@@ -811,40 +865,38 @@ def get_live_telemetry_html():
         p1_hp_pct = int((p1_hp / 176.0) * 100)
         p2_hp_pct = int((p2_hp / 176.0) * 100)
 
-        # Stage coordinates translation logic
-        # Left & Right coordinates are scaled to fit in a 100% width display representing screen width 500
-        # Center coordinate of Ryu P1 starts around 150px, Ken starts 350px.
+        # Stage coordinates translation logic using verified visual coordinate mapper
         rel_x = f.get("rel_x", 80)
+        rel_y = f.get("rel_y", 0)
         p1_corner_dist = f.get("p1_corner_dist", 120)
         p1_proj = f.get("p1_proj", -1)
         p2_proj = f.get("p2_proj", -1)
         
-        # Position fighters relative to arena boundaries
-        p1_left_pos = p1_corner_dist
-        p2_left_pos = p1_corner_dist + rel_x
+        p1_pct, p1_bottom, p2_pct, p2_bottom = compute_fighter_visual_coords(
+            rel_x=rel_x, rel_y=rel_y, corner_dist=p1_corner_dist
+        )
         
-        # Scale coordinates into percentage sizes of the 100% vector container (width: 500 maximum)
         scale = 100.0 / 500.0
-        p1_pct = max(2, min(95, int(p1_left_pos * scale)))
-        p2_pct = max(2, min(95, int(p2_left_pos * scale)))
-        
         proj1_html = ""
         if p1_proj > 0:
-            p1_proj_pct = max(2, min(95, int(p1_proj * scale)))
-            proj1_html = f"<div class='projectile p1-proj' style='position: absolute; bottom: 48px; width: 12px; height: 12px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 12px #3b82f6, 0 0 6px #fff; left: {p1_proj_pct}%'></div>"
+            p1_proj_pct = max(2, min(98, int(p1_proj * scale)))
+            proj1_html = f"<div class='projectile p1-proj' style='position: absolute; bottom: {p1_bottom + 20}px; width: 10px; height: 10px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 12px #3b82f6, 0 0 6px #fff; left: {p1_proj_pct}%; transform: translateX(-50%);'></div>"
 
         proj2_html = ""
         if p2_proj > 0:
-            p2_proj_pct = max(2, min(95, int(p2_proj * scale)))
-            proj2_html = f"<div class='projectile p2-proj' style='position: absolute; bottom: 48px; width: 12px; height: 12px; border-radius: 50%; background: #f87171; box-shadow: 0 0 12px #ef4444, 0 0 6px #fff; left: {p2_proj_pct}%'></div>"
+            p2_proj_pct = max(2, min(98, int(p2_proj * scale)))
+            proj2_html = f"<div class='projectile p2-proj' style='position: absolute; bottom: {p2_bottom + 20}px; width: 10px; height: 10px; border-radius: 50%; background: #f87171; box-shadow: 0 0 12px #ef4444, 0 0 6px #fff; left: {p2_proj_pct}%; transform: translateX(-50%);'></div>"
+
+        p1_char_name = f.get("p1_char_name", "AI")
+        p2_char_name = f.get("p2_char_name", "OPP")
 
         frames_html += f"""
         <div class='{card_class}' style='background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.06); {border_color_style} border-radius: 14px; padding: 20px; position: relative;'>
             <div class='frame-label' style='font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 12px; font-weight: 800; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 6px;'>{card_title}</div>
             
             <div class='hp-bar-container' style='display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px; font-weight: bold;'>
-                <span>AI HP ({p1_hp})</span>
-                <span>OPP HP ({p2_hp})</span>
+                <span>{p1_char_name} ({p1_hp})</span>
+                <span>{p2_char_name} ({p2_hp})</span>
             </div>
             <div style='display: flex; justify-content: space-between; margin-bottom: 8px;'>
                 <div class='hp-bar' style='width: 46%; height: 8px; background: #111827; border-radius: 4px; overflow: hidden;'><div class='hp-fill p1' style='height:100%; width: {p1_hp_pct}%; background: linear-gradient(90deg, #2563eb, #3b82f6);'></div></div>
@@ -855,10 +907,10 @@ def get_live_telemetry_html():
             <div class='arena-view' style='width: 100%; height: 140px; background: #04060b; border-radius: 10px; position: relative; border: 1px solid rgba(255, 255, 255, 0.08); margin: 12px 0; overflow: hidden;'>
                 <div class='corner-line left' style='position: absolute; top: 0; bottom: 24px; width: 3px; left: 12px; border-left: 2px dashed rgba(59, 130, 246, 0.4);'></div>
                 <div class='corner-line right' style='position: absolute; top: 0; bottom: 24px; width: 3px; right: 12px; border-right: 2px dashed rgba(239, 68, 68, 0.4);'></div>
-                <!-- Ryu P1 (AI) -->
-                <div class='fighter p1' style='position: absolute; bottom: 24px; width: 26px; height: 60px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; left: {p1_pct}%; background: linear-gradient(180deg, rgba(59, 130, 246, 0.85), rgba(29, 78, 216, 0.85)); border: 1.5px solid #60a5fa; color: #fff;'>AI</div>
-                <!-- Ken P2 (OPP) -->
-                <div class='fighter p2' style='position: absolute; bottom: 24px; width: 26px; height: 60px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; left: {p2_pct}%; background: linear-gradient(180deg, rgba(239, 68, 68, 0.85), rgba(185, 28, 28, 0.85)); border: 1.5px solid #f87171; color: #fff;'>OPP</div>
+                <!-- Fighter P1 -->
+                <div class='fighter p1' style='position: absolute; bottom: {p1_bottom}px; width: 26px; height: 56px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; left: {p1_pct:.1f}%; transform: translateX(-50%); background: linear-gradient(180deg, rgba(59, 130, 246, 0.85), rgba(29, 78, 216, 0.85)); border: 1.5px solid #60a5fa; color: #fff; transition: bottom 0.05s ease, left 0.05s ease;' title='{p1_char_name} (AI)'>{p1_char_name[:3].upper()}</div>
+                <!-- Fighter P2 -->
+                <div class='fighter p2' style='position: absolute; bottom: {p2_bottom}px; width: 26px; height: 56px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; left: {p2_pct:.1f}%; transform: translateX(-50%); background: linear-gradient(180deg, rgba(239, 68, 68, 0.85), rgba(185, 28, 28, 0.85)); border: 1.5px solid #f87171; color: #fff; transition: bottom 0.05s ease, left 0.05s ease;' title='{p2_char_name} (OPP)'>{p2_char_name[:3].upper()}</div>
                 {proj1_html}
                 {proj2_html}
                 <div class='arena-floor' style='position: absolute; bottom: 0; left: 0; width: 100%; height: 24px; background: repeating-linear-gradient(45deg, #131a2b, #131a2b 12px, #080b13 12px, #080b13 24px); border-top: 2px solid rgba(255, 255, 255, 0.12);'></div>
@@ -1012,6 +1064,8 @@ def get_live_telemetry_html():
         </div>
     </div>
     """
+    _cached_telemetry_html = html
+    _cached_telemetry_time = time.time()
     return html
 
 # --- UI Construction ---

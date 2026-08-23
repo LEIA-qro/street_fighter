@@ -16,6 +16,7 @@ import numpy as np
 from collections import deque
 from typing import Dict, List, Any, Set, Tuple
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.utils import get_schedule
 
 import core.config as config
 
@@ -227,9 +228,10 @@ class AutoCurriculumCallback(BaseCallback):
             print(f"  Steps  : {self.num_timesteps:,}")
             print(f"{'='*60}\n")
 
-    def _apply_level_hyperparams(self, level: int):
+    def _apply_level_hyperparams(self, level: int) -> None:
         """Push LR / ent_coef / clip_range / tau from configuration into the live model."""
-        # Check if algorithm has LEVEL_HYPERPARAMS defined, else map dynamically using phase = (level - 1) // 2
+        # Check if algorithm has LEVEL_HYPERPARAMS defined, else map dynamically
+        # using phase = (level - 1) // 2.
         # This guarantees absolute backward compatibility with existing 4-phase DQN/SAC setups.
         phase_idx = (level - 1) // 2
         
@@ -248,7 +250,7 @@ class AutoCurriculumCallback(BaseCallback):
         # 1. Learning Rate
         if "lr" in params:
             lr = params["lr"]
-            self.model.learning_rate = lambda _: lr
+            self.model.learning_rate = get_schedule(lr)
             for pg in self.model.policy.optimizer.param_groups:
                 pg["lr"] = lr
 
@@ -259,16 +261,21 @@ class AutoCurriculumCallback(BaseCallback):
         # 3. Clip Range (PPO)
         if "clip" in params and hasattr(self.model, "clip_range"):
             clip = params["clip"]
-            self.model.clip_range = lambda _: clip
+            self.model.clip_range = get_schedule(clip)
 
         # 4. Tau (SAC)
         if "tau" in params and hasattr(self.model, "tau"):
             self.model.tau = params["tau"]
 
         if self.verbose:
-            log_parts = [f"{k}={v:.2e}" if isinstance(v, (float, np.float32, np.float64)) else f"{k}={v}" 
-                        for k, v in params.items()]
-            print(f"[AutoCurriculum] Applied Hyperparams (Lvl {level} -> Phase Fallback {phase_idx}) -> {' | '.join(log_parts)}")
+            log_parts = [
+                f"{k}={v:.2e}" if isinstance(v, (float, np.float32, np.float64)) else f"{k}={v}"
+                for k, v in params.items()
+            ]
+            print(
+                f"[AutoCurriculum] Applied Hyperparams (Lvl {level} -> Phase Fallback {phase_idx}) "
+                f"-> {' | '.join(log_parts)}"
+            )
 
     def _save_curriculum_state(self, force: bool = False):
         """Serialize current curriculum state variables to disk safely, gated to avoid massive overwrites."""

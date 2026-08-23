@@ -158,12 +158,17 @@ class BizHawkBaseEnv(gym.Env):
         # 1. Send the Poison Pill to Lua
         if self.conn:
             try:
-                self.send_command("EXIT\n")
-                time.sleep(0.5) # Give Lua a fraction of a second to process the command
-            except (ConnectionResetError, BrokenPipeError):
+                formatted_reply = f"{len('EXIT\n')} EXIT\n"
+                self.conn.sendall(formatted_reply.encode('utf-8'))
+                time.sleep(0.3)  # Give Lua a fraction of a second to process the command
+            except (ConnectionResetError, BrokenPipeError, OSError):
                 pass
             finally:
-                self.conn.close()
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
             
         if self.server_socket:
             self.server_socket.close()

@@ -140,9 +140,9 @@ while true do
         local p1_hp = mainmemory.read_u16_be(0x8042)
         local p2_hp = mainmemory.read_u16_be(0x82C2)
         local p1_x  = mainmemory.read_u16_be(0x8006)
-        local p2_x  = mainmemory.read_u16_be(0x8358)
+        local p2_x  = mainmemory.read_u16_be(0x8286)
         local p1_y  = mainmemory.read_u16_be(0x800A)
-        local p2_y  = mainmemory.read_u16_be(0x828A)
+        local p2_y  = bit.band(mainmemory.read_u16_be(0x828A), 0xFF)
 
         local p1_state_raw = mainmemory.read_u16_be(0x804E)
         local p2_state_raw = mainmemory.read_u16_be(0x82CE)
@@ -169,10 +169,10 @@ while true do
         prev_p1_proj_x = raw_p1_proj_x
         prev_p2_proj_x = raw_p2_proj_x
 
-        -- Using read_u8 because Character IDs are standard 8-bit integers
-        local p1_char_id = mainmemory.read_u8(0x81DA)
-        local p2_char_id = mainmemory.read_u8(0x845A)
-        local rel_dist = mainmemory.read_u8(0x834C)
+        -- Low-byte Character IDs (0..11) and 16-bit Relative Distance
+        local p1_char_id = mainmemory.read_u8(0x81DB)
+        local p2_char_id = mainmemory.read_u8(0x845B)
+        local rel_dist = mainmemory.read_u16_be(0x834C)
 
         -- Format Payload (Now 13 dimensions) & Send
         local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
