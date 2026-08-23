@@ -43,3 +43,4 @@ GEMINI.md
 /.superpowers
 code_testing/test_telemetry_dashboard.py
 /docs
+code_testing/test_telemetry_dashboard.py
