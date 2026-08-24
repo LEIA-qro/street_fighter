@@ -46,3 +46,4 @@ code_testing/test_telemetry_dashboard.py
 /models/production
 /models/tuning
 .telemetry.json
+/code_testing/pytest
