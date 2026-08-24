@@ -26,14 +26,17 @@ For optimal organization, **clone or move this `street_fighter` project director
 Initialize the isolated environment from the `street_fighter/` root directory:
 
 ```powershell
-# Create the environment
+# Create the environment (Python 3.10+)
 python -m venv .venv
 
-# Activate the environment
+# Activate the environment (Windows PowerShell)
 .venv\Scripts\Activate.ps1
+
+# Or for Windows Command Prompt (CMD):
+# .venv\Scripts\activate.bat
 ```
 
-Confirm that your terminal prompt is now prefixed with `(.venv)`.
+Confirm that your terminal prompt is now prefixed with `(.venv)`. All commands should use the virtual environment's Python interpreter (`.venv\Scripts\python.exe`).
 
 ### 4. Dependency Installation
 Install all production requirements directly:
@@ -42,20 +45,27 @@ Install all production requirements directly:
 pip install -r requirements.txt
 ```
 
-**You will also need** [**pytorch**](https://pytorch.org/get-started/locally/), search what version you need, it depends of your operating system and hardware.
+Install [**PyTorch**](https://pytorch.org/get-started/locally/) for your hardware configuration:
 
+```powershell
+# For MOST NVIDIA GPUs (CUDA acceleration - Recommended):
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+# Or for CPU-only systems:
+pip install torch torchvision
+```
 
 Verify GPU availability for PyTorch training:
 
 ```powershell
-python verify_gpu.py
+python code_testing/verify_gpu.py
 ```
 
 > **Note:** If you encounter *ImportError: DLL load failed while importing mtrand: An Application Control policy has blocked this file.*
-Check Windows Smart App Control (Most Common on Windows 11)
-Open the Start menu and search for Windows Security.
-Go to App & browser control > Smart App Control settings.
-If Smart App Control is set to On or Evaluation, it frequently blocks unsigned or pip-installed .pyd and .dll files in user directories. Setting it to Off will immediately stop it from blocking NumPy.
+Check Windows Smart App Control (Most Common on Windows 11):
+1. Open the Start menu and search for **Windows Security**.
+2. Go to **App & browser control** > **Smart App Control settings**.
+3. If Smart App Control is set to *On* or *Evaluation*, it frequently blocks unsigned or pip-installed `.pyd` and `.dll` files in user directories. Setting it to *Off* will immediately stop it from blocking NumPy and C-extensions.
 
 
 ---
@@ -94,30 +104,45 @@ street_fighter/
 │       ├── training_env_client.lua   # Headless emulator loop optimized for training
 │       ├── match_test_env_client.lua  # Interactive loop with throttled disk I/O for testing
 │       └── generated_config.lua      # Configured dynamically by Python (do not edit)
+├── doc/                     # Architecture justifications, RAM locations, and developer manuals
+│   ├── DEVELOPER_CLI_GUIDE.md        # Comprehensive CLI flag reference and mode manual
+│   └── README.md                     # Mathematical proofs, RAM layouts, and design justifications
+├── code_testing/            # Unit test suites, diagnostics, and verification tools
+│   ├── pytest/              # Automated test cases (auto-curriculum, telemetry, configs)
+│   ├── env_test/            # Offline and randomized environment verification
+│   └── verify_gpu.py        # Hardware diagnostic and PyTorch CUDA check tool
+├── requirements.txt         # Core Python package dependencies
 └── src/                     # Core Python codebase
     ├── core/                # Emulator lifecycle, socket bridge, selective normalizer, and global config
     │   ├── config.py             # Active directory definitions, states list, and hyperparameters
     │   ├── bizhawk_base.py       # Bare-metal TCP server socket and payload parsing
     │   ├── env_tools.py          # Process snipers, clean teardown registration, and VRAM purging
-    │   └── selective_norm.py     # Custom running statistics normalizer for observations
+    │   ├── selective_norm.py     # Custom running statistics normalizer for observations
+    │   └── telemetry.py          # Real-time dashboard telemetry serializer and action decoder
     ├── envs/                # Gymnasium environment implementations (Zero RL knowledge)
     │   ├── base_env.py           # Base Gym wrapper mapping observations and rewards
+    │   ├── league_env.py         # Dual-agent competitive PvP league environment
     │   ├── sf2_v1.py             # Early experimental observation spaces
     │   ├── sf2_v2.py             # Enhanced 554-dim/stacked reward tracking
-    │   └── sf2_v3.py             # Fully-integrated current Gymnasium environment
+    │   └── sf2_v3.py             # MultiDiscrete action space and advanced physics tracking
     ├── agents/              # Core RL algorithms and callback systems
-    │   ├── ppo/                  # PPO-specific modular agent logic
-    │   ├── sac/                  # SAC-specific modular agent logic
-    │   ├── dqn/                  # DQN-specific modular agent logic
+    │   ├── ppo/                  # PPO-specific modular agent logic and Optuna tuning
+    │   ├── sac/                  # SAC-specific modular agent logic and Optuna tuning
+    │   ├── dqn/                  # DQN-specific modular agent logic and Optuna tuning
+    │   ├── league/               # League matchmaking pool and dynamic opponent manager
+    │   ├── pbt/                  # Population-Based Training orchestrator and mutation schedules
     │   ├── base_agent.py         # Abstract base class enforcing Train/Resume/Tune/Test interface
     │   ├── manual_curriculum_callback.py  # Manual training progression checkpoints
     │   └── auto_curriculum_callback.py    # Rehearsal lottery, gating, and micro-step evaluator
     └── scripts/             # Execution CLI and Gradio Web Dashboard
-        ├── train.py              # CLI training initializer
-        ├── resume.py             # CLI model resuming and curriculum recoverer
-        ├── tune.py               # CLI Optuna optimization runner
+        ├── train.py              # CLI single-agent training initializer
+        ├── resume.py             # CLI automated crash-recovery supervisor
+        ├── tune.py               # CLI Optuna hyperparameter optimization runner
         ├── test_agent_v2.py      # Interactive matchup tester (P1 agent vs CPU or Human)
         ├── test_ai_vs_ai_v2.py   # Agent vs Agent matchup battles
+        ├── train_league.py       # Self-play league training runner
+        ├── train_exploiter.py    # Adversarial exploiter training runner
+        ├── train_pbt.py          # Population-Based Training runner (PB2)
         └── web_dashboard.py      # Gradio Web Control Center (Visual management suite)
 ```
 
@@ -209,7 +234,7 @@ Open `http://localhost:6006/` in your browser.
 
 Training multiple simultaneous instances of emulation is resource-intensive. The pipeline implements three core failsafes to guarantee stability:
 1.  **Multi-Process Thread Sniper:** Terminating Python training forces a cleanup callback via `atexit`. It triggers a PowerShell command query (`Get-CimInstance Win32_Process`) that automatically sniper-terminates grandchild `EmuHawk.exe` instances matching this specific project's path, completely avoiding zombie CPU hogs.
-2.  **RAM Delta Safety Clamping:** Raw RAM readings for HP are strictly clamped (threshold = 100 HP) inside `sf2_v3.py` to prevent emulator memory glitches from generating synthetic, corrupted gradient spikes.
+2.  **RAM Delta Safety Clamping:** Raw RAM readings for HP are strictly clamped (threshold = 100 HP) inside the environment layers (`base_env.py` and `sf2_v3.py`) to prevent emulator memory glitches from generating synthetic, corrupted gradient spikes.
 3.  **Graceful Stopping Signal:** Writing a `.stop_training` file in the project root triggers the active callbacks to serialize model states, dump the current curriculum registry to JSON, and execute a clean process exit without corrupting rollout buffers.
 
 ---
