@@ -8,22 +8,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from core import config
-from core.env_tools import SFv2_make_env
+from core.env_tools import SFv2_make_env, failsafe_env
 
 def main():
-    config.generate_lua_config()
-
-    # GPU Verification
-    import torch
-    # Performance Optimization: Restrict PyTorch to 2 CPU threads during tuning
-    # This prevents it from hijacking logical cores alongside active EmuHawk emulators.
-    torch.set_num_threads(2)
-
-    if torch.cuda.is_available():
-        print(f"[Hardware] Tuning on GPU: {torch.cuda.get_device_name(0)}")
-    else:
-        print("[Hardware] WARNING: No GPU detected for tuning. Running on CPU.")
-
     parser = argparse.ArgumentParser(description="Street Fighter II RL Hyperparameter Tuning via Optuna")
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"], help="RL algorithm to tune")
     parser.add_argument("--env", default="v2", choices=["v1", "v2", "v3"], help="Environment version")
@@ -37,6 +24,19 @@ def main():
     parser.add_argument("--timesteps", type=int, default=50000, help="Timesteps per trial")
     parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
+
+    config.generate_lua_config()
+
+    # GPU Verification
+    import torch
+    # Performance Optimization: Restrict PyTorch to 2 CPU threads during tuning
+    # This prevents it from hijacking logical cores alongside active EmuHawk emulators.
+    torch.set_num_threads(2)
+
+    if torch.cuda.is_available():
+        print(f"[Hardware] Tuning on GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[Hardware] WARNING: No GPU detected for tuning. Running on CPU.")
 
     # Device Auto-Logic
     device = args.device
@@ -79,6 +79,8 @@ def main():
     except Exception as e:
         print(f"[CRITICAL] Tuning process failed: {e}")
         sys.exit(1)
+    finally:
+        failsafe_env()
 
 if __name__ == "__main__":
     main()
