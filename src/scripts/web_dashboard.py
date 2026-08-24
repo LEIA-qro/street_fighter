@@ -141,6 +141,11 @@ def stream_logs(cmd):
     except Exception as e:
         yield full_output + f"\n[ERROR] {str(e)}"
     finally:
+        if 'proc' in locals() and proc and proc.stdout:
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
         state.active_process = None
 
 def graceful_stop_process():
@@ -1642,10 +1647,21 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
     state_upload.upload(handle_state_upload, inputs=[state_upload], outputs=[state_upload_status])
 
-if __name__ == "__main__":
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Street Fighter II RL Gradio Web Control Center")
+    parser.add_argument("--host", "--server_name", dest="server_name", type=str, default="0.0.0.0", help="Server host address (default: 0.0.0.0)")
+    parser.add_argument("--port", "--server_port", dest="server_port", type=int, default=7860, help="Server port number (default: 7860)")
+    parser.add_argument("--share", action="store_true", help="Generate public shareable Gradio link")
+    args = parser.parse_args()
+
     demo.queue().launch(
-        server_name="0.0.0.0", 
-        server_port=7860, 
+        server_name=args.server_name, 
+        server_port=args.server_port, 
+        share=args.share,
         theme=gr.themes.Soft(primary_hue="blue"), 
         css="#terminal textarea { font-family: monospace; }"
     )
+
+if __name__ == "__main__":
+    main()
