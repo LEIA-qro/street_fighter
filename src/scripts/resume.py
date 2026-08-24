@@ -31,7 +31,8 @@ from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
 
 def resume_training(model_path, vec_path,
                     callback_class=None,
-                    start_phase: int = None) -> dict:
+                    start_phase: int = None,
+                    device: str = "auto") -> dict:
     """
     Returns a result dict:
       {"success": True,  "reason": "completed"}
@@ -48,7 +49,10 @@ def resume_training(model_path, vec_path,
     # This prevents it from hijacking logical cores alongside active EmuHawk emulators.
     torch.set_num_threads(2)
 
-    print(f"Initializing {config.N_ENVS}-Core Resume Environment...")
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    print(f"Initializing {config.N_ENVS}-Core Resume Environment (Device: {device})...")
     
     algo_part = "ppo"
     env_part = "v2"
@@ -125,7 +129,7 @@ def resume_training(model_path, vec_path,
         model = PPO.load(
             model_path, 
             env=env, 
-            device="cuda", 
+            device=device, 
             tensorboard_log=directories["logs"],
             custom_objects={
                 "learning_rate": phase_params["lr"],
@@ -231,21 +235,39 @@ def resume_training(model_path, vec_path,
     finally:
         failsafe_env(env=env, model=model)
 
-if __name__ == "__main__":
-    current_model_path = os.path.join(directories["project_root"], config.TRAINING_ZIP_FILE)
-    current_vec_path = os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Street Fighter II RL Automated Crash-Recovery Supervisor")
+    parser.add_argument("--load_zip", type=str, default=None, help="Path to model .zip file to resume")
+    parser.add_argument("--load_pkl", type=str, default=None, help="Path to VecNormalize .pkl file")
+    parser.add_argument("--phase", type=str, default=None, help="Optional starting phase or level override")
+    parser.add_argument("--device", type=str, default="auto", help="Compute device (cuda, cpu, auto)")
+    args = parser.parse_args()
 
+    current_model_path = args.load_zip if args.load_zip else os.path.join(directories["project_root"], config.TRAINING_ZIP_FILE)
+    current_vec_path = args.load_pkl if args.load_pkl else os.path.join(directories["project_root"], config.TRAINING_PKL_FILE)
+
+    if not os.path.isabs(current_model_path):
+        current_model_path = os.path.join(config.PROJECT_ROOT, current_model_path)
+    if not os.path.isabs(current_vec_path):
+        current_vec_path = os.path.join(config.PROJECT_ROOT, current_vec_path)
+
+    phase_override = int(args.phase) if (args.phase is not None and args.phase.isdigit()) else None
     restart_count = 0
-    phase_state = None # Load saved phase dynamically from curriculum_state.json
-    while True:
-        result = resume_training(current_model_path, current_vec_path, start_phase=phase_state)
-        
+    try:
+        while True:
+            result = resume_training(current_model_path, current_vec_path, start_phase=phase_override, device=args.device)
 
-        if result["success"]:
-            print(f"Training session ended: {result['reason']}")
-            break
-        else:
-            restart_count += 1
-            print(f"\n--- AUTO-RESTART #{restart_count} ---")
-            current_model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
-            current_vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
+            if result["success"]:
+                print(f"Training session ended: {result['reason']}")
+                break
+            else:
+                restart_count += 1
+                print(f"\n--- AUTO-RESTART #{restart_count} ---")
+                current_model_path = os.path.join(directories["production"], f"{config.MODEL_NAME}_CRASH_SAVE.zip")
+                current_vec_path   = os.path.join(directories["production"], f"{config.MODEL_NAME}_vecnormalize_CRASH_SAVE.pkl")
+    finally:
+        failsafe_env()
+
+if __name__ == "__main__":
+    main()

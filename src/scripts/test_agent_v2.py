@@ -40,18 +40,7 @@ def get_model_class(algo_name):
     return PPO
 
 def test_agent():
-    # GPU Verification
-    import torch
-    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
-    # This prevents it from hijacking all logical cores for inference.
-    torch.set_num_threads(1)
-
-    if torch.cuda.is_available():
-        print(f"[Hardware] Testing on GPU: {torch.cuda.get_device_name(0)}")
-    else:
-        print("[Hardware] WARNING: No GPU detected for testing. Running on CPU.")
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Street Fighter II RL Interactive Matchup Tester")
     parser.add_argument("--algo", type=str, default="ppo")
     parser.add_argument("--env",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip", type=str, required=True)
@@ -64,6 +53,17 @@ def test_agent():
     parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
     parser.add_argument("--cpu_level_cap", type=int, default=5, choices=range(1, 9), help="Maximum CPU difficulty level cap (1-8) for infinite matchups")
     args = parser.parse_args()
+
+    # GPU Verification
+    import torch
+    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
+    # This prevents it from hijacking all logical cores for inference.
+    torch.set_num_threads(1)
+
+    if torch.cuda.is_available():
+        print(f"[Hardware] Testing on GPU: {torch.cuda.get_device_name(0)}")
+    else:
+        print("[Hardware] WARNING: No GPU detected for testing. Running on CPU.")
 
     # Auto-detect algorithm override based on path to prevent mismatch errors
     if args.load_zip != "None":
@@ -341,7 +341,7 @@ def test_agent():
             print("="*60)
             stats = pstats.Stats(profiler).sort_stats('cumulative')
             stats.print_stats(20)
-        env.close()
+        failsafe_env(env=env if 'env' in locals() else None, model=model if 'model' in locals() else None)
 
 if __name__ == "__main__":
     test_agent()

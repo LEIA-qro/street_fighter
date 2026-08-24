@@ -150,11 +150,7 @@ class LeagueMatchmakingCallback(CallbackList):
         print(f"{'='*60}\n")
 
 def train_league():
-    # Enforce thread restriction to prevent core thrashing
-    import torch
-    torch.set_num_threads(1)
-    
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Street Fighter II RL Self-Play League Training")
     parser.add_argument("--steps", type=int, default=5000000)
     parser.add_argument("--env_version", type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--matchup_mode", type=str, default="ryu_vs_ryu", choices=["ryu_vs_ryu", "ryu_vs_all", "custom"])
@@ -163,6 +159,10 @@ def train_league():
     parser.add_argument("--resume", action="store_true", help="Resume from an existing active model")
     parser.add_argument("--device", type=str, default="auto")
     args = parser.parse_args()
+    
+    # Enforce thread restriction to prevent core thrashing
+    import torch
+    torch.set_num_threads(1)
     
     device = args.device
     if device == "auto":
@@ -297,7 +297,7 @@ def train_league():
             
     finally:
         # Failsafe cleanup to prevent zombie processes and release CUDA memory
-        failsafe_env(env=env, model=model if 'model' in locals() else None)
+        failsafe_env(env=env if 'env' in locals() else None, model=model if 'model' in locals() else None)
 
 if __name__ == "__main__":
     train_league()

@@ -1,4 +1,4 @@
-import os, time, multiprocessing, gc, atexit
+import os, sys, time, multiprocessing, gc, atexit
 
 import core.config as config
 
@@ -95,14 +95,14 @@ def failsafe_env(env=None, model=None, ignore_gate=False):
     
     # 3. The VRAM Purge
     gc.collect()
-    try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except ImportError:
-        pass
+    if "torch" in sys.modules:
+        try:
+            torch_mod = sys.modules["torch"]
+            if hasattr(torch_mod, "cuda") and torch_mod.cuda.is_available():
+                torch_mod.cuda.empty_cache()
+        except Exception:
+            pass
         
-    time.sleep(1)
     allow_sleep()
     print("[ENV] Failsafe complete.")
 
