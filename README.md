@@ -51,6 +51,12 @@ Verify GPU availability for PyTorch training:
 python verify_gpu.py
 ```
 
+> **Note:** If you encounter *ImportError: DLL load failed while importing mtrand: An Application Control policy has blocked this file.*
+Check Windows Smart App Control (Most Common on Windows 11)
+Open the Start menu and search for Windows Security.
+Go to App & browser control > Smart App Control settings.
+If Smart App Control is set to On or Evaluation, it frequently blocks unsigned or pip-installed .pyd and .dll files in user directories. Setting it to Off will immediately stop it from blocking NumPy.
+
 
 ---
 
