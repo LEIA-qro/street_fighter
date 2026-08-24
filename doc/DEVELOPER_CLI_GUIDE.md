@@ -32,7 +32,7 @@ All commands should be executed from the `street_fighter/` project root director
 Verify PyTorch CUDA acceleration, GPU device indexing, available VRAM, and driver compatibility before starting training:
 
 ```powershell
-python verify_gpu.py
+python code_testing/verify_gpu.py
 ```
 
 ### Specific GPU Selection
@@ -94,6 +94,15 @@ python src/scripts/train.py --algo ppo --env v2 --steps 5000000 --load_zip model
 python src/scripts/resume.py
 ```
 
+### Parameter Reference
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--load_zip` | `str` | `config.TRAINING_ZIP_FILE` | Path to starting model `.zip` file. |
+| `--load_pkl` | `str` | `config.TRAINING_PKL_FILE` | Path to starting `VecNormalize` `.pkl` file. |
+| `--phase` | `str` | `None` (auto-detected) | Starting curriculum phase or level override. |
+| `--device` | `str` | `auto` | Compute device (`cuda`, `cpu`, or `auto`). |
+
 > [!TIP]
 > Use `resume.py` for long unattended background runs where automated restart loops and crash-save recovery are needed. For targeted manual resumes with custom file paths, use `train.py --load_zip ... --load_pkl ...`.
 
@@ -152,6 +161,9 @@ python src/scripts/test_agent_v2.py --algo ppo --env v2 --load_zip models/produc
 | `--opponent_type` | `str` | `human` | Opponent type: `cpu` (emulator AI) or `human` (keyboard controls). |
 | `--device` | `str` | `auto` | Inference device (`cuda`, `cpu`, `auto`). |
 | `--profile` | `flag` | `False` | Runs `cProfile` performance analysis on step inference. |
+| `--infinite_match` | `flag` | `False` | Automatically reset and start rematches on KO. |
+| `--rematch_delay` | `float` | `2.0` | Delay in seconds before triggering auto-rematch. |
+| `--cpu_level_cap` | `int` | `5` | Maximum CPU difficulty level cap (1-8) for infinite matchups. |
 
 ---
 
@@ -183,6 +195,8 @@ python src/scripts/test_ai_vs_ai_v2.py `
 | `--env_p2` | `str` | `v2` | Player 2 environment version (`v2`, `v3`). |
 | `--device_p2` | `str` | `auto` | Compute device for Player 2 policy inference. |
 | `--profile` | `flag` | `False` | Enables `cProfile` performance telemetry. |
+| `--infinite_match` | `flag` | `False` | Automatically reset and start rematches on KO. |
+| `--rematch_delay` | `float` | `2.0` | Delay in seconds before triggering auto-rematch. |
 
 ---
 
@@ -256,6 +270,12 @@ Implements Population-Based Training using Population-Based Bandits (PB2) with G
 
 ### Usage
 
+> [!NOTE]
+> Population-Based Training uses Ray Tune. Install the optional dependency before running:
+> ```powershell
+> pip install "ray[tune]"
+> ```
+
 ```powershell
 # Run PBT with 10 agents, 1 environment per worker, exploring every 500k steps
 python src/scripts/train_pbt.py --algo ppo --env v2 --population 10 --steps 5000000 --steps_per_exploit 500000 --model_name PBT_PPO_v2
@@ -291,6 +311,14 @@ python src/scripts/web_dashboard.py
 ```
 
 Access the UI in your web browser at: **`http://127.0.0.1:7860`**
+
+### Parameter Reference
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--host`, `--server_name` | `str` | `0.0.0.0` | Host IP to bind server to. |
+| `--port`, `--server_port` | `int` | `7860` | Network port for dashboard UI. |
+| `--share` | `flag` | `False` | Generates a temporary public Gradio URL. |
 
 ---
 
