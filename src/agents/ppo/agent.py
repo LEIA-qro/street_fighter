@@ -99,6 +99,7 @@ class PPOAgent(BaseAgent):
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
                     device=device,
+                    tensorboard_log=directories["logs"],
                     custom_objects={"learning_rate": active_lr, "clip_range": active_clip, "ent_coef": active_ent}
                 )
             else:
