@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from core import config
+from core.env_tools import failsafe_env
 from agents.pbt import build_orchestrator
 
 def update_ppo_config_var(key, value):
@@ -18,14 +19,7 @@ def update_ppo_config_var(key, value):
     return False
 
 def main():
-    config.generate_lua_config()
-
-    import torch
-    # Performance Optimization: Restrict PyTorch to 2 CPU threads during PBT run
-    # Prevents logical core thrashing alongside active EmuHawk instances.
-    torch.set_num_threads(2)
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Street Fighter II RL Population-Based Training (PB2)")
     parser.add_argument("--algo", default="ppo")
     parser.add_argument("--env", default="v2")
     parser.add_argument("--model_name", default="PBT_BEST_model")
@@ -38,8 +32,14 @@ def main():
     parser.add_argument("--max_concurrent", type=int, default=None, help="Max concurrent trials (default: population size)")
     parser.add_argument("--envs_per_worker", type=int, default=1, help="Number of environments per PBT agent")
     parser.add_argument("--resume", action="store_true")
-    
     args = parser.parse_args()
+
+    config.generate_lua_config()
+
+    import torch
+    # Performance Optimization: Restrict PyTorch to 2 CPU threads during PBT run
+    # Prevents logical core thrashing alongside active EmuHawk instances.
+    torch.set_num_threads(2)
 
     # Set max_concurrent to population if not provided
     if args.max_concurrent is None:
@@ -54,18 +54,26 @@ def main():
         )
 
     print(f"Starting PBT (Pop: {args.population}, Concurrent: {args.max_concurrent}, Envs/Worker: {args.envs_per_worker}, Steps: {args.steps})...")
-    orchestrator = build_orchestrator()
-    best_config = orchestrator.run(
-        algo=args.algo, env_version=args.env, total_steps=args.steps, population_size=args.population,
-        max_concurrent=args.max_concurrent, envs_per_worker=args.envs_per_worker,
-        steps_per_exploit=args.steps_per_exploit, start_phase=args.phase, 
-        base_zip=args.load_zip, base_pkl=args.load_pkl, model_name=args.model_name, resume=args.resume
-    )
+    try:
+        try:
+            orchestrator = build_orchestrator()
+            best_config = orchestrator.run(
+                algo=args.algo, env_version=args.env, total_steps=args.steps, population_size=args.population,
+                max_concurrent=args.max_concurrent, envs_per_worker=args.envs_per_worker,
+                steps_per_exploit=args.steps_per_exploit, start_phase=args.phase, 
+                base_zip=args.load_zip, base_pkl=args.load_pkl, model_name=args.model_name, resume=args.resume
+            )
+        except ImportError as e:
+            if "ray" in str(e).lower():
+                sys.exit("[CRITICAL] Ray is required for Population-Based Training. Please install it with: pip install \"ray[tune]\"")
+            raise
 
-    if args.algo == "ppo":
-        update_ppo_config_var("LR", best_config.get("lr"))
-        update_ppo_config_var("ENT_COEF", best_config.get("ent_coef"))
-        update_ppo_config_var("CLIP_RANGE", best_config.get("clip_range"))
+        if args.algo == "ppo" and best_config:
+            update_ppo_config_var("LR", best_config.get("lr"))
+            update_ppo_config_var("ENT_COEF", best_config.get("ent_coef"))
+            update_ppo_config_var("CLIP_RANGE", best_config.get("clip_range"))
+    finally:
+        failsafe_env()
 
 if __name__ == "__main__":
     main()
