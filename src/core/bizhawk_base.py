@@ -155,10 +155,10 @@ class BizHawkBaseEnv(gym.Env):
         """Clean teardown of network and subprocess."""
         if self.verbose: print("Closing Environment: Initiating graceful teardown...")
         
-        # 1. Send the Poison Pill to Lua
         if self.conn:
             try:
-                formatted_reply = f"{len('EXIT\n')} EXIT\n"
+                exit_cmd = "EXIT\n"
+                formatted_reply = f"{len(exit_cmd)} {exit_cmd}"
                 self.conn.sendall(formatted_reply.encode('utf-8'))
                 time.sleep(0.3)  # Give Lua a fraction of a second to process the command
             except (ConnectionResetError, BrokenPipeError, OSError):
