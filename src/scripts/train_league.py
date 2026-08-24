@@ -228,7 +228,8 @@ def train_league():
             model = PPO.load(
                 active_model_path,
                 env=env,
-                device=device
+                device=device,
+                tensorboard_log=os.path.join(directories["logs"], "league")
             )
         else:
             print("[League] Creating fresh active Main Agent PPO network...")

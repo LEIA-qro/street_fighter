@@ -144,6 +144,7 @@ class DQNAgent(BaseAgent):
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
                     device=device,
+                    tensorboard_log=directories["logs"],
                     custom_objects={"learning_rate": active_lr, "exploration_fraction": active_expl_frac}
                 )
             else:

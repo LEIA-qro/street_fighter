@@ -164,6 +164,7 @@ class SACAgent(BaseAgent):
                     os.path.join(config.PROJECT_ROOT, load_zip), 
                     env=env, 
                     device=device,
+                    tensorboard_log=directories["logs"],
                     custom_objects={"learning_rate": active_lr, "tau": active_tau, "ent_coef": active_ent}
                 )
             else:

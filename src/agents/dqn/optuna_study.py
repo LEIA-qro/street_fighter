@@ -135,6 +135,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 os.path.join(config.PROJECT_ROOT, load_zip),
                 env=env,
                 device=device,
+                tensorboard_log=trial_log_dir,
                 custom_objects={
                     "learning_rate": lr,
                     "gamma": gamma,

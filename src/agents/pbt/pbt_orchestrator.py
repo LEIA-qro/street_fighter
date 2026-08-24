@@ -139,10 +139,10 @@ def run_agent_worker(config_dict):
     
     if checkpoint_dir and os.path.exists(os.path.join(checkpoint_dir, "model.zip")):
         model_path = os.path.join(checkpoint_dir, "model.zip")
-        model = PPO.load(model_path, env=env, device="cuda", custom_objects=custom_objs)
+        model = PPO.load(model_path, env=env, device="cuda", tensorboard_log=trial_log_dir, custom_objects=custom_objs)
     elif base_zip and base_zip != "None":
         model_path = os.path.join(core_config.PROJECT_ROOT, base_zip)
-        model = PPO.load(model_path, env=env, device="cuda", custom_objects=custom_objs)
+        model = PPO.load(model_path, env=env, device="cuda", tensorboard_log=trial_log_dir, custom_objects=custom_objs)
     else:
         model = PPO("MlpPolicy", env=env, learning_rate=active_lr, n_steps=FIXED_PARAMS["n_steps"], batch_size=FIXED_PARAMS["batch_size"],
                     ent_coef=active_ent, clip_range=active_clip, n_epochs=10, gamma=0.99, target_kl=0.03,
