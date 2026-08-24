@@ -1,8 +1,11 @@
 import os
 import sys
+from pathlib import Path
 
 # Add src to path
-sys.path.append(os.path.abspath('src'))
+SRC_DIR = str(Path(__file__).resolve().parents[2] / "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
 from envs.sf2_v1 import StreetFighterEnv
 from envs.sf2_v2 import StreetFighterEnvV2
@@ -16,7 +19,7 @@ print("V1 Action Space:", v1_env.action_space)
 
 try:
     v1_env.close()
-except Exception as e:
+except Exception:
     pass
 
 print("Tests passed.")
