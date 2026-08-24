@@ -39,11 +39,6 @@ python -m venv .venv
 Confirm that your terminal prompt is now prefixed with `(.venv)`. All commands should use the virtual environment's Python interpreter (`.venv\Scripts\python.exe`).
 
 ### 4. Dependency Installation
-Install all production requirements directly:
-
-```powershell
-pip install -r requirements.txt
-```
 
 Install [**PyTorch**](https://pytorch.org/get-started/locally/) for your hardware configuration:
 
@@ -53,6 +48,12 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 
 # Or for CPU-only systems:
 pip install torch torchvision
+```
+
+Install all production requirements directly:
+
+```powershell
+pip install -r requirements.txt
 ```
 
 Verify GPU availability for PyTorch training:
