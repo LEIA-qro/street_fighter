@@ -148,11 +148,7 @@ def process_action(act, algo, env_version="v2"):
             return "".join(str(int(b)) for b in act[0])
 
 def test_ai_vs_ai():
-    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
-    import torch
-    torch.set_num_threads(1)
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Street Fighter II RL AI vs AI Dual Agent Battle")
     parser.add_argument("--algo_p1", type=str, default="ppo")
     parser.add_argument("--env_p1",  type=str, default="v2", choices=["v2", "v3"])
     parser.add_argument("--load_zip_p1", type=str, required=True)
@@ -168,6 +164,10 @@ def test_ai_vs_ai():
     parser.add_argument("--infinite_match", action="store_true", help="Automatically reset and start rematches on KO")
     parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
     args = parser.parse_args()
+
+    # Performance Optimization: Restrict PyTorch to 1 CPU core during testing
+    import torch
+    torch.set_num_threads(1)
 
     # Auto-detect algorithm override for P1
     if args.load_zip_p1 != "None":
@@ -445,7 +445,7 @@ def test_ai_vs_ai():
             print("="*60)
             stats = pstats.Stats(profiler).sort_stats('cumulative')
             stats.print_stats(20)
-        master_env.close()
+        failsafe_env(env=master_env if 'master_env' in locals() else None)
 
 if __name__ == "__main__":
     test_ai_vs_ai()
