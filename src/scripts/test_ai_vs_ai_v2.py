@@ -303,6 +303,13 @@ def test_ai_vs_ai():
     model_p2 = load_model_safely(args.algo_p2, args.load_zip_p2, "Player 2", device_p2)
 
     
+    match_count = 1
+    p1_wins = 0
+    p2_wins = 0
+    round_started = False
+    ko_time = None
+    round_winner_msg = None
+
     print(f"\n{('='*50)}")
     print("FIGHT! (AI vs AI V2 running...)")
     print(f"{('='*50)}")
@@ -312,7 +319,7 @@ def test_ai_vs_ai():
     if args.infinite_match:
         initial_state_path = os.path.join(config.STATES_DIR, "RYU_RYU_R1_PvP.State")
         print(f"[Infinite Match] Cold-starting in active duel state: {initial_state_path}", flush=True)
-        master_env.send_command(f"RESET {initial_state_path}\n")
+        master_env.send_command(f"RESET {initial_state_path}|{p1_wins}|{p2_wins}\n")
         first_payload = master_env.receive_payload()
     else:
         first_payload = master_env.receive_payload()
@@ -329,13 +336,6 @@ def test_ai_vs_ai():
         profiler = cProfile.Profile()
         profiler.enable()
         print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.", flush=True)
-
-    match_count = 1
-    p1_wins = 0
-    p2_wins = 0
-    round_started = False
-    ko_time = None
-    round_winner_msg = None
 
     try:
         while True:
@@ -381,9 +381,9 @@ def test_ai_vs_ai():
                         print(f"[Rematch] Loading new round...", flush=True)
                         print(f"{'='*50}\n", flush=True)
 
-                        # Trigger Lua RESET to RYU_RYU_R1_PvP.State
+                        # Trigger Lua RESET to RYU_RYU_R1_PvP.State with scoreboard
                         reset_state_path = os.path.join(config.STATES_DIR, "RYU_RYU_R1_PvP.State")
-                        master_env.send_command(f"RESET {reset_state_path}\n")
+                        master_env.send_command(f"RESET {reset_state_path}|{p1_wins}|{p2_wins}\n")
 
                         # Receive new post-reset state and re-prime buffers
                         reset_payload = master_env.receive_payload()

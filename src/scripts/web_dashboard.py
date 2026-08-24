@@ -356,7 +356,7 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled, infinite_match_enabled=False, rematch_delay=2.0):
+def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled, infinite_match_enabled=False, rematch_delay=2.0, cpu_level_cap=5):
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
@@ -392,6 +392,8 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
         cmd += ["--profile"]
     if infinite_match_enabled:
         cmd += ["--infinite_match", "--rematch_delay", str(float(rematch_delay))]
+        if (p1_is_ai and not p2_is_ai and p2_algo == "CPU (Built-in AI)") or (p2_is_ai and not p1_is_ai and p1_algo == "CPU (Built-in AI)"):
+            cmd += ["--cpu_level_cap", str(int(cpu_level_cap))]
         
     for log in stream_logs(cmd):
         yield log
@@ -1402,6 +1404,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         match_profile_checkbox = gr.Checkbox(label="Enable Performance Profiling", value=False)
                         infinite_match_checkbox = gr.Checkbox(label="🔄 Infinite Matchups (Auto-Rematch)", value=False)
                         rematch_delay_slider = gr.Slider(label="Rematch Delay (seconds)", minimum=1.0, maximum=5.0, value=2.0, step=0.5)
+                        cpu_level_cap_slider = gr.Slider(label="CPU Max Level Cap (Infinite Match)", minimum=1, maximum=8, value=5, step=1)
                     
                     with gr.Row():
                         toggle_agent_btn = gr.Button("⏯️ Toggle Agent (Play/Pause)", variant="secondary")
@@ -1448,7 +1451,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 inputs=[
                     p1_algo, p1_env, p1_zip, p1_pkl, p1_device, 
                     p2_algo, p2_env, p2_zip, p2_pkl, p2_device, 
-                    match_profile_checkbox, infinite_match_checkbox, rematch_delay_slider
+                    match_profile_checkbox, infinite_match_checkbox, rematch_delay_slider,
+                    cpu_level_cap_slider
                 ], 
                 outputs=[match_logs]
             )

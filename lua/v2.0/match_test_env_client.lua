@@ -29,11 +29,41 @@ local id_cyp = 0xC0FDDBCF -- Button Yup Pressed
 local id_cnp = 0xC0000000 -- Button Not Pressed
 local id_cbg = 0xC0000E60 -- Background
 
+-- Match State Tracking
+local current_match_state = "Manual / Menu"
+
+local function get_state_display_name(path)
+    if path == nil or path == "" then return "Manual / Menu" end
+    local name = path:match("^.+\\(.+)$") or path:match("^.+/(.+)$") or path
+    return string.gsub(name, "%.State$", ""):gsub("%.state$", "")
+end
+
+-- Scoreboard Tracking (Infinite Matchups only)
+local show_scoreboard = false
+local p1_score = 0
+local p2_score = 0
+
 local function draw_model_labels()
-    -- Draw Player 1 Label (Left)
-    gui.text(10, 660, p1_label, 0xFFFFFFFF, "bottomleft")
-    -- Draw Player 2 Label (Right)
-    gui.text(600, 660, p2_label, 0xFFFFFFFF, "bottomleft")
+    if show_scoreboard then
+        -- Draw Player 1 Label & Score (Bottom-Left)
+        gui.text(10, 24, p1_label, 0xFFFFFFFF, "bottomleft")
+        gui.text(10, 8, string.format("Wins: %d", p1_score), 0xFF00FF00, "bottomleft")
+        
+        -- Draw Player 2 Label & Score (Bottom-Right)
+        gui.text(10, 24, p2_label, 0xFFFFFFFF, "bottomright")
+        gui.text(10, 8, string.format("Wins: %d", p2_score), 0xFF00FF00, "bottomright")
+    else
+        -- Draw Player 1 Label (Bottom-Left: 10px from left edge, 10px from bottom edge)
+        gui.text(10, 10, p1_label, 0xFFFFFFFF, "bottomleft")
+        -- Draw Player 2 Label (Bottom-Right: 10px from right edge, 10px from bottom edge)
+        gui.text(10, 10, p2_label, 0xFFFFFFFF, "bottomright")
+    end
+end
+
+local function draw_state_name()
+    if current_match_state and current_match_state ~= "None" then
+        gui.text(10, 10, "State: " .. current_match_state, 0xFFFFFFFF, "topright")
+    end
 end
 
 local function draw_inputs()
@@ -87,6 +117,12 @@ local function draw_inputs()
     end
 end
 
+local function draw_overlay()
+    draw_inputs()
+    draw_model_labels()
+    draw_state_name()
+end
+
 local STATES_DIR = python_config.STATES_DIR
 local state_file_path = python_config.PROJECT_ROOT .. "\\.agent_state"
 
@@ -133,8 +169,7 @@ while true do
 
     if not is_running then
         gui.clearGraphics()
-        draw_inputs()
-        draw_model_labels()
+        draw_overlay()
         emu.frameadvance()
     else
         -- Read RAM
@@ -231,14 +266,35 @@ while true do
             client.exit()                  -- Safely terminates the BizHawk application
             break
         elseif string.sub(response, 1, 5) == "RESET" then
-            local state_file_path = string.sub(response, 7) -- Extract the state name after "RESET "
-            console.log("Received RESET command. Loading New Random State... ")
+            local reset_arg = string.sub(response, 7) -- Extract argument string after "RESET "
+            local state_file_path = reset_arg
+            local sep_idx = string.find(reset_arg, "|")
+            if sep_idx then
+                state_file_path = string.sub(reset_arg, 1, sep_idx - 1)
+                local score_str = string.sub(reset_arg, sep_idx + 1)
+                local sep2_idx = string.find(score_str, "|")
+                if sep2_idx then
+                    local p1_str = string.sub(score_str, 1, sep2_idx - 1)
+                    local p2_str = string.sub(score_str, sep2_idx + 1)
+                    p1_score = tonumber(p1_str) or 0
+                    p2_score = tonumber(p2_str) or 0
+                    show_scoreboard = true
+                else
+                    p1_score = tonumber(score_str) or 0
+                    p2_score = 0
+                    show_scoreboard = true
+                end
+            else
+                show_scoreboard = false
+            end
+
+            console.log("Received RESET command. Loading State: " .. state_file_path)
             savestate.load(state_file_path)
+            current_match_state = get_state_display_name(state_file_path)
             
             -- Skip input injection and frame advance, yield control to the newly loaded state
             gui.clearGraphics()
-            draw_inputs()
-            draw_model_labels()
+            draw_overlay()
             emu.frameadvance() 
         else
             -- Normal Step: Inject Inputs via 20-Bit Protocol
@@ -288,8 +344,7 @@ while true do
                 if p1_controlled then joypad.set(p1_input, 1) end
                 if p2_controlled then joypad.set(p2_input, 2) end
                 gui.clearGraphics()
-                draw_inputs()
-                draw_model_labels()
+                draw_overlay()
                 emu.frameadvance()
             end
         end

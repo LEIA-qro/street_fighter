@@ -415,6 +415,16 @@ DIFFICULTY_LEVELS = {
     8: LEVEL_8_STATES,
 }
 
+def get_cpu_states_up_to_level(max_level: int = 5) -> list[str]:
+    """Returns all CPU state filenames for difficulty levels from 1 up to max_level (clamped 1..8)."""
+    clamped_level = max(1, min(int(max_level), 8))
+    states = []
+    for lvl in range(1, clamped_level + 1):
+        if lvl in DIFFICULTY_LEVELS:
+            states.extend(DIFFICULTY_LEVELS[lvl])
+    return states
+
+
 RYU_PVP_STATES = [
     "RYU_RYU_R1_PvP.State",
     "RYU_KEN_R1_PvP.State",
@@ -445,4 +455,12 @@ TRAINING_STATES = CURRICULUM_PHASES[0] # Global variable to be updated by the ca
 WIN_RATE_THRESHOLD = 0.75
 WIN_RATE_WINDOW = 250
 
-CUSTOM_STATES = ["Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave7.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave9.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave4.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave3.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave5.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave0.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave1.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave8.State", "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave6.State"]
+CUSTOM_STATES = ["Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave7.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave9.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave4.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave3.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave5.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave0.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave1.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave8.State", 
+                 "Street Fighter II - Special Champion Edition U .Genplus-gx.QuickSave6.State"]

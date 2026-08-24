@@ -62,6 +62,7 @@ def test_agent():
     parser.add_argument("--profile", action="store_true", help="Enable performance profiling via cProfile")
     parser.add_argument("--infinite_match", action="store_true", help="Automatically reset and start rematches on KO")
     parser.add_argument("--rematch_delay", type=float, default=2.0, help="Delay in seconds before triggering auto-rematch")
+    parser.add_argument("--cpu_level_cap", type=int, default=5, choices=range(1, 9), help="Maximum CPU difficulty level cap (1-8) for infinite matchups")
     args = parser.parse_args()
 
     # Auto-detect algorithm override based on path to prevent mismatch errors
@@ -173,18 +174,28 @@ def test_agent():
 
     model = load_model_safely(args.algo, model_load_path, device)
     
+    match_count = 1
+    ai_wins = 0
+    opp_wins = 0
+    round_started = False
+    ko_time = None
+    round_winner_msg = None
+
     print(f"\nFIGHT! (The {args.algo.upper()} AI engine is now running in the background)")
     if args.infinite_match:
         if args.opponent_type == "human":
             initial_state_file = "RYU_RYU_R1_PvP.State"
         else:
-            cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
-            initial_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
+            cpu_candidates = config.get_cpu_states_up_to_level(args.cpu_level_cap)
+            available_cpu = [s for s in cpu_candidates if os.path.exists(os.path.join(config.STATES_DIR, s))]
+            initial_state_file = random.choice(available_cpu) if available_cpu else "RYU_BALROG_R1_HARD.State"
 
         initial_state_path = os.path.join(config.STATES_DIR, initial_state_file)
         print(f"[Infinite Match] Cold-starting in active state: {initial_state_file}", flush=True)
         base_env = env.envs[0]
-        base_env.send_command(f"RESET {initial_state_path}\n")
+        p1_score = ai_wins if args.player == 1 else opp_wins
+        p2_score = opp_wins if args.player == 1 else ai_wins
+        base_env.send_command(f"RESET {initial_state_path}|{p1_score}|{p2_score}\n")
         reset_payload = base_env.receive_payload()
         observation = base_env._parse_payload(reset_payload, is_reset=True)
         base_env.frames.clear()
@@ -202,13 +213,6 @@ def test_agent():
         profiler = cProfile.Profile()
         profiler.enable()
         print("[Profiling] Performance tracking ENABLED. Results will display after the session ends.", flush=True)
-
-    match_count = 1
-    ai_wins = 0
-    opp_wins = 0
-    round_started = False
-    ko_time = None
-    round_winner_msg = None
 
     try:
         while True:
@@ -300,16 +304,18 @@ def test_agent():
                         if args.opponent_type == "human":
                             rematch_state_file = "RYU_RYU_R1_PvP.State"
                         else:
-                            # Random CPU state
-                            cpu_states = [s for s in os.listdir(config.STATES_DIR) if s.startswith("RYU_") and s.endswith(".State") and "PvP" not in s]
-                            rematch_state_file = random.choice(cpu_states) if cpu_states else "RYU_BALROG_R1_HARD.State"
+                            cpu_candidates = config.get_cpu_states_up_to_level(args.cpu_level_cap)
+                            available_cpu = [s for s in cpu_candidates if os.path.exists(os.path.join(config.STATES_DIR, s))]
+                            rematch_state_file = random.choice(available_cpu) if available_cpu else "RYU_BALROG_R1_HARD.State"
 
                         print(f"[Rematch] Loading state: {rematch_state_file}", flush=True)
                         full_state_path = os.path.join(config.STATES_DIR, rematch_state_file)
                         
                         # Send RESET command directly via underlying base env
                         base_env = env.envs[0]
-                        base_env.send_command(f"RESET {full_state_path}\n")
+                        p1_score = ai_wins if args.player == 1 else opp_wins
+                        p2_score = opp_wins if args.player == 1 else ai_wins
+                        base_env.send_command(f"RESET {full_state_path}|{p1_score}|{p2_score}\n")
                         reset_payload = base_env.receive_payload()
                         observation = base_env._parse_payload(reset_payload, is_reset=True)
                         base_env.frames.clear()
