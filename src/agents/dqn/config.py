@@ -6,7 +6,9 @@ N_HYPERPARAMETER_TRIALS = 50
 
 # --- HYPERPARAMETERS FROM OPTUNA TRIAL ---
 LR = 1e-4
-BUFFER_SIZE = 100000 
+# With N_ENVS=16, 16 transitions land per env step, so 100k held only ~6,250
+# iterations -- minutes of wall clock against a 96-savestate curriculum.
+BUFFER_SIZE = 1_000_000
 BATCH_SIZE = 256
 GAMMA = 0.99
 EXPLORATION_FRACTION = 0.1

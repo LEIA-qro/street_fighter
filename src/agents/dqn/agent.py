@@ -1,6 +1,6 @@
 import os
 import time
-from stable_baselines3 import DQN
+from sb3_contrib import QRDQN
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from core import config
@@ -8,6 +8,7 @@ from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from agents.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
+from agents.common.action_wrappers import FlattenDiscreteActionWrapper
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
 
 
@@ -83,51 +84,10 @@ class DQNAgent(BaseAgent):
         directories = config.get_directory()
         
         try:
-            from gymnasium import ActionWrapper, spaces
-            import numpy as np
-
-            class DiscreteToMultiBinaryWrapper(ActionWrapper):
-                """Convert DQN's Discrete output to MultiBinary or MultiDiscrete.
-
-                Supports both action space types:
-                - MultiBinary(n): Discrete(2^n) with binary string decode
-                - MultiDiscrete(nvec): Discrete(prod(nvec)) with divmod decode
-                """
-                def __init__(self, env):
-                    super().__init__(env)
-                    raw_space = env.action_space
-                    if isinstance(raw_space, spaces.MultiBinary):
-                        self._mode = "multibinary"
-                        self._n_buttons = raw_space.n
-                        self.action_space = spaces.Discrete(2 ** self._n_buttons)
-                    elif isinstance(raw_space, spaces.MultiDiscrete):
-                        self._mode = "multidiscrete"
-                        self._nvec = raw_space.nvec.copy()
-                        self.action_space = spaces.Discrete(int(np.prod(self._nvec)))
-                    else:
-                        raise TypeError(
-                            f"DQN wrapper: unsupported action space "
-                            f"{type(raw_space).__name__}. Expected "
-                            f"MultiBinary or MultiDiscrete."
-                        )
-
-                def action(self, action):
-                    if self._mode == "multibinary":
-                        binary_str = format(action, f'0{self._n_buttons}b')
-                        return np.array([int(b) for b in binary_str], dtype=np.int8)
-                    else:
-                        # Decode flat index → MultiDiscrete via divmod
-                        decoded = []
-                        remaining = int(action)
-                        for n in reversed(self._nvec):
-                            decoded.append(remaining % n)
-                            remaining //= n
-                        return np.array(list(reversed(decoded)), dtype=np.int64)
-
             def make_dqn_env(rank):
                 original_init = env_fn(rank)
                 def _init():
-                    return DiscreteToMultiBinaryWrapper(original_init())
+                    return FlattenDiscreteActionWrapper(original_init())
                 return _init
 
             env = SubprocVecEnv([make_dqn_env(i) for i in range(n_envs)])
@@ -148,15 +108,15 @@ class DQNAgent(BaseAgent):
                                              n_frames=config.NUM_FRAMES)
 
             if load_zip and load_zip != "None":
-                model = DQN.load(
-                    os.path.join(config.PROJECT_ROOT, load_zip), 
-                    env=env, 
+                model = QRDQN.load(
+                    os.path.join(config.PROJECT_ROOT, load_zip),
+                    env=env,
                     device=device,
                     tensorboard_log=directories["logs"],
                     custom_objects={"learning_rate": active_lr, "exploration_fraction": active_expl_frac}
                 )
             else:
-                model = DQN(
+                model = QRDQN(
                     policy="MlpPolicy",
                     env=env,
                     learning_rate=active_lr,
@@ -165,8 +125,12 @@ class DQNAgent(BaseAgent):
                     exploration_fraction=active_expl_frac,
                     exploration_initial_eps=EXPLORATION_INITIAL_EPS,
                     exploration_final_eps=EXPLORATION_FINAL_EPS,
-                    gamma=0.99,
-                    policy_kwargs=dict(net_arch=[512, 512, 256]),
+                    gamma=0.995,
+                    learning_starts=10_000,
+                    train_freq=4,
+                    gradient_steps=1,
+                    target_update_interval=10_000,
+                    policy_kwargs=dict(net_arch=[512, 512, 256], n_quantiles=51),
                     verbose=1,
                     tensorboard_log=directories["logs"],
                     device=device
@@ -175,7 +139,7 @@ class DQNAgent(BaseAgent):
             # Extract env_version and algo from save_dir safely
             normalized_path = os.path.normpath(save_dir)
             path_parts = normalized_path.split(os.sep)
-            algo_part = "dqn"
+            algo_part = "qrdqn"
             env_part = "v2"
             if len(path_parts) >= 2:
                 algo_part = path_parts[-1]

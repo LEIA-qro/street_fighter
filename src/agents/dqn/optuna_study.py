@@ -7,6 +7,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
+from agents.common.action_wrappers import FlattenDiscreteActionWrapper
 
 from stable_baselines3.common.callbacks import BaseCallback
 from collections import deque
@@ -68,51 +69,10 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
     model = None
     
     try:
-        from gymnasium import ActionWrapper, spaces
-        import numpy as np
-
-        class DiscreteToMultiBinaryWrapper(ActionWrapper):
-            """Convert DQN's Discrete output to MultiBinary or MultiDiscrete.
-
-            Supports both action space types:
-            - MultiBinary(n): Discrete(2^n) with binary string decode
-            - MultiDiscrete(nvec): Discrete(prod(nvec)) with divmod decode
-            """
-            def __init__(self, env):
-                super().__init__(env)
-                raw_space = env.action_space
-                if isinstance(raw_space, spaces.MultiBinary):
-                    self._mode = "multibinary"
-                    self._n_buttons = raw_space.n
-                    self.action_space = spaces.Discrete(2 ** self._n_buttons)
-                elif isinstance(raw_space, spaces.MultiDiscrete):
-                    self._mode = "multidiscrete"
-                    self._nvec = raw_space.nvec.copy()
-                    self.action_space = spaces.Discrete(int(np.prod(self._nvec)))
-                else:
-                    raise TypeError(
-                        f"DQN wrapper: unsupported action space "
-                        f"{type(raw_space).__name__}. Expected "
-                        f"MultiBinary or MultiDiscrete."
-                    )
-
-            def action(self, action):
-                if self._mode == "multibinary":
-                    binary_str = format(action, f'0{self._n_buttons}b')
-                    return np.array([int(b) for b in binary_str], dtype=np.int8)
-                else:
-                    # Decode flat index → MultiDiscrete via divmod
-                    decoded = []
-                    remaining = int(action)
-                    for n in reversed(self._nvec):
-                        decoded.append(remaining % n)
-                        remaining //= n
-                    return np.array(list(reversed(decoded)), dtype=np.int64)
-
         def make_dqn_env(rank):
             original_init = env_fn(rank)
             def _init():
-                return DiscreteToMultiBinaryWrapper(original_init())
+                return FlattenDiscreteActionWrapper(original_init())
             return _init
 
         env = SubprocVecEnv([make_dqn_env(i) for i in range(n_envs)])
