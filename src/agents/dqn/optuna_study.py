@@ -103,6 +103,11 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 }
             )
         else:
+            # learning_starts/train_freq/gradient_steps/target_update_interval
+            # must stay in step with the QRDQN(...) call in agents/dqn/agent.py --
+            # if the tuner and the trainer warm up on different schedules, the
+            # study is scoring hyperparameters under conditions production
+            # training never sees. Keep these four in sync at both call sites.
             model = QRDQN(
                 "MlpPolicy",
                 env,
@@ -111,6 +116,10 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 batch_size=batch_size,
                 gamma=gamma,
                 exploration_fraction=exploration_fraction,
+                learning_starts=10_000,
+                train_freq=4,
+                gradient_steps=1,
+                target_update_interval=10_000,
                 policy_kwargs=dict(net_arch=net_arch, n_quantiles=51),
                 verbose=0,
                 tensorboard_log=trial_log_dir,
