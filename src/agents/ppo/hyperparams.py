@@ -50,8 +50,9 @@ def build_ppo_kwargs(lr: float, ent_coef: float, clip_range: float,
       FRAME_SKIP=4 that is ~6.7 seconds, far short of a full SF2 round. 0.995
       roughly doubles it so the value head can see the KO from mid-round.
     * learning_rate annealed by default.
-    * vf_coef / max_grad_norm / normalize_advantage made explicit so Optuna
-      can reach them.
+    * vf_coef / max_grad_norm / normalize_advantage stated explicitly here
+      rather than inherited as SB3 library defaults, so the full PPO
+      configuration is visible in one place and reviewable.
     """
     learning_rate = linear_schedule(lr) if anneal_lr else lr
     return {

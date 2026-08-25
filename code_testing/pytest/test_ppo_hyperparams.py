@@ -43,6 +43,14 @@ def test_build_ppo_kwargs_sets_every_coefficient_explicitly():
                 "target_kl", "policy_kwargs", "device"):
         assert key in kwargs, f"missing explicit hyperparameter: {key}"
 
+    # Presence alone would pass even if these shipped with the wrong values
+    # (e.g. vf_coef=1.0 or normalize_advantage=False) -- pin the values the
+    # plan calls load-bearing.
+    assert kwargs["vf_coef"] == pytest.approx(0.5)
+    assert kwargs["max_grad_norm"] == pytest.approx(0.5)
+    assert kwargs["normalize_advantage"] is True
+    assert kwargs["gae_lambda"] == pytest.approx(0.95)
+
 
 def test_build_ppo_kwargs_annealing_produces_callables():
     kwargs = build_ppo_kwargs(lr=3e-4, ent_coef=0.01, clip_range=0.2,
@@ -103,14 +111,13 @@ def test_resolve_sac_ent_coef_accepts_none_and_explicit_zero():
     assert resolve_sac_ent_coef(0.02) == pytest.approx(0.02)
 
 
-def test_all_three_train_methods_use_none_sentinel_for_lr_and_ent_coef():
-    """PPOAgent.train already defaults lr/ent_coef/clip_range to None (Task 4).
-    DQNAgent.train and SACAgent.train keep their pre-existing 0.0 defaults on
-    the signature by design (train.py is their only caller and always passes
-    an explicit value), but their internal resolution must treat None as
-    "not provided" -- verified above via resolve_dqn_lr/resolve_sac_lr/
-    resolve_sac_ent_coef, which is what train.py's explicit None argument
-    actually reaches at runtime.
+def test_ppo_train_signature_defaults_lr_and_overrides_to_none():
+    """PPOAgent.train defaults lr/ent_coef/clip_range to None (Task 4), the
+    sentinel resolve_override() relies on. DQNAgent.train and SACAgent.train
+    intentionally keep their pre-existing 0.0 signature defaults (train.py is
+    their only caller and always passes an explicit value); their internal
+    None-handling is covered separately by resolve_dqn_lr/resolve_sac_lr/
+    resolve_sac_ent_coef above.
     """
     import inspect
     from agents.ppo.agent import PPOAgent
