@@ -80,6 +80,7 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         self.corrupt_payload_count = 0
         self.sticky_direction = None
         self.sticky_counter = 0
+        self.hp_sentinel = False
 
         # --- Spaces (mirrors sf2_v2 / sf2_v3) ---
         cont_low = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.]

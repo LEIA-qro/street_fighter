@@ -25,6 +25,9 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
     Concrete subclasses override the action spaces and parsing helpers.
     """
 
+    # HP reads above this are round-transition sentinels (0xFF etc.), not health.
+    HP_SENTINEL_THRESHOLD = 200
+
     def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=True, player=1, verbose=True):
         assigned_port = config.PORT + rank
 
@@ -57,6 +60,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.corrupt_payload_count = 0
         self.sticky_direction = None
         self.sticky_counter = 0
+        self.hp_sentinel = False
 
     def set_training_states(self, new_states):
         """Receives broadcast from the Main Process and updates local memory."""
@@ -199,16 +203,24 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
         self.prev_my_hp, self.prev_enemy_hp = current_my_hp, current_enemy_hp
 
-        terminated = bool(current_my_hp <= 0 or current_enemy_hp <= 0) if self.trainable else False
+        # A frame where BOTH HP reads are sentinels is a round transition, not a
+        # KO. Terminating there fabricates episodes out of menu frames.
+        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
+        terminated = ko if self.trainable else False
         truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
-        # Emit win/loss outcome and health in info
         info = {
             "my_hp": current_my_hp,
             "enemy_hp": current_enemy_hp,
+            "hp_sentinel": self.hp_sentinel,
         }
         if terminated or truncated:
-            info["win"] = 1 if current_enemy_hp <= 0 and current_my_hp > 0 else 0
+            double_ko = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
+            info["double_ko"] = double_ko
+            info["timeout"] = bool(truncated)
+            info["episode_steps"] = self._steps
+            info["win"] = 1 if (terminated and current_enemy_hp <= 0 and current_my_hp > 0) else 0
+            info["loss"] = 1 if (terminated and current_my_hp <= 0 and current_enemy_hp > 0) else 0
             if hasattr(self, "current_state_file"):
                 info["state_file"] = self.current_state_file
 
@@ -256,6 +268,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.frames_since_last_hit = 0
                 self.sticky_counter = 0
                 self.sticky_direction = None
+                self.hp_sentinel = False
 
                 self.frames.clear()
                 for _ in range(config.NUM_FRAMES): self.frames.append(observation)
@@ -295,8 +308,13 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             try:
                 raw = [int(x) for x in parts]
 
-                raw[0] = 0 if raw[0] > 200 else raw[0]
-                raw[1] = 0 if raw[1] > 200 else raw[1]
+                p1_sentinel = raw[0] > self.HP_SENTINEL_THRESHOLD
+                p2_sentinel = raw[1] > self.HP_SENTINEL_THRESHOLD
+                # Both players reading sentinel at once means a round transition,
+                # not a simultaneous KO. Flag it so step() can refuse to terminate.
+                self.hp_sentinel = p1_sentinel and p2_sentinel
+                raw[0] = 0 if p1_sentinel else raw[0]
+                raw[1] = 0 if p2_sentinel else raw[1]
 
                 # PERSPECTIVE FLIP
                 if self.player == 2:
