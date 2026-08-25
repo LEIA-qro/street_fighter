@@ -31,7 +31,7 @@ from gymnasium import spaces
 
 import core.config as config
 from envs.sf2_v3 import StreetFighterEnvV3
-from envs.base_env import ACT_CATEGORIES, CHAR_CATEGORIES
+from envs.base_env import ACT_CATEGORIES, CHAR_CATEGORIES, TOTAL_OBS_DIM
 
 V4_CONT_DIM = 13
 V4_FLAG_DIM = 2
@@ -69,6 +69,14 @@ class StreetFighterEnvV4(StreetFighterEnvV3):
         in exactly one place.
         """
         full = super()._parse_payload(data, is_reset=is_reset)
+
+        # The base failsafe repeats the last good frame verbatim. For v4 that
+        # frame is already compact (V4_FRAME_DIM), not the 554-dim v2/v3 layout,
+        # so re-running the one-hot argmax extraction on it would read empty
+        # slices and raise. Pass it through unchanged.
+        if full.shape[0] != TOTAL_OBS_DIM:
+            return full.astype(np.float32)
+
         x = self.extra_ram
 
         base_cont = full[:10]

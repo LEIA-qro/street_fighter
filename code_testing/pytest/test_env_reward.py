@@ -17,8 +17,9 @@ if str(Path(__file__).resolve().parent) not in sys.path:
 import numpy as np
 import pytest
 
-from fakes.fake_bizhawk import FakeBizHawkEnv, make_payload
+from fakes.fake_bizhawk import FakeBizHawkEnv, FakeBizHawkEnvV4, make_payload
 import core.config as config
+from envs.sf2_v4 import V4_FRAME_DIM
 
 
 def test_reset_fills_frame_stack():
@@ -240,3 +241,27 @@ def test_expanded_payload_exposes_the_recovered_fields():
     assert env.extra_ram["p1_act_lo"] == 5
     assert env.extra_ram["p2_btn"] == 8
     assert env.extra_ram["p2_air"] == 1
+
+
+def test_v4_corrupt_payload_after_a_good_frame_does_not_crash():
+    """StreetFighterBaseEnv's corrupt-payload failsafe repeats the last good
+    frame verbatim (self.frames[-1][:TOTAL_OBS_DIM]). For v4 that frame is
+    already the compact 23-dim layout, not the 554-dim v2/v3 one-hot layout.
+    Re-running the one-hot argmax extraction on a 23-element array reads an
+    empty slice for the P2 action one-hot (full[266:522]) and raises
+    ValueError -- which propagates out of step() (parsing happens outside its
+    try/except) and kills a SubprocVecEnv worker. StreetFighterEnvV4 must
+    detect the failsafe frame and pass it through unchanged instead.
+    """
+    env = FakeBizHawkEnvV4([make_payload(176, 176, extended=True,
+                                         p1_act_lo=5, p2_btn=8, p2_air=1)])
+    good_obs, _ = env.reset()
+    good_frame = good_obs[-V4_FRAME_DIM:]
+
+    env.queue(["0 1,2,3"])  # deliberately corrupt: not 13 or 24 fields
+    obs, reward, terminated, truncated, info = env.step(np.array([0, 0]))
+
+    assert obs.shape == (V4_FRAME_DIM * config.NUM_FRAMES,)
+    latest_frame = obs[-V4_FRAME_DIM:]
+    assert latest_frame.shape == (V4_FRAME_DIM,)
+    assert np.array_equal(latest_frame, good_frame)
