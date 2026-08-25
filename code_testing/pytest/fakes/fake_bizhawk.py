@@ -81,6 +81,7 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         self.corrupt_payload_count = 0
         self.sticky_direction = None
         self.sticky_counter = 0
+        self.sticky_enabled = True
         self.hp_sentinel = False
         self.reward_cfg = RewardConfig()
         self.reward_state = RewardState(

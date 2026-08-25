@@ -25,7 +25,16 @@ def SFv2_make_env(rank, **kwargs):
         else:
             from envs.sf2_v2 import StreetFighterEnvV2
             env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
-            
+
+        if kwargs.get("macros", False):
+            if version != "v3":
+                raise ValueError(
+                    f"macros require the MultiDiscrete([9,7]) action space of env v3, "
+                    f"got version={version!r}"
+                )
+            from envs.macro_wrapper import MacroActionWrapper
+            env = MacroActionWrapper(env)
+
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")
         os.makedirs(log_dir, exist_ok=True)
         return Monitor(env, filename=os.path.join(log_dir, "monitor.csv"))

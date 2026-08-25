@@ -26,6 +26,8 @@ def main():
     parser.add_argument("--phase", type=str, default="0")
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--auto_curriculum", action="store_true", help="Use progressive auto-curriculum pipeline")
+    parser.add_argument("--macros", action="store_true",
+                        help="Add Ryu special-move macros to the action space (env v3 only)")
 
     # Advanced Hyperparameter Overrides. Default None means "use the phase
     # value"; passing 0 explicitly disables the term.
@@ -62,7 +64,7 @@ def main():
     # Dynamic dispatch
     module  = importlib.import_module(f"agents.{args.algo}")
     agent   = module.build_agent()
-    env_fn  = lambda rank: SFv2_make_env(rank, version=args.env)
+    env_fn  = lambda rank: SFv2_make_env(rank, version=args.env, macros=args.macros)
 
     save_dir = os.path.join(config.get_directory()["production"], args.env, args.algo)
     os.makedirs(save_dir, exist_ok=True)

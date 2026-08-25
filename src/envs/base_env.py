@@ -69,6 +69,10 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.sticky_counter = 0
         self.hp_sentinel = False
 
+        # Macro actions need exact, unmodified input sequences; MacroActionWrapper
+        # turns this off. See src/envs/macro_wrapper.py.
+        self.sticky_enabled = True
+
     def set_training_states(self, new_states):
         """Receives broadcast from the Main Process and updates local memory."""
         self.active_training_states = new_states
@@ -93,37 +97,44 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             action_string = self._action_to_string(action)
 
             # --- STICKY MOVEMENT LOGIC ---
+            # Holds a fresh directional input for two extra agent steps so the
+            # policy can walk instead of jittering. Disabled by MacroActionWrapper,
+            # whose macros are exact multi-step input sequences.
             action_list = list(action_string)
-            
-            agent_left = action_list[2] == '1'
-            agent_right = action_list[3] == '1'
-            agent_crouch = action_list[1] == '1'
-            
-            # Cancel stickiness if the agent is crouching or inputs the opposite direction
-            opposite_input = (self.sticky_direction == 'L' and agent_right) or (self.sticky_direction == 'R' and agent_left)
-            
-            if agent_crouch or opposite_input:
+
+            if not self.sticky_enabled:
                 self.sticky_counter = 0
                 self.sticky_direction = None
-                
-            if self.sticky_counter > 0:
-                if self.sticky_direction == 'L':
-                    action_list[2] = '1'
-                    action_list[3] = '0'  # Prevent conflicting Left+Right inputs
-                elif self.sticky_direction == 'R':
-                    action_list[3] = '1'
-                    action_list[2] = '0'  # Prevent conflicting Left+Right inputs
-                self.sticky_counter -= 1
             else:
-                # Initiate stickiness on fresh directional inputs, provided we are not crouching
-                if not agent_crouch:
+                agent_left = action_list[2] == '1'
+                agent_right = action_list[3] == '1'
+                agent_crouch = action_list[1] == '1'
+
+                # Cancel stickiness if the agent is crouching or inputs the opposite direction
+                opposite_input = ((self.sticky_direction == 'L' and agent_right)
+                                  or (self.sticky_direction == 'R' and agent_left))
+
+                if agent_crouch or opposite_input:
+                    self.sticky_counter = 0
+                    self.sticky_direction = None
+
+                if self.sticky_counter > 0:
+                    if self.sticky_direction == 'L':
+                        action_list[2] = '1'
+                        action_list[3] = '0'  # Prevent conflicting Left+Right inputs
+                    elif self.sticky_direction == 'R':
+                        action_list[3] = '1'
+                        action_list[2] = '0'  # Prevent conflicting Left+Right inputs
+                    self.sticky_counter -= 1
+                elif not agent_crouch:
+                    # Initiate stickiness on fresh directional inputs
                     if agent_left:
                         self.sticky_direction = 'L'
                         self.sticky_counter = 2
                     elif agent_right:
                         self.sticky_direction = 'R'
                         self.sticky_counter = 2
-                        
+
             action_string = "".join(action_list)
             # -----------------------------
 
