@@ -10,6 +10,14 @@ from agents.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
 
+
+def resolve_dqn_lr(lr, phase_params):
+    """None means "not provided" -> use the phase value; 0.0 is a legitimate
+    override and must not be treated as falsy. Do not go back to `lr > 0.0`.
+    """
+    return phase_params.get("lr", 1e-4) if lr is None else lr
+
+
 class DQNAgent(BaseAgent):
     def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda", auto_curriculum=False, anneal_lr=True):
         print(f"[Training] Initializing DQN Curriculum Production Training in {save_dir}...")
@@ -67,7 +75,7 @@ class DQNAgent(BaseAgent):
             phase_idx = (active_phase_idx - 1) // 2
             phase_params = PHASE_HYPERPARAMS.get(phase_idx, PHASE_HYPERPARAMS[0]).copy()
         
-        active_lr = lr if lr > 0.0 else phase_params.get("lr", 1e-4)
+        active_lr = resolve_dqn_lr(lr, phase_params)
         active_expl_frac = phase_params.get("exploration_fraction", 0.1)
         
         env = None

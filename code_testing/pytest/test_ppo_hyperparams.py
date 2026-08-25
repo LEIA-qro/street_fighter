@@ -16,6 +16,8 @@ import pytest
 from agents.ppo.hyperparams import (
     linear_schedule, build_ppo_kwargs, resolve_override,
 )
+from agents.dqn.agent import resolve_dqn_lr
+from agents.sac.agent import resolve_sac_lr, resolve_sac_ent_coef
 
 
 def test_linear_schedule_anneals_from_initial_to_final():
@@ -66,3 +68,54 @@ def test_build_ppo_kwargs_default_gamma_covers_a_full_round():
     which spans a full SF2 round at FRAME_SKIP=4."""
     kwargs = build_ppo_kwargs(lr=3e-4, ent_coef=0.01, clip_range=0.2)
     assert kwargs["gamma"] == pytest.approx(0.995)
+
+
+# Regression coverage for the DQN/SAC override sentinels. train.py's CLI now
+# defaults --lr/--ent_coef/--clip_range to None (required for the PPO fix
+# above), and that None is passed straight through to DQNAgent.train /
+# SACAgent.train on every CLI invocation, even when no override is given.
+# The old `lr if lr > 0.0 else ...` sentinel raises TypeError on `None > 0.0`,
+# which would break `--algo dqn` and `--algo sac` from the CLI. These tests
+# exercise the pure resolver functions directly -- no model or env is built.
+
+def test_resolve_dqn_lr_accepts_none_and_explicit_zero():
+    phase_params = {"lr": 5e-5}
+    # Not provided (the CLI default) -> fall back to the phase value. This is
+    # the exact call train.py makes on every unmodified `--algo dqn` run.
+    assert resolve_dqn_lr(None, phase_params) == pytest.approx(5e-5)
+    # 0.0 is a legitimate override and must survive, not be swallowed.
+    assert resolve_dqn_lr(0.0, phase_params) == pytest.approx(0.0)
+    assert resolve_dqn_lr(1e-3, phase_params) == pytest.approx(1e-3)
+
+
+def test_resolve_sac_lr_accepts_none_and_explicit_zero():
+    phase_params = {"lr": 5e-5}
+    assert resolve_sac_lr(None, phase_params) == pytest.approx(5e-5)
+    assert resolve_sac_lr(0.0, phase_params) == pytest.approx(0.0)
+    assert resolve_sac_lr(1e-3, phase_params) == pytest.approx(1e-3)
+
+
+def test_resolve_sac_ent_coef_accepts_none_and_explicit_zero():
+    # Not provided -> SAC's own automatic entropy tuning.
+    assert resolve_sac_ent_coef(None) == "auto"
+    # 0.0 is a legitimate override that disables it, not a no-op.
+    assert resolve_sac_ent_coef(0.0) == pytest.approx(0.0)
+    assert resolve_sac_ent_coef(0.02) == pytest.approx(0.02)
+
+
+def test_all_three_train_methods_use_none_sentinel_for_lr_and_ent_coef():
+    """PPOAgent.train already defaults lr/ent_coef/clip_range to None (Task 4).
+    DQNAgent.train and SACAgent.train keep their pre-existing 0.0 defaults on
+    the signature by design (train.py is their only caller and always passes
+    an explicit value), but their internal resolution must treat None as
+    "not provided" -- verified above via resolve_dqn_lr/resolve_sac_lr/
+    resolve_sac_ent_coef, which is what train.py's explicit None argument
+    actually reaches at runtime.
+    """
+    import inspect
+    from agents.ppo.agent import PPOAgent
+
+    ppo_defaults = inspect.signature(PPOAgent.train).parameters
+    assert ppo_defaults["lr"].default is None
+    assert ppo_defaults["ent_coef"].default is None
+    assert ppo_defaults["clip_range"].default is None

@@ -13,6 +13,22 @@ from agents.sac.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE
 from gymnasium import ActionWrapper, spaces
 import numpy as np
 
+
+def resolve_sac_lr(lr, phase_params):
+    """None means "not provided" -> use the phase value; 0.0 is a legitimate
+    override and must not be treated as falsy. Do not go back to `lr > 0.0`.
+    """
+    return phase_params.get("lr", 1e-4) if lr is None else lr
+
+
+def resolve_sac_ent_coef(ent_coef):
+    """None means "not provided" -> fall back to SAC's own automatic entropy
+    tuning; 0.0 is a legitimate override that disables it. Do not go back to
+    `ent_coef > 0.0`, which silently ignored `--ent_coef 0`.
+    """
+    return "auto" if ent_coef is None else ent_coef
+
+
 class ContinuousToDiscreteSoftRelaxationWrapper(ActionWrapper):
     """Convert SAC's continuous output to MultiBinary or MultiDiscrete.
 
@@ -127,8 +143,8 @@ class SACAgent(BaseAgent):
             phase_idx = (active_phase_idx - 1) // 2
             phase_params = PHASE_HYPERPARAMS.get(phase_idx, PHASE_HYPERPARAMS[0]).copy()
         
-        active_lr = lr if lr > 0.0 else phase_params.get("lr", 1e-4)
-        active_ent = ent_coef if ent_coef > 0.0 else "auto"
+        active_lr = resolve_sac_lr(lr, phase_params)
+        active_ent = resolve_sac_ent_coef(ent_coef)
         active_tau = phase_params.get("tau", 0.005)
         
         env = None
