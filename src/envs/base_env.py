@@ -8,6 +8,7 @@ from collections import deque
 
 import core.config as config
 from core.bizhawk_base import BizHawkBaseEnv
+from envs.reward import RewardConfig, RewardState, compute_reward
 
 CONTINUOUS_DIM = config.OBS_DIM  # HP(2), RelX(1), RelY(1), WallDist(1), Proj_X(2), Vel_X(2), RelDist(1) = 10
 ACT_CATEGORIES = 256
@@ -50,6 +51,12 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.prev_p1_x     = 0
         self.prev_p2_x     = 0
         self.frames        = deque(maxlen=config.NUM_FRAMES)
+
+        self.reward_cfg = RewardConfig()
+        self.reward_state = RewardState(
+            prev_my_hp=176.0, prev_enemy_hp=176.0, prev_rel_dist=80.0,
+            combo_counter=0, frames_since_last_hit=0,
+        )
 
         # Counter systems
         self._steps = 0
@@ -141,71 +148,31 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
         # =====================================================
         # 3. Calculate Reward
-        current_my_hp, current_enemy_hp = observation[0], observation[1]
-
-        damage_clamp = 100
-        damage_dealt = min(max(0, self.prev_enemy_hp - current_enemy_hp), damage_clamp)
-        damage_taken = min(max(0, self.prev_my_hp    - current_my_hp),    damage_clamp)
-
+        current_my_hp, current_enemy_hp = float(observation[0]), float(observation[1])
+        rel_dist = float(observation[9])
         self._steps += 1
 
-        COMBO_WINDOW = 6  # steps — a hit within 6 steps of the last extends the combo
-        DAMAGE_TAKEN_PENALTY = 0.77
-        FOOTSIE_RANGE_MAX    = 80     # 0x834C value — within effective fighting range
-        FOOTSIE_BASE_REWARD  = 0.05
-
-        # Read the engine-native distance from observation (index 9)
-        rel_dist = float(observation[9])
-
-        # Potential-Based Reward Shaping (PBRS) for footsie range
-        def potential(d):
-            return FOOTSIE_BASE_REWARD * max(0.0, 1.0 - d / FOOTSIE_RANGE_MAX)
-
-        phi_curr = potential(rel_dist)
-        phi_prev = potential(self.prev_rel_dist)
-        # Using gamma = 0.99 consistent with PPO training discount factor
-        dist_reward = 0.99 * phi_curr - phi_prev
-        self.prev_rel_dist = rel_dist
-
-        if rel_dist <= FOOTSIE_RANGE_MAX:
+        if rel_dist <= self.reward_cfg.peak_dist:
             self.footsie_steps += 1
         else:
             self.footsie_steps = 0
 
-        if damage_dealt > 0:
-            # Landing a hit resets the decay
-            self.footsie_steps = 0
+        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
 
-            if self.frames_since_last_hit == 0:
-                pass # Continuous damage on consecutive frames, do not increment combo
-            elif self.frames_since_last_hit <= COMBO_WINDOW:
-                self.combo_counter += 1
-            else:
-                self.combo_counter = 1
-            self.frames_since_last_hit = 0
+        reward, self.reward_state, reward_parts = compute_reward(
+            self.reward_state, current_my_hp, current_enemy_hp,
+            rel_dist, ko, self.reward_cfg,
+        )
 
-            combo_bonus = min(self.combo_counter * 0.5, 4.0)  # caps at 8-hit combo
-
-            reward = (float(damage_dealt)
-                      + combo_bonus
-                      - (DAMAGE_TAKEN_PENALTY * float(damage_taken))
-                      + dist_reward)
-
-        else:
-            self.frames_since_last_hit += 1
-            if self.frames_since_last_hit > COMBO_WINDOW:
-                self.combo_counter = 0
-
-            reward = -(DAMAGE_TAKEN_PENALTY * float(damage_taken)) - 0.015 + dist_reward
-
-        if current_enemy_hp <= 0: reward += 65.0
-        if current_my_hp <= 0: reward -= 50.0  # To avoid a tie
-
-        self.prev_my_hp, self.prev_enemy_hp = current_my_hp, current_enemy_hp
+        # Mirror into the legacy attributes other modules still read.
+        self.prev_my_hp = self.reward_state.prev_my_hp
+        self.prev_enemy_hp = self.reward_state.prev_enemy_hp
+        self.prev_rel_dist = self.reward_state.prev_rel_dist
+        self.combo_counter = self.reward_state.combo_counter
+        self.frames_since_last_hit = self.reward_state.frames_since_last_hit
 
         # A frame where BOTH HP reads are sentinels is a round transition, not a
         # KO. Terminating there fabricates episodes out of menu frames.
-        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
         terminated = ko if self.trainable else False
         truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
@@ -213,6 +180,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             "my_hp": current_my_hp,
             "enemy_hp": current_enemy_hp,
             "hp_sentinel": self.hp_sentinel,
+            "reward_parts": reward_parts,
         }
         if terminated or truncated:
             double_ko = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
@@ -266,6 +234,13 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.prev_rel_dist = float(observation[9])
                 self.combo_counter = 0
                 self.frames_since_last_hit = 0
+                self.reward_state = RewardState(
+                    prev_my_hp=self.prev_my_hp,
+                    prev_enemy_hp=self.prev_enemy_hp,
+                    prev_rel_dist=self.prev_rel_dist,
+                    combo_counter=0,
+                    frames_since_last_hit=0,
+                )
                 self.sticky_counter = 0
                 self.sticky_direction = None
                 self.hp_sentinel = False

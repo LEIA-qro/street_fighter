@@ -46,6 +46,7 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         import numpy as np
         import core.config as config
         from envs.base_env import ONE_HOT_ACT_DIM, ONE_HOT_CHAR_DIM
+        from envs.reward import RewardConfig, RewardState
 
         gym.Env.__init__(self)
 
@@ -81,6 +82,11 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         self.sticky_direction = None
         self.sticky_counter = 0
         self.hp_sentinel = False
+        self.reward_cfg = RewardConfig()
+        self.reward_state = RewardState(
+            prev_my_hp=176.0, prev_enemy_hp=176.0, prev_rel_dist=80.0,
+            combo_counter=0, frames_since_last_hit=0,
+        )
 
         # --- Spaces (mirrors sf2_v2 / sf2_v3) ---
         cont_low = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.]

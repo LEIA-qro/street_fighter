@@ -110,3 +110,111 @@ def test_episode_steps_are_reported_on_termination():
     _, _, terminated, _, info = env.step(np.array([0, 0]))
     assert terminated is True
     assert info["episode_steps"] == 2
+
+
+def test_reward_components_sum_to_total():
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig()
+    state = RewardState(prev_my_hp=176.0, prev_enemy_hp=176.0,
+                        prev_rel_dist=80.0, combo_counter=0,
+                        frames_since_last_hit=0)
+    reward, new_state, parts = compute_reward(
+        state, my_hp=170.0, enemy_hp=150.0, rel_dist=60.0,
+        terminated=False, cfg=cfg,
+    )
+    assert reward == pytest.approx(sum(parts.values()))
+    assert parts["damage"] == pytest.approx(26.0)
+    assert parts["taken"] == pytest.approx(-0.77 * 6.0)
+    assert new_state.prev_my_hp == 170.0
+    assert new_state.prev_enemy_hp == 150.0
+
+
+def test_potential_based_shaping_telescopes_to_zero_on_a_round_trip():
+    """PBRS guarantee (Ng, Harada & Russell 1999): shaping over a closed loop
+    of states contributes (gamma^n - 1) * Phi, i.e. exactly 0 at gamma = 1.
+    This is what makes the 50x scale-up safe."""
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig(gamma=1.0)
+    state = RewardState(176.0, 176.0, 80.0, 0, 0)
+    total_shaping = 0.0
+    for dist in (60.0, 40.0, 60.0, 80.0):
+        _, state, parts = compute_reward(state, 176.0, 176.0, dist, False, cfg)
+        total_shaping += parts["shaping"]
+    assert total_shaping == pytest.approx(0.0, abs=1e-9)
+
+
+def test_spacing_potential_has_no_dead_zone_across_the_measured_range():
+    """The regression this task exists to fix: the old potential was
+    identically zero for every d >= 80, which telemetry measured at 52.2%
+    of all training steps. Every adjacent pair must now differ."""
+    from envs.reward import RewardConfig, spacing_potential
+
+    cfg = RewardConfig()
+    values = [spacing_potential(float(d), cfg) for d in range(0, 188)]
+    deltas = [b - a for a, b in zip(values, values[1:])]
+    assert all(abs(d) > 1e-6 for d in deltas), "flat region found in the potential"
+
+
+def test_spacing_potential_peaks_at_poke_range():
+    from envs.reward import RewardConfig, spacing_potential
+
+    cfg = RewardConfig()
+    values = [spacing_potential(float(d), cfg) for d in range(0, 188)]
+    assert values.index(max(values)) == int(cfg.peak_dist) == 70
+    # Decays on BOTH sides -- a monotone "closer is better" potential would
+    # teach pure rushdown, which is the wrong game for Ryu.
+    assert spacing_potential(20.0, cfg) < spacing_potential(70.0, cfg)
+    assert spacing_potential(150.0, cfg) < spacing_potential(70.0, cfg)
+
+
+def test_closing_from_max_range_to_poke_range_is_worth_about_one_light_hit():
+    """Previously this whole traverse was worth +0.05 against a -8.6 time
+    penalty. It must now be on the same order as landing a hit."""
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig(gamma=1.0)
+    state = RewardState(176.0, 176.0, 187.0, 0, 0)
+    shaping = 0.0
+    for dist in range(186, 69, -1):
+        _, state, parts = compute_reward(state, 176.0, 176.0, float(dist), False, cfg)
+        shaping += parts["shaping"]
+    assert 1.5 < shaping < 4.0
+
+
+def test_time_penalty_over_a_full_round_no_longer_rivals_a_hit():
+    """Measured mean episode length is ~570 steps."""
+    from envs.reward import RewardConfig
+
+    cfg = RewardConfig()
+    assert cfg.time_penalty * 570 < 2.0
+
+
+def test_combo_counter_extends_within_window_and_resets_outside():
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig()
+    state = RewardState(176.0, 176.0, 80.0, 0, 5)
+    # Hit inside the combo window -> counter increments.
+    _, state, parts = compute_reward(state, 176.0, 166.0, 80.0, False, cfg)
+    assert state.combo_counter == 1
+    assert parts["combo"] == pytest.approx(0.5)
+
+    state.frames_since_last_hit = 99  # far outside the window
+    _, state, parts = compute_reward(state, 176.0, 156.0, 80.0, False, cfg)
+    assert state.combo_counter == 1
+    assert parts["combo"] == pytest.approx(0.5)
+
+
+def test_terminal_bonus_is_applied_only_when_terminated():
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig()
+    state = RewardState(176.0, 20.0, 80.0, 0, 0)
+    _, _, parts = compute_reward(state, 176.0, 0.0, 80.0, True, cfg)
+    assert parts["terminal"] == pytest.approx(65.0)
+
+    state = RewardState(20.0, 176.0, 80.0, 0, 0)
+    _, _, parts = compute_reward(state, 0.0, 176.0, 80.0, True, cfg)
+    assert parts["terminal"] == pytest.approx(-50.0)
