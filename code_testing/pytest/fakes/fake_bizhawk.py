@@ -82,6 +82,8 @@ def _bootstrap_common_fields(env, player, trainable):
     env.sticky_counter = 0
     env.sticky_enabled = True
     env.hp_sentinel = False
+    env.p1_sentinel = False
+    env.p2_sentinel = False
     env.extra_ram = {}
     env.reward_cfg = RewardConfig()
     env.reward_state = RewardState(

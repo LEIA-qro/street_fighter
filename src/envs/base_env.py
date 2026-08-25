@@ -68,6 +68,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.sticky_direction = None
         self.sticky_counter = 0
         self.hp_sentinel = False
+        self.p1_sentinel = False
+        self.p2_sentinel = False
 
         # Extra RAM fields from the 24-field payload. Empty when the Lua client
         # is an older 13-field build. Only v4 reads these.
@@ -174,20 +176,28 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
         ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
 
-        reward, self.reward_state, reward_parts = compute_reward(
-            self.reward_state, current_my_hp, current_enemy_hp,
-            rel_dist, ko, self.reward_cfg,
-        )
+        if self.hp_sentinel:
+            # HP is unknown on this frame (round transition, menu, KO
+            # animation on at least one side) -- do NOT diff a real previous
+            # HP against a fabricated sentinel-derived zero. Skip reward
+            # computation and leave reward_state untouched so the next real
+            # frame diffs against the last real HP.
+            reward, reward_parts = 0.0, {}
+        else:
+            reward, self.reward_state, reward_parts = compute_reward(
+                self.reward_state, current_my_hp, current_enemy_hp,
+                rel_dist, ko, self.reward_cfg,
+            )
 
-        # Mirror into the legacy attributes other modules still read.
-        self.prev_my_hp = self.reward_state.prev_my_hp
-        self.prev_enemy_hp = self.reward_state.prev_enemy_hp
-        self.prev_rel_dist = self.reward_state.prev_rel_dist
-        self.combo_counter = self.reward_state.combo_counter
-        self.frames_since_last_hit = self.reward_state.frames_since_last_hit
+            # Mirror into the legacy attributes other modules still read.
+            self.prev_my_hp = self.reward_state.prev_my_hp
+            self.prev_enemy_hp = self.reward_state.prev_enemy_hp
+            self.prev_rel_dist = self.reward_state.prev_rel_dist
+            self.combo_counter = self.reward_state.combo_counter
+            self.frames_since_last_hit = self.reward_state.frames_since_last_hit
 
-        # A frame where BOTH HP reads are sentinels is a round transition, not a
-        # KO. Terminating there fabricates episodes out of menu frames.
+        # A frame where either HP read is a sentinel is a round transition,
+        # not a KO. Terminating there fabricates episodes out of menu frames.
         terminated = ko if self.trainable else False
         truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
@@ -259,6 +269,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.sticky_counter = 0
                 self.sticky_direction = None
                 self.hp_sentinel = False
+                self.p1_sentinel = False
+                self.p2_sentinel = False
 
                 self.frames.clear()
                 for _ in range(config.NUM_FRAMES): self.frames.append(observation)
@@ -336,9 +348,16 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
                 p1_sentinel = raw[0] > self.HP_SENTINEL_THRESHOLD
                 p2_sentinel = raw[1] > self.HP_SENTINEL_THRESHOLD
-                # Both players reading sentinel at once means a round transition,
-                # not a simultaneous KO. Flag it so step() can refuse to terminate.
-                self.hp_sentinel = p1_sentinel and p2_sentinel
+                self.p1_sentinel = p1_sentinel
+                self.p2_sentinel = p2_sentinel
+                # A sentinel on EITHER side means that side's HP is unreadable
+                # this frame (round transition, menu, KO animation) -- not
+                # that HP is actually zero. step() treats any sentinel frame
+                # as "HP unknown": it refuses to terminate and skips reward
+                # computation entirely, rather than diffing a real HP against
+                # a fabricated zero (a false KO when only one side sentinels,
+                # or ~+23 reward of pure noise when both do).
+                self.hp_sentinel = p1_sentinel or p2_sentinel
                 raw[0] = 0 if p1_sentinel else raw[0]
                 raw[1] = 0 if p2_sentinel else raw[1]
 

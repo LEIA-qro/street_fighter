@@ -103,6 +103,73 @@ def test_hp_sentinel_frame_is_flagged_and_does_not_terminate():
     assert terminated is False
 
 
+def test_single_sided_hp_sentinel_does_not_fabricate_a_loss():
+    """P1 HP reading the 0xFF sentinel while P2 reads a real value is a
+    menu/transition frame on one side only, not a KO. Before the fix this
+    zeroed only raw[0] for the ko/reward check (hp_sentinel required BOTH
+    sides to read sentinel), so my_hp=0 < enemy_hp produced a fabricated
+    info["loss"] worth -127 reward (terminal -50 + taken -77) from a menu
+    frame.
+    """
+    env = FakeBizHawkEnv([make_payload(176, 176)])
+    env.reset()
+    env.queue([make_payload(255, 120)])  # P1 sentinel, P2 real HP
+    _, reward, terminated, truncated, info = env.step(np.array([0, 0]))
+    assert terminated is False
+    assert truncated is False
+    assert info.get("loss", 0) == 0
+    assert reward == pytest.approx(0.0)
+
+
+def test_p1_and_p2_sentinel_flags_track_each_side_independently():
+    """hp_sentinel stays the 'any sentinel this frame' flag every existing
+    consumer reads; p1_sentinel/p2_sentinel are the new per-side detail."""
+    env = FakeBizHawkEnv([make_payload(176, 176)])
+    env.reset()
+    env.queue([make_payload(255, 120)])
+    env.step(np.array([0, 0]))
+    assert env.p1_sentinel is True
+    assert env.p2_sentinel is False
+    assert env.hp_sentinel is True
+
+
+def test_both_sided_hp_sentinel_yields_zero_reward_and_preserves_reward_state():
+    """A round-transition frame where both players read the sentinel used to
+    feed compute_reward a fabricated (0, 0) HP pair -- roughly +23.5 of pure
+    noise from a menu frame (damage_dealt=100, damage_taken=100). It must
+    contribute exactly 0.0 reward and leave reward_state untouched, so the
+    next real frame diffs against the last real HP rather than zero.
+    """
+    env = FakeBizHawkEnv([make_payload(176, 176)])
+    env.reset()
+    env.queue([make_payload(255, 255)])
+    _, reward, terminated, _, _ = env.step(np.array([0, 0]))
+    assert terminated is False
+    assert reward == pytest.approx(0.0)
+
+    # The next real frame at the same HP must show zero damage in both
+    # directions -- if reward_state had been corrupted to (0, 0) by the
+    # sentinel frame, this would instead read damage_dealt=176 (clamped to
+    # 100) and damage_taken=176 (clamped to 100).
+    env.queue([make_payload(176, 176)])
+    _, _, _, _, info2 = env.step(np.array([0, 0]))
+    assert info2["reward_parts"]["damage"] == pytest.approx(0.0)
+    assert info2["reward_parts"]["taken"] == pytest.approx(0.0)
+
+
+def test_genuine_single_sided_loss_reports_loss_flag():
+    """No test previously asserted directly on info['loss']. A real KO --
+    my_hp at 0, enemy_hp alive, no sentinel on either side -- must terminate
+    and set info['loss'] = 1."""
+    env = FakeBizHawkEnv([make_payload(176, 176)])
+    env.reset()
+    env.queue([make_payload(0, 120)])
+    _, reward, terminated, _, info = env.step(np.array([0, 0]))
+    assert terminated is True
+    assert info["loss"] == 1
+    assert info["win"] == 0
+
+
 def test_episode_steps_are_reported_on_termination():
     env = FakeBizHawkEnv([make_payload(176, 176)])
     env.reset()
@@ -185,11 +252,24 @@ def test_closing_from_max_range_to_poke_range_is_worth_about_one_light_hit():
 
 
 def test_time_penalty_over_a_full_round_no_longer_rivals_a_hit():
-    """Measured mean episode length is ~570 steps."""
-    from envs.reward import RewardConfig
+    """Measured mean episode length is ~570 steps. This used to assert only
+    on the RewardConfig constant and never called compute_reward, so it
+    would keep passing even if the time penalty were wired up wrong (e.g.
+    applied on hit steps too, or scaled incorrectly) -- exactly the kind of
+    silent error C3 shows the per-step reward budget is sensitive to.
+    Actually accumulate it over a simulated no-damage round instead.
+    """
+    from envs.reward import RewardConfig, RewardState, compute_reward
 
     cfg = RewardConfig()
-    assert cfg.time_penalty * 570 < 2.0
+    state = RewardState(176.0, 176.0, 80.0, 0, 0)
+    total_time_penalty = 0.0
+    for _ in range(570):
+        _, state, parts = compute_reward(state, 176.0, 176.0, 80.0, False, cfg)
+        total_time_penalty += parts["time"]
+
+    assert total_time_penalty == pytest.approx(-cfg.time_penalty * 570)
+    assert abs(total_time_penalty) < 2.0
 
 
 def test_combo_counter_extends_within_window_and_resets_outside():
