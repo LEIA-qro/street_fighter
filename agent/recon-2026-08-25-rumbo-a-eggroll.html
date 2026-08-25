@@ -1,0 +1,443 @@
+<title>Rumbo a EGGROLL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #F2F5F8;
+    --card: #FFFFFF;
+    --card-2: #E9EEF4;
+    --ink: #18222E;
+    --muted: #5A6B7E;
+    --line: #D4DDE6;
+    --accent: #0A62B1;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #E1EDF8;
+    --good: #1E7D45;
+    --good-soft: #E2F2E8;
+    --warn: #A66A00;
+    --warn-soft: #F7EEDA;
+    --bad: #B3372F;
+    --bad-soft: #F8E6E4;
+    --code-bg: #EAEFF4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1420;
+      --card: #16202E;
+      --card-2: #1C2938;
+      --ink: #E6ECF4;
+      --muted: #93A4B8;
+      --line: #2A3A4D;
+      --accent: #4D9FE8;
+      --accent-ink: #0B1B2B;
+      --accent-soft: #16304A;
+      --good: #4CC57E;
+      --good-soft: #14301F;
+      --warn: #E0A33C;
+      --warn-soft: #33270F;
+      --bad: #E06B5F;
+      --bad-soft: #3A1815;
+      --code-bg: #1C2836;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1420;
+    --card: #16202E;
+    --card-2: #1C2938;
+    --ink: #E6ECF4;
+    --muted: #93A4B8;
+    --line: #2A3A4D;
+    --accent: #4D9FE8;
+    --accent-ink: #0B1B2B;
+    --accent-soft: #16304A;
+    --good: #4CC57E;
+    --good-soft: #14301F;
+    --warn: #E0A33C;
+    --warn-soft: #33270F;
+    --bad: #E06B5F;
+    --bad-soft: #3A1815;
+    --code-bg: #1C2836;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1, h2, h3 { font-family: "Chakra Petch", "IBM Plex Sans", sans-serif; text-wrap: balance; line-height: 1.2; }
+  h1 { font-size: 2.3rem; font-weight: 700; margin: 0 0 8px; }
+  h2 { font-size: 1.45rem; font-weight: 700; margin: 0 0 4px; }
+  h3 { font-size: 1.08rem; font-weight: 600; margin: 24px 0 8px; }
+  p { margin: 10px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover, a:focus-visible { text-decoration: underline; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  header.hero { padding: 56px 0 12px; }
+  .eyebrow {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .hero-sub { color: var(--muted); font-size: 1.02rem; max-width: 64ch; }
+  .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.76rem;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip strong { color: var(--ink); font-weight: 600; }
+  section { margin-top: 44px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 2px solid var(--line); padding-bottom: 10px; margin-bottom: 18px; }
+  .sec-num {
+    font-family: "Chakra Petch", sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  .sec-note { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+  .tldr {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-top: 28px;
+  }
+  .tldr h2 { font-size: 1.05rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .tldr ul { margin: 10px 0 0; padding-left: 20px; }
+  .tldr li { margin: 8px 0; }
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--card-2);
+    white-space: nowrap;
+  }
+  td.num { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.86rem; }
+  .verdict { font-family: "Chakra Petch", sans-serif; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 5px; white-space: nowrap; }
+  .v-ok   { background: var(--good-soft); color: var(--good); }
+  .v-part { background: var(--warn-soft); color: var(--warn); }
+  .v-bad  { background: var(--bad-soft); color: var(--bad); }
+  .v-info { background: var(--accent-soft); color: var(--accent); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .card h3 { margin: 0 0 6px; }
+  .card p { font-size: 0.92rem; margin: 6px 0; }
+  .card .muted { color: var(--muted); font-size: 0.85rem; }
+  .finding { border-left: 4px solid var(--warn); }
+  .finding.crit { border-left-color: var(--bad); }
+  .finding.plus { border-left-color: var(--good); }
+  .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  /* Gate meter — barra de vida */
+  .gate {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-top: 16px;
+  }
+  .gate-row { margin: 14px 0; }
+  .gate-label { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 0.88rem; margin-bottom: 6px; }
+  .gate-label .who { font-family: "Chakra Petch", sans-serif; font-weight: 600; }
+  .gate-label .val { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.8rem; }
+  .bar {
+    height: 14px;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar > i { display: block; height: 100%; border-radius: 2px; }
+  .fill-now  { background: var(--bad); width: 0.66%; min-width: 3px; }
+  .fill-16   { background: var(--warn); width: 8%; }
+  .fill-retro{ background: var(--warn); width: 48%; }
+  .fill-goal { background: var(--good); width: 100%; }
+  .gate-note { color: var(--muted); font-size: 0.85rem; margin-top: 10px; }
+  /* Ciclo por paso */
+  .cycle { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stage {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+  }
+  .stage b { font-family: "Chakra Petch", sans-serif; display: block; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 6px; }
+  .stage ul { margin: 0; padding-left: 16px; }
+  .stage li { margin: 3px 0; }
+  /* Flujos */
+  .flow {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-top: 14px;
+  }
+  .flow-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .flow-id {
+    font-family: "Chakra Petch", sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-radius: 6px;
+    padding: 2px 10px;
+  }
+  .flow h3 { margin: 0; }
+  .flow-meta { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .flow p { font-size: 0.94rem; }
+  .flow ul { font-size: 0.92rem; margin: 8px 0; padding-left: 20px; }
+  .flow li { margin: 5px 0; }
+  .reco {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-top: 24px;
+  }
+  .reco h3 { margin-top: 0; color: var(--accent); }
+  .kicker { font-family: "Chakra Petch", sans-serif; font-size: 0.76rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .refs { font-size: 0.88rem; columns: 2; column-gap: 32px; }
+  .refs li { margin: 6px 0; break-inside: avoid; }
+  @media (max-width: 640px) { .refs { columns: 1; } .sec-note { display: none; } }
+  footer { margin-top: 56px; color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">LEIA-qro / street_fighter · Reconocimiento preliminar</div>
+  <h1>Rumbo a EGGROLL</h1>
+  <p class="hero-sub">Estado del pipeline de RL de Street Fighter II', qué tan confiable es el handoff que dejó la sesión anterior, dónde vive de verdad el cuello de botella, y los flujos de investigación entre los que hay que decidir para acercar el throughput a la escala que exigen las estrategias evolutivas.</p>
+  <div class="meta-chips">
+    <span class="chip">rama <strong>sf2-sota-rl-upgrade</strong> · 26 commits sin mergear</span>
+    <span class="chip"><strong>110</strong> tests offline en verde</span>
+    <span class="chip">handoff <strong>2026-08-25</strong></span>
+    <span class="chip">reconocimiento: <strong>7 agentes</strong> · 2026-08-25</span>
+  </div>
+</header>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>El handoff es confiable.</strong> Auditamos sus 12 afirmaciones falsables contra el código: todas confirmadas (dos con matices menores). Se puede construir sobre él sin re-derivar nada.</li>
+    <li><strong>Hallazgo nuevo:</strong> el protocolo Lua↔Python corre <em>permanentemente desfasado un mensaje</em>: el agente observa el estado de un paso atrás (retraso de acción de 4 frames) y el reset devuelve una observación del episodio anterior. Es a la vez un bug de semántica y un pipelining accidental que hoy regala throughput — cualquier refactor ingenuo del orden send/recv lo destruiría.</li>
+    <li><strong>El número que manda no existe:</strong> nadie ha medido steps/s agregados con 16 emuladores en la máquina de entrenamiento (i9-13900K + RTX 4090). Todo lo medido es de una laptop.</li>
+    <li><strong>La aritmética de EGGROLL es dura:</strong> la compuerta pide ≥25,000 agent steps/s; hoy hay ~165 con un emulador. Incluso el techo optimista con stable-retro (~12k) se queda a la mitad. El paper de EGGROLL acelera el <em>forward del modelo</em>, no la emulación — sus experimentos de RL usan entornos JAX en GPU, no emuladores.</li>
+    <li><strong>La decisión real</strong> es cuánto invertir en cada uno de 4 frentes: instrumentar y medir (obligatorio, ~1 día), spike de stable-retro (la medición que decide todo), harness a la medida estilo EnvPool (el camino de throughput máximo), y micro-optimizar el rig BizHawk actual (que de todos modos queda como ground truth y liga PvP).</li>
+  </ul>
+</div>
+
+<section>
+  <div class="sec-head"><span class="sec-num">01</span><h2>El proyecto en una pantalla</h2><span class="sec-note">contexto</span></div>
+  <p>Entrenar a Ryu en <em>Street Fighter II' — Special Champion Edition</em> (Genesis) contra el CPU en 12 oponentes × 8 dificultades, y después en liga de self-play. El objetivo conductual es <strong>spacing</strong>: caminar dentro y fuera del rango de poke. La arquitectura: <code>train.py</code> → PPO/QR-DQN (SB3) → <code>SubprocVecEnv×16</code> → env Gymnasium → TCP lock-step (1 round-trip por paso) → EmuHawk (BizHawk 2.8) + cliente Lua, con FRAME_SKIP=4.</p>
+  <p>El defecto histórico ya está diagnosticado y corregido en la rama: <strong>la función de reward pagaba por no moverse</strong> — el potencial de shaping era exactamente cero en el 52.2% de los pasos (mediana de <code>rel_dist</code>=83, zona muerta desde d≥80), mientras la penalización de tiempo hacía que acercarse fuera neto-negativo por dos órdenes de magnitud. La corrección (potencial de dos lados con pico en d=70, γ unificada en <code>AGENT_GAMMA=0.995</code>) <strong>nunca se ha validado con un run de entrenamiento</strong>, y las métricas que la juzgarían no se registran en ningún lado.</p>
+  <div class="tbl-scroll"><table>
+    <tr><th>Cantidad</th><th>Valor</th><th>Nota</th></tr>
+    <tr><td>Throughput, 1 emulador</td><td class="num">~165 agent steps/s</td><td>≈660 fps de emulador · <strong>medido en laptop, no en la 13900K</strong></td></tr>
+    <tr><td>Throughput, 16 emuladores</td><td class="num">SIN MEDIR</td><td>el número más importante del proyecto no existe</td></tr>
+    <tr><td>Observación v2/v3 → v4</td><td class="num">2,216 → 92 floats</td><td>v4 reemplaza one-hots con embeddings (23 floats/frame)</td></tr>
+    <tr><td>Parámetros de política</td><td class="num">3.1 M → 1.45 M</td><td>MLP [512,512,256] π y V separados</td></tr>
+    <tr><td>Episodio medio</td><td class="num">~570 steps</td><td>≈2,280 frames por round</td></tr>
+    <tr><td>Rollout PPO</td><td class="num">2048×16 = 32,768</td><td>batch 1024 · 4 épocas → 128 updates/rollout</td></tr>
+    <tr><td>Compuerta EGGROLL #1</td><td class="num">≥25,000 agent steps/s</td><td>≈100k fps de emulador · hoy: ~2 órdenes de magnitud abajo</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">02</span><h2>Auditoría del handoff</h2><span class="sec-note">¿podemos confiar en él?</span></div>
+  <p>Verificamos cada afirmación falsable de <code>agent/handoff.md</code> contra el código en <code>ea6ddd5a</code>. Resultado: <strong>es un documento honesto</strong> — ninguna afirmación refutada, y sus 11 "open items" siguen todos abiertos (ninguno se resolvió en silencio).</p>
+  <div class="tbl-scroll"><table>
+    <tr><th>Afirmación</th><th>Veredicto</th><th>Detalle</th></tr>
+    <tr><td><code>reward_parts</code> y <code>macro_action</code> se escriben pero nadie los lee</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>cero consumidores en producción; solo tests los tocan</td></tr>
+    <tr><td><code>core/elo.py</code> no está conectado a nada</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>único import: su propio test</td></tr>
+    <tr><td><code>league_env.py</code> entrena con el reward roto viejo</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>potencial con zona muerta, γ=0.99 hardcodeada, y el bug de falso-KO por sentinel <em>vivo</em> en liga</td></tr>
+    <tr><td>Optuna tunea γ sin pasarla al reward (3 estudios)</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>resultados de γ de los 3 estudios no confiables</td></tr>
+    <tr><td>QR-DQN replay ratio ≈ 0.016</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>64 transiciones por gradient step; arreglo de 1 línea pendiente</td></tr>
+    <tr><td>v4/macros invisibles para eval, tuning, liga y dashboard</td><td><span class="verdict v-ok">CONFIRMADO+</span></td><td>peor de lo dicho: hay un <strong>5.º dropdown</strong> — el dashboard tampoco puede <em>entrenar</em> v4 (<code>web_dashboard.py:1184</code>)</td></tr>
+    <tr><td>110 tests, suite offline forzada</td><td><span class="verdict v-ok">CONFIRMADO</span></td><td>conteo estático exacto; el fake revienta si algo intenta abrir socket/emulador</td></tr>
+    <tr><td>"AGENT_GAMMA es el único literal de descuento"</td><td><span class="verdict v-part">PARCIAL</span></td><td>sobreviven 3: <code>league_env.py:275</code>, <code>selective_norm.py:96</code> (norm. de reward con 0.99 vs γ=0.995 — no está en el handoff), y código muerto de SAC. El guard de AST solo cachea las formas <code>gamma=lit</code>/<code>GAMMA=lit</code></td></tr>
+    <tr><td>Callbacks de curriculum solo leen <code>info["win"]</code></td><td><span class="verdict v-part">PARCIAL</span></td><td>también leen <code>state_file</code> y <code>episode.r</code>; el punto sustantivo (no leen diagnósticos) se sostiene</td></tr>
+    <tr><td>Plan gobernante de 3,354 líneas</td><td><span class="verdict v-bad">AUSENTE</span></td><td><code>docs/superpowers/…</code> no existe en el repo (gitignoreado) — vive solo en la máquina Windows que lo escribió</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">03</span><h2>Hallazgos nuevos</h2><span class="sec-note">lo que el handoff no dice</span></div>
+  <div class="cards">
+    <div class="card finding crit">
+      <h3>El protocolo corre desfasado un mensaje</h3>
+      <p>Lua manda el payload <em>antes</em> de esperar el comando; Python manda-y-recibe. El offset se conserva para siempre: <code>step(Aₖ)</code> devuelve la observación de <em>antes</em> de aplicar Aₖ — un retraso de acción de 4 frames — y <code>reset()</code> devuelve el último frame del <em>episodio anterior</em>, copiado ×4 al frame stack.</p>
+      <p class="muted">Doble filo: es un bug de semántica (relevante en un juego de reacciones) y a la vez pipelining gratis — el forward de la política se solapa con la emulación. El costo por ciclo es max(emulación, Python), no la suma. Arreglarlo ingenuamente serializa el loop y <em>baja</em> el throughput.</p>
+    </div>
+    <div class="card finding crit">
+      <h3>Un worker muerto puede matar los 16 emuladores</h3>
+      <p><code>atexit.register(failsafe_env)</code> en <code>env_tools.py:147</code> corre en <em>cada</em> proceso spawn. El francotirador de PowerShell matchea cualquier EmuHawk del proyecto: un worker que muere convierte una falla local en crash total → ciclo de retry de ~70 s+.</p>
+    </div>
+    <div class="card finding">
+      <h3>El spinlock de Lua es una incógnita, no un hecho</h3>
+      <p>El handoff asume que quema un core por worker. Pero <code>comm.socketServerSetTimeout(10)</code> (lua:46, nunca mencionado) puede convertirlo en un poll de ≤100 Hz. La medición de ~165 steps/s ya descarta la peor variante. <strong>Una medición de CPU% con Python pausado decide si "16 cores desperdiciados" es real o un fantasma.</strong></p>
+    </div>
+    <div class="card finding">
+      <h3>v4 parsea MÁS caro que v2/v3</h3>
+      <p><code>sf2_v4._parse_payload</code> llama al parser base (construye el frame de 554 dims con 4 one-hots) y luego hace <strong>4 × np.argmax para recuperar enteros que el parser ya tenía</strong>, más un <code>.astype</code> redundante que copia todo otra vez. El env insignia deshace trabajo en cada paso.</p>
+    </div>
+    <div class="card finding">
+      <h3>SubprocVecEnv no aporta paralelismo real</h3>
+      <p>El lado Python de cada env es I/O-bound (espera al socket del emulador). Los 16 procesos worker solo agregan un hop de pickle de ~9 KB por env por paso, boot escalonado de 52.5 s en cada retry, y el riesgo del atexit. Un VecEnv en un solo proceso sobre los 16 sockets elimina todo eso.</p>
+    </div>
+    <div class="card finding">
+      <h3>Desperdicio por paso, listo para borrar</h3>
+      <p>f-string de debug construido <em>cada paso</em> aunque nunca se imprime; dict <code>extra_ram</code> de 11 llaves por paso que v2/v3 jamás leen; 4 × <code>np.clip</code> escalar (antipatrón, ~10× más lento que min/max); <code>np.concatenate</code> de 2,216 floats por paso sin ring buffer; <code>SelectiveVecNormalize</code> copia el batch completo y hace 4 round-trips a float64 por vec-step; un stat() a <code>.stop_training</code> por vec-step.</p>
+    </div>
+    <div class="card finding plus">
+      <h3>Activos que nadie mencionó</h3>
+      <p><code>telemetry.py</code> implementa completo el dashboard de observación en vivo (spec 2026-05-28) — pero es solo inferencia, y v4 lo rompería en silencio. Incluye <code>ACTION_NAMES</code>: un decode curado de 37 entradas del byte de acción (startup/active de fireball, hitstun, wakeup…) — oro para análisis y reward futuro, no existe en ningún otro lado.</p>
+    </div>
+    <div class="card finding">
+      <h3>v4 revirtió una doctrina sin decirlo</h3>
+      <p><code>doc/README.md</code> excluye deliberadamente los botones propios de P1 de la observación (riesgo de colapso por identidad); v4 los reintroduce (<code>p1_btn</code>, índice 19). Ninguno de los dos documentos reconoce al otro. Decisión a revisar cuando se valide v4.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">04</span><h2>Anatomía de un paso</h2><span class="sec-note">dónde vive el costo</span></div>
+  <p>Un agent step = 4 frames de Genesis + 1 round-trip TCP + parse + ensamblado de observación + (amortizado) un forward de la política. Gracias al desfase, emulación e inferencia se solapan; el resto es serial.</p>
+  <div class="cycle">
+    <div class="stage"><b>Lua · lee RAM</b><ul><li><strong>24 crossings Lua↔C#</strong> por paso (1 por dirección de memoria)</li><li>string.format de 24 args → CSV ASCII ~60-110 B</li></ul></div>
+    <div class="stage"><b>Wire · TCP loopback</b><ul><li>1 send + 1 recv por lado</li><li>sin TCP_NODELAY (en el socket equivocado según el handoff: va en <code>conn</code>, no en el listener)</li><li>prefijo "{len} " que nadie usa como framing</li></ul></div>
+    <div class="stage"><b>Python · parse + obs</b><ul><li>split + 24 × int()</li><li>4 × np.zeros one-hot + concat 554</li><li>concat 2,216 floats (frame stack)</li><li>dict extra_ram + f-string debug</li></ul></div>
+    <div class="stage"><b>Vec · learner</b><ul><li>pickle ~9 KB × 16 envs × 2 direcciones</li><li>lock-step: espera al emulador más lento</li><li>SelectiveVecNormalize: copy + 4 round-trips f64</li></ul></div>
+    <div class="stage"><b>Lua · emula</b><ul><li>joypad.set + frameadvance × 4</li><li>spinlock esperando a Python (¿poll 100 Hz o busy loop? — medir)</li><li>emulador congelado mientras espera</li></ul></div>
+  </div>
+  <p class="gate-note">Contexto de escala: el lado Python son decenas de µs contra ~6 ms de round-trip con emulador. Las micro-optimizaciones importan ×16 workers y crecen en peso conforme el emulador se acelera — en un backend headless a 2k fps, el Python actual se volvería EL cuello.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">05</span><h2>La aritmética de EGGROLL</h2><span class="sec-note">verificada contra el paper y el ecosistema</span></div>
+  <p><strong>Lo que EGGROLL es</strong> (arXiv:2511.16652, Oxford/Mila/NVIDIA): ES con perturbaciones low-rank AB^T — reduce memoria de O(mn) a O(r(m+n)) y convierte la evaluación de la población en matmuls batcheados. Población demostrada: 2²⁰ en pretraining de LM. <strong>Lo que no es:</strong> un acelerador de emulación. Sus 16 experimentos de RL corren en entornos JAX-nativos en GPU (Brax, Craftax, Jumanji…), pop 512–4096, y el resultado es <em>paridad</em> con OpenES — no superioridad sobre PPO. Código público: <a href="https://github.com/ESHyperscale/HyperscaleES">HyperscaleES</a> y <a href="https://github.com/ESHyperscale/nano-egg">nano-egg</a> (el código de los envs de RL no está visible en el árbol).</p>
+  <div class="gate">
+    <div class="kicker">Compuerta #1 · throughput agregado (agent steps/s, frame-skip 4)</div>
+    <div class="gate-row">
+      <div class="gate-label"><span class="who">Hoy · 1 emulador BizHawk (laptop)</span><span class="val">~165 /s</span></div>
+      <div class="bar"><i class="fill-now"></i></div>
+    </div>
+    <div class="gate-row">
+      <div class="gate-label"><span class="who">Estimado · 16 emuladores BizHawk (nunca medido)</span><span class="val">≤ ~2,000 /s ??</span></div>
+      <div class="bar"><i class="fill-16"></i></div>
+    </div>
+    <div class="gate-row">
+      <div class="gate-label"><span class="who">Techo optimista · stable-retro × 24 cores (extrapolado, no verificado)</span><span class="val">~12,000 /s</span></div>
+      <div class="bar"><i class="fill-retro"></i></div>
+    </div>
+    <div class="gate-row">
+      <div class="gate-label"><span class="who">Compuerta EGGROLL #1</span><span class="val">25,000 /s</span></div>
+      <div class="bar"><i class="fill-goal"></i></div>
+    </div>
+    <div class="gate-note">Números de referencia (por instancia, con overhead Python incluido): FightLadder midió <strong>1,936 fps</strong> por env gym-retro en SF2 SCE Genesis (ICML 2024); DIAMBRA ~500 fps; BizHawk uncapped ~700–1,000 fps y cae bajo carga. No existe emulación de Genesis en GPU/JAX (lo más cercano: CuLE para Atari, Octax para CHIP-8). El patrón EnvPool (pool C++ + shared memory) dio 14.9× sobre vectorización por subprocesos en Atari.</div>
+  </div>
+  <p>Las otras compuertas del handoff se sostienen: red ≤ ~100k parámetros (o una donde el truco low-rank pague), resets como carga de savestate sin boot de proceso, un objetivo no-diferenciable conectado (Elo — el módulo existe, está desconectado), y un plateau documentado de PPO como control. <strong>Y la compuerta cero, que es de física, no de ingeniería:</strong> ES necesita ~50× más muestras que PPO para el mismo progreso; el primer uso honesto de EGGROLL aquí es fine-tuning de última capa sobre una política ya entrenada, optimizando Elo directo.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">06</span><h2>Flujos de investigación</h2><span class="sec-note">el menú a decidir</span></div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">A</span><h3>Instrumentar y medir</h3><div class="flow-meta"><span class="verdict v-ok">~1-2 días</span><span class="verdict v-info">bloqueante</span></div></div>
+    <p>El callback de TensorBoard (~40 líneas: <code>reward_parts</code>, <code>rel_dist</code>, uso de macros, diagnósticos), contadores de throughput por rank, medición del spinlock (CPU% de EmuHawk con Python pausado), y la línea base agregada de 16 envs <strong>en la 13900K</strong>. Después, el run de validación Stage 1: ¿el fix del reward hace que Ryu camine? Sin esto, nada de lo demás es atribuible. No es opcional bajo ningún flujo.</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">B</span><h3>Spike de stable-retro</h3><div class="flow-meta"><span class="verdict v-ok">~2-4 días</span><span class="verdict v-info">máxima información</span></div></div>
+    <p>La medición que decide todo el rumbo: fps/core reales de Genesis Plus GX vía stable-retro en hardware propio. SF2'SCE <strong>ya está integrado</strong> en stable-retro (mismo ROM que el del repo), y <strong>FightLadder (MIT) ya publicó</strong> estados 2P, wrappers y curriculum sobre este juego exacto — reutilizable, recorta meses del costo de migración. Portar las 24 direcciones RAM a <code>data.json</code> es mecánico; los 122 savestates BizHawk NO son compatibles y habría que re-autorarlos (el riesgo grande: paridad de dificultad de los 96 estados del curriculum).</p>
+    <ul>
+      <li>Los módulos puros portan gratis (verificado import por import): <code>reward.py</code>, macros, extractor, Elo, curriculum callbacks, normalizador.</li>
+      <li>Corre en cualquier máquina — incluso esta Mac, donde el rig actual ni siquiera importa (<code>config.py</code> revienta sin EmuHawk.exe).</li>
+      <li>BizHawk se queda como ground truth, PvP y liga — el spike no lo reemplaza, lo complementa.</li>
+    </ul>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">C</span><h3>Harness a la medida (estilo EnvPool)</h3><div class="flow-meta"><span class="verdict v-warn"></span><span class="verdict v-part">semanas</span><span class="verdict v-info">techo máximo</span></div></div>
+    <p>La reescritura de la que hablaba el equipo: un frontend libretro propio en C/C++/Rust — workers persistentes, N instancias del core (proceso por core o dlmopen/copias del .so, patrón jaitro), observaciones por shared memory, stepping batcheado, cero Python en el camino por paso. El propio <code>src/</code> de stable-retro es un frontend C++ headless reutilizable como punto de partida. Es el único camino con probabilidad real de cruzar los 25k steps/s — y solo tiene sentido <em>después</em> de que B entregue el número por core: C multiplica ese número, no lo crea.</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">D</span><h3>Micro-optimizar el rig BizHawk</h3><div class="flow-meta"><span class="verdict v-ok">días, incremental</span><span class="verdict v-info">techo ~1.5-3×</span></div></div>
+    <p>Vale la pena aunque se migre, porque BizHawk sigue siendo la plataforma de evaluación y liga. Ranking con evidencia: batchear los 24 reads de RAM en 1-2 crossings (<code>read_bytes_as_array</code> — el clásico cuello de BizHawk-Lua); medir y en su caso apagar el spinlock; VecEnv de un solo proceso sobre los 16 sockets (elimina pickle + boot escalonado + el hazard del atexit); vectorizar <code>SelectiveVecNormalize</code>; borrar el desperdicio por paso (§03); afinidad P/E-cores; TCP_NODELAY en el socket correcto; protocolo binario negociado (48 bytes fijos) solo si se hace junto con el batcheo de RAM.</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">E</span><h3>Correcciones de semántica antes de cualquier run largo</h3><div class="flow-meta"><span class="verdict v-ok">horas-días</span><span class="verdict v-info">protege todo lo demás</span></div></div>
+    <p>Decidir qué hacer con el desfase de un mensaje (documentarlo como MDP con retraso, o arreglarlo consciente del costo); consumir el payload pendiente en reset (arregla la obs rancia por 1 mensaje extra por episodio, no por paso); portar <code>league_env.py</code> a <code>reward.py</code> (la liga hoy entrena contra el bug exacto que la rama arregló); guard del atexit en workers; γ=0.99 de <code>selective_norm</code>; limpiar <code>stream_buffer</code> al respawnear; replay ratio de QR-DQN (1 línea).</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-head"><span class="flow-id">F</span><h3>Prototipo ES / EGGROLL</h3><div class="flow-meta"><span class="verdict v-part">investigación</span><span class="verdict v-info">condicionado a B/C</span></div></div>
+    <p>OpenES/CMA-ES con redes chicas ([64,64] ≈ 45k params) sobre las features de v4, corriendo en el backend rápido; nano-egg como referencia de implementación low-rank. Primer experimento honesto: fine-tuning de última capa de la política PPO congelada (el checkpoint de 39.7M steps / 83% WR que está en el repo), optimizando Elo/win-rate directo con <code>core/elo.py</code> por fin conectado. No requiere cruzar la compuerta de 25k para empezar a aprender del método.</p>
+  </div>
+
+  <div class="reco">
+    <h3>Recomendación</h3>
+    <p><strong>A + E en paralelo esta semana</strong> (baratos, obligatorios, protegen todo), <strong>B como el spike de decisión</strong> — su entregable es un número: fps/core de GPGX en hardware real, que convierte la discusión B-vs-C-vs-D en aritmética. D se activa selectivamente (las 3-4 piezas de mayor evidencia) mientras B corre. C y F se deciden con el número de B en la mano. Si B confirma ~2k fps/core, el camino a 25k steps/s pasa por C; si da mucho menos, la conversación honesta es re-dimensionar la meta de EGGROLL hacia el fine-tuning de última capa (F) en vez del entrenamiento tabula-rasa.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">07</span><h2>Referencias clave</h2><span class="sec-note">todo verificado 2026-08-25</span></div>
+  <ul class="refs">
+    <li><a href="https://arxiv.org/abs/2511.16652">EGGROLL — Evolution Strategies at the Hyperscale</a> · <a href="https://github.com/ESHyperscale/HyperscaleES">código</a></li>
+    <li><a href="https://github.com/Farama-Foundation/stable-retro">stable-retro</a> (v1.0.1, jun-2026; GPGX; SF2'SCE integrado)</li>
+    <li><a href="https://arxiv.org/abs/2406.02081">FightLadder</a> · <a href="https://github.com/wenzhe-li/FightLadder">repo MIT</a> — 1,936 fps/env en SF2 SCE; estados 2P listos</li>
+    <li><a href="https://github.com/sail-sg/envpool">EnvPool</a> — pool C++ + shared memory; 14.9× sobre subprocess</li>
+    <li><a href="https://rlj.cs.umass.edu/2025/papers/Paper151.html">PufferLib 2.0</a> — patrones de vectorización a 1M steps/s</li>
+    <li><a href="https://arxiv.org/abs/1907.08467">CuLE</a> / <a href="https://arxiv.org/abs/2510.01764">Octax</a> — emulación en GPU (Atari/CHIP-8; Genesis no existe)</li>
+    <li><a href="https://github.com/heuripedes/nanoarch">nanoarch</a> · <a href="https://github.com/kevinw/jaitro">jaitro</a> — frontends libretro mínimos / multi-instancia</li>
+    <li><a href="https://arxiv.org/pdf/2210.10595">DIAMBRA Arena</a> — descartado para throughput (~0.5k fps + Docker/gRPC)</li>
+    <li>En el repo: <code>agent/handoff.md</code> (758 líneas) · <code>agent/archive/handoff-2026-08-25-branch-session.md</code> · <code>doc/RAM locations…txt</code></li>
+  </ul>
+</section>
+
+<footer>
+  Reconocimiento ejecutado el 2026-08-25 con 7 agentes en paralelo sobre <code>LEIA-qro/street_fighter@ea6ddd5a</code> (clon local <code>~/TEC/LEIA/street_fighter</code>): protocolo de wire, ruta de step, loop de entrenamiento, auditoría de claims, documentación secundaria, superficie de migración e investigación externa. Los reportes crudos por agente están disponibles en la sesión.
+</footer>
+
+</div>
