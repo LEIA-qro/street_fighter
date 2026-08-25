@@ -30,4 +30,3 @@ lua/test2.lua
 gha-creds-*.json
 /.agents
 /docs/superpowers
-/code_testing/pytest
