@@ -86,27 +86,31 @@ class ContinuousToDiscreteSoftRelaxationWrapper(ActionWrapper):
                     
             return np.array(discrete_actions, dtype=np.int64)
 
+
+_SAC_DISCRETE_MESSAGE = (
+    "SAC is not usable on Street Fighter II's discrete action space.\n"
+    "\n"
+    "The ContinuousToDiscreteSoftRelaxationWrapper draws a fresh categorical\n"
+    "sample from the softmax on every call, so the same continuous action\n"
+    "produces different game behaviour each step. SAC's critic learns\n"
+    "Q(s, a) over the CONTINUOUS action, so that discretization noise is\n"
+    "unmodelled environment stochasticity and biases the Bellman targets.\n"
+    "Separately, the entropy term is computed over the Box action rather\n"
+    "than over the categorical distribution that actually acts, so the\n"
+    "temperature auto-tuning optimizes the wrong entropy.\n"
+    "\n"
+    "The principled fix is SAC-Discrete (Christodoulou, 2019,\n"
+    "arXiv:1910.07207), which makes the actor categorical and computes the\n"
+    "entropy and Q-expectation in closed form over all actions.\n"
+    "Stable-Baselines3 does not ship it.\n"
+    "\n"
+    "Use --algo ppo (recommended) or --algo dqn (QR-DQN) instead."
+)
+
+
 class SACAgent(BaseAgent):
     def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda", auto_curriculum=False, anneal_lr=True, recurrent=False):
-        raise NotImplementedError(
-            "SAC is not usable on Street Fighter II's discrete action space.\n"
-            "\n"
-            "The ContinuousToDiscreteSoftRelaxationWrapper draws a fresh categorical\n"
-            "sample from the softmax on every call, so the same continuous action\n"
-            "produces different game behaviour each step. SAC's critic learns\n"
-            "Q(s, a) over the CONTINUOUS action, so that discretization noise is\n"
-            "unmodelled environment stochasticity and biases the Bellman targets.\n"
-            "Separately, the entropy term is computed over the Box action rather\n"
-            "than over the categorical distribution that actually acts, so the\n"
-            "temperature auto-tuning optimizes the wrong entropy.\n"
-            "\n"
-            "The principled fix is SAC-Discrete (Christodoulou, 2019,\n"
-            "arXiv:1910.07207), which makes the actor categorical and computes the\n"
-            "entropy and Q-expectation in closed form over all actions.\n"
-            "Stable-Baselines3 does not ship it.\n"
-            "\n"
-            "Use --algo ppo (recommended) or --algo dqn (QR-DQN) instead."
-        )
+        raise NotImplementedError(_SAC_DISCRETE_MESSAGE)
         print(f"[Training] Initializing SAC Curriculum Production Training in {save_dir}...")
         print(f"[Training] Compute Device: {device}")
         
@@ -327,6 +331,7 @@ class SACAgent(BaseAgent):
         pass
 
     def tune(self, env_fn, n_trials, study_name="sac_sf2_tuning", load_zip=None, load_pkl=None, start_phase="0", timesteps=50000, device="cuda"):
+        raise NotImplementedError(_SAC_DISCRETE_MESSAGE)
         import optuna
         from agents.sac.optuna_study import objective
         

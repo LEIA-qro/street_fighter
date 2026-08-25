@@ -73,3 +73,13 @@ def test_sac_refuses_to_train_on_a_discrete_action_space():
 
     with pytest.raises(NotImplementedError, match="SAC-Discrete"):
         SACAgent().train(env_fn=None, save_dir=None, steps=0)
+
+
+def test_sac_refuses_to_tune_on_a_discrete_action_space():
+    from agents.sac.agent import SACAgent
+
+    # env_fn=None: if the guard were placed after any use of env_fn (e.g. to
+    # spin up a SubprocVecEnv for the Optuna study), this would blow up with
+    # a TypeError/AttributeError instead of the expected NotImplementedError.
+    with pytest.raises(NotImplementedError, match="SAC-Discrete"):
+        SACAgent().tune(env_fn=None, n_trials=0)

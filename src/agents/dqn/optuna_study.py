@@ -1,7 +1,7 @@
 import os
 import optuna
 import traceback
-from stable_baselines3 import DQN
+from sb3_contrib import QRDQN
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 from core import config
@@ -91,7 +91,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
             env = SelectiveVecNormalize(env, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES)
 
         if load_zip and load_zip != "None":
-            model = DQN.load(
+            model = QRDQN.load(
                 os.path.join(config.PROJECT_ROOT, load_zip),
                 env=env,
                 device=device,
@@ -103,7 +103,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 }
             )
         else:
-            model = DQN(
+            model = QRDQN(
                 "MlpPolicy",
                 env,
                 learning_rate=lr,
@@ -111,7 +111,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 batch_size=batch_size,
                 gamma=gamma,
                 exploration_fraction=exploration_fraction,
-                policy_kwargs=dict(net_arch=net_arch),
+                policy_kwargs=dict(net_arch=net_arch, n_quantiles=51),
                 verbose=0,
                 tensorboard_log=trial_log_dir,
                 device=device
