@@ -25,6 +25,17 @@
 #   [17-18] p1_act_lo, p2_act_lo   (0-255, recovered low byte)
 #   [19-20] p1_btn, p2_btn         (0-255, raw inputs)
 #   [21-22] p1_char, p2_char       (0-15)
+#
+# NOTE on p2_btn (0x845E, index 20): this is the P2 controller port, and it
+# reads constant 0 when training against the built-in CPU -- the CPU drives
+# its character through game logic, never through the input port. Verified
+# live over a 3000-step run against level-1 CPU states: every other new field
+# showed real variation (rel_y_dist 100 distinct values, p1/p2_head 111/105,
+# p1/p2_chest 107/108, p1_act_lo/p2_act_lo 6 each, p1_btn 0..64) while p2_btn
+# showed exactly 1 distinct value across the whole run. It is regime-dependent,
+# not a bad address: it carries real signal in PvP/league play, where P2's
+# actions are injected via joypad.set the same way P1's are. Left in the
+# layout deliberately -- see the note beside self.extra_ram in base_env.py.
 
 import numpy as np
 from gymnasium import spaces
@@ -97,6 +108,10 @@ class StreetFighterEnvV4(StreetFighterEnvV3):
             float(x.get("p2_air", 0)),
             p1_act, p2_act,
             float(x.get("p1_act_lo", 0)), float(x.get("p2_act_lo", 0)),
+            # p2_btn (0x845E) reads constant 0 vs. the built-in CPU (it drives
+            # its character through game logic, not the input port) -- see the
+            # module docstring above for the 3000-step measurement. Real
+            # signal only in PvP/league play; kept for layout stability.
             float(x.get("p1_btn", 0)), float(x.get("p2_btn", 0)),
             p1_char, p2_char,
         ], dtype=np.float32)

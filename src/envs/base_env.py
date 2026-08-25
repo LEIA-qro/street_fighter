@@ -308,6 +308,16 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                         p1_lo, p2_lo = p2_lo, p1_lo
                         p1_btn, p2_btn = p2_btn, p1_btn
                         p1_air, p2_air = p2_air, p1_air
+                    # NOTE: p2_btn (0x845E) is the P2 controller port. It reads
+                    # constant 0 when training against the built-in CPU, which
+                    # drives its character through game logic rather than the
+                    # input port -- confirmed over a 3000-step live run (single
+                    # distinct value observed). It carries real signal only in
+                    # PvP/league play, where P2's actions are injected via
+                    # joypad.set the same way P1's are. Kept in the layout
+                    # anyway: dropping it would churn the observation shape
+                    # that Tasks 7-9 build on for the sake of one embedding
+                    # lookup the network already learns to ignore.
                     self.extra_ram = {
                         "p1_act_lo": p1_lo, "p2_act_lo": p2_lo,
                         "p1_btn": p1_btn, "p2_btn": p2_btn,
