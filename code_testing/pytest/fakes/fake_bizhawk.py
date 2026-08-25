@@ -50,6 +50,9 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         gym.Env.__init__(self)
 
         # --- BizHawkBaseEnv fields ---
+        self.bizhawk_path = None
+        self.rom_path = None
+        self.lua_path = None
         self.host, self.port = config.HOST, config.PORT
         self.trainable = trainable
         self.verbose = False
@@ -109,3 +112,14 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
 
     def close(self):
         pass
+
+    def _start_emulator_bridge(self):
+        # StreetFighterBaseEnv.reset() has a self-healing retry path that
+        # catches RuntimeError/OSError and calls this to respawn the
+        # emulator. If a test ever triggers that path, fail loudly instead
+        # of silently reaching socket.bind()/subprocess.Popen(EmuHawk.exe).
+        raise AssertionError(
+            "FakeBizHawkEnv must never launch a real emulator. "
+            "Something reached the self-healing respawn path in "
+            "StreetFighterBaseEnv.reset()."
+        )
