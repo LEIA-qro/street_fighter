@@ -27,10 +27,13 @@ def main():
     parser.add_argument("--device", type=str, default="auto")
     parser.add_argument("--auto_curriculum", action="store_true", help="Use progressive auto-curriculum pipeline")
 
-    # Advanced Hyperparameter Overrides
-    parser.add_argument("--lr", type=float, default=0.0)
-    parser.add_argument("--ent_coef", type=float, default=0.0)
-    parser.add_argument("--clip_range", type=float, default=0.0)
+    # Advanced Hyperparameter Overrides. Default None means "use the phase
+    # value"; passing 0 explicitly disables the term.
+    parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--ent_coef", type=float, default=None)
+    parser.add_argument("--clip_range", type=float, default=None)
+    parser.add_argument("--no_anneal_lr", action="store_true",
+                        help="Disable linear learning-rate annealing (PPO only)")
     args = parser.parse_args()
 
     config.generate_lua_config()
@@ -106,7 +109,8 @@ def main():
                     ent_coef=args.ent_coef, 
                     clip_range=args.clip_range,
                     device=device,
-                    auto_curriculum=args.auto_curriculum
+                    auto_curriculum=args.auto_curriculum,
+                    anneal_lr=not args.no_anneal_lr,
                 )
 
                 # If we reached here, training finished normally

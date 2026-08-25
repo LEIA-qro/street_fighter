@@ -9,9 +9,12 @@ from core.env_tools import failsafe_env
 from agents.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS, N_STEPS, BATCH_SIZE
+from agents.ppo.hyperparams import build_ppo_kwargs, resolve_override
 
 class PPOAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cpu", auto_curriculum=False):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0",
+              lr=None, ent_coef=None, clip_range=None, device="cpu",
+              auto_curriculum=False, anneal_lr=True):
         print(f"[Training] Initializing Curriculum Production Training in {save_dir}...")
         print(f"[Training] Compute Device: {device}")
         
@@ -67,10 +70,11 @@ class PPOAgent(BaseAgent):
             phase_idx = (active_phase_idx - 1) // 2
             phase_params = PHASE_HYPERPARAMS.get(phase_idx, PHASE_HYPERPARAMS[0]).copy()
         
-        # Apply Overrides from Dashboard if provided (> 0.0)
-        active_lr = lr if lr > 0.0 else phase_params.get("lr", 1e-4)
-        active_ent = ent_coef if ent_coef > 0.0 else phase_params.get("ent_coef", 0.0)
-        active_clip = clip_range if clip_range > 0.0 else phase_params.get("clip", 0.2)
+        # Apply Overrides from Dashboard/CLI. None means "not provided";
+        # 0.0 is a legitimate value (e.g. --ent_coef 0 to disable exploration bonus).
+        active_lr = resolve_override(lr, phase_params.get("lr", 1e-4))
+        active_ent = resolve_override(ent_coef, phase_params.get("ent_coef", 0.0))
+        active_clip = resolve_override(clip_range, phase_params.get("clip", 0.2))
         
         env = None
         model = None
@@ -103,21 +107,19 @@ class PPOAgent(BaseAgent):
                     custom_objects={"learning_rate": active_lr, "clip_range": active_clip, "ent_coef": active_ent}
                 )
             else:
+                ppo_kwargs = build_ppo_kwargs(
+                    lr=active_lr,
+                    ent_coef=active_ent,
+                    clip_range=active_clip,
+                    device=device,
+                    anneal_lr=anneal_lr,
+                )
                 model = PPO(
                     policy="MlpPolicy",
                     env=env,
-                    learning_rate=active_lr,
-                    n_steps=N_STEPS,
-                    batch_size=BATCH_SIZE,
-                    ent_coef=active_ent,
-                    clip_range=active_clip,
-                    n_epochs=10,
-                    gamma=0.99,
-                    target_kl=0.03,
-                    policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
                     verbose=1,
                     tensorboard_log=directories["logs"],
-                    device=device
+                    **ppo_kwargs,
                 )
 
             # Extract env_version and algo from save_dir safely

@@ -11,7 +11,7 @@ from agents.base_agent import BaseAgent
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
 
 class DQNAgent(BaseAgent):
-    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda", auto_curriculum=False):
+    def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0", lr=0.0, ent_coef=0.0, clip_range=0.0, device="cuda", auto_curriculum=False, anneal_lr=True):
         print(f"[Training] Initializing DQN Curriculum Production Training in {save_dir}...")
         print(f"[Training] Compute Device: {device}")
         
