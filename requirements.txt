@@ -7,3 +7,4 @@ tensorboard==2.21.0
 ale-py==0.12.1
 numpy>=1.26.0
 pytest>=8.0.0
+sb3-contrib==2.9.0

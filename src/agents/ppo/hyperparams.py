@@ -36,7 +36,7 @@ def build_ppo_kwargs(lr: float, ent_coef: float, clip_range: float,
                      device: str = "cpu", anneal_lr: bool = True,
                      target_kl: Optional[float] = None,
                      gamma: float = 0.995, gae_lambda: float = 0.95,
-                     n_epochs: int = 4) -> dict:
+                     n_epochs: int = 4, recurrent: bool = False) -> dict:
     """Complete PPO kwargs minus policy / env / tensorboard_log.
 
     Defaults that differ from the previous inline configuration, and why:
@@ -55,10 +55,15 @@ def build_ppo_kwargs(lr: float, ent_coef: float, clip_range: float,
       configuration is visible in one place and reviewable.
     """
     learning_rate = linear_schedule(lr) if anneal_lr else lr
+    n_steps, batch_size = N_STEPS, BATCH_SIZE
+    if recurrent:
+        # RecurrentPPO backpropagates through the whole rollout. 2048 steps x
+        # 16 envs of LSTM BPTT will not fit alongside 16 live emulators.
+        n_steps, batch_size = 512, 256
     return {
         "learning_rate": learning_rate,
-        "n_steps": N_STEPS,
-        "batch_size": BATCH_SIZE,
+        "n_steps": n_steps,
+        "batch_size": batch_size,
         "n_epochs": n_epochs,
         "gamma": gamma,
         "gae_lambda": gae_lambda,

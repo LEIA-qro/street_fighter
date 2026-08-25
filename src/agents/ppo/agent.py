@@ -14,7 +14,7 @@ from agents.ppo.hyperparams import build_ppo_kwargs, resolve_override
 class PPOAgent(BaseAgent):
     def train(self, env_fn, save_dir, steps, load_zip=None, load_pkl=None, start_phase="0",
               lr=None, ent_coef=None, clip_range=None, device="cpu",
-              auto_curriculum=False, anneal_lr=True):
+              auto_curriculum=False, anneal_lr=True, recurrent=False):
         print(f"[Training] Initializing Curriculum Production Training in {save_dir}...")
         print(f"[Training] Compute Device: {device}")
         
@@ -116,10 +116,16 @@ class PPOAgent(BaseAgent):
                                              n_continuous_dims=n_cont,
                                              n_frames=config.NUM_FRAMES)
 
+            if recurrent:
+                from sb3_contrib import RecurrentPPO
+                algo_cls, policy_name = RecurrentPPO, "MlpLstmPolicy"
+            else:
+                algo_cls, policy_name = PPO, "MlpPolicy"
+
             if load_zip and load_zip != "None":
-                model = PPO.load(
-                    os.path.join(config.PROJECT_ROOT, load_zip), 
-                    env=env, 
+                model = algo_cls.load(
+                    os.path.join(config.PROJECT_ROOT, load_zip),
+                    env=env,
                     device=device,
                     tensorboard_log=directories["logs"],
                     custom_objects={"learning_rate": active_lr, "clip_range": active_clip, "ent_coef": active_ent}
@@ -131,6 +137,7 @@ class PPOAgent(BaseAgent):
                     clip_range=active_clip,
                     device=device,
                     anneal_lr=anneal_lr,
+                    recurrent=recurrent,
                 )
 
                 # V4 emits raw category IDs; route them through embeddings.
@@ -148,8 +155,8 @@ class PPOAgent(BaseAgent):
                         ),
                     )
 
-                model = PPO(
-                    policy="MlpPolicy",
+                model = algo_cls(
+                    policy=policy_name,
                     env=env,
                     verbose=1,
                     tensorboard_log=directories["logs"],

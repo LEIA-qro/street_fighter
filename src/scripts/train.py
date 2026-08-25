@@ -28,6 +28,8 @@ def main():
     parser.add_argument("--auto_curriculum", action="store_true", help="Use progressive auto-curriculum pipeline")
     parser.add_argument("--macros", action="store_true",
                         help="Add Ryu special-move macros to the action space (env v3 only)")
+    parser.add_argument("--recurrent", action="store_true",
+                        help="Use RecurrentPPO (PPO-LSTM) instead of feed-forward PPO")
 
     # Advanced Hyperparameter Overrides. Default None means "use the phase
     # value"; passing 0 explicitly disables the term.
@@ -113,6 +115,7 @@ def main():
                     device=device,
                     auto_curriculum=args.auto_curriculum,
                     anneal_lr=not args.no_anneal_lr,
+                    recurrent=args.recurrent,
                 )
 
                 # If we reached here, training finished normally

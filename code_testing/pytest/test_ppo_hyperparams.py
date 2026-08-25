@@ -126,3 +126,14 @@ def test_ppo_train_signature_defaults_lr_and_overrides_to_none():
     assert ppo_defaults["lr"].default is None
     assert ppo_defaults["ent_coef"].default is None
     assert ppo_defaults["clip_range"].default is None
+
+
+def test_recurrent_kwargs_shorten_the_rollout_for_bptt():
+    from agents.ppo.hyperparams import build_ppo_kwargs
+
+    flat = build_ppo_kwargs(lr=3e-4, ent_coef=0.01, clip_range=0.2)
+    lstm = build_ppo_kwargs(lr=3e-4, ent_coef=0.01, clip_range=0.2,
+                            recurrent=True)
+    assert lstm["n_steps"] == 512
+    assert lstm["n_steps"] < flat["n_steps"]
+    assert lstm["batch_size"] <= lstm["n_steps"]
