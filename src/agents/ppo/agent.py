@@ -79,7 +79,18 @@ class PPOAgent(BaseAgent):
         env = None
         model = None
         directories = config.get_directory()
-        
+
+        # Extract env_version and algo from save_dir safely. Computed up front
+        # so env construction (SelectiveVecNormalize, features extractor) can
+        # branch on env_part before the SubprocVecEnv is even built.
+        normalized_path = os.path.normpath(save_dir)
+        path_parts = normalized_path.split(os.sep)
+        algo_part = "ppo"
+        env_part = "v2"
+        if len(path_parts) >= 2:
+            algo_part = path_parts[-1]
+            env_part = path_parts[-2]
+
         try:
             env = SubprocVecEnv([env_fn(i) for i in range(n_envs)])
             
@@ -94,8 +105,15 @@ class PPOAgent(BaseAgent):
                 env = SelectiveVecNormalize.load(os.path.join(config.PROJECT_ROOT, load_pkl), env)
                 env.training = True
             else:
+                # v4 has 13 continuous dims per frame, not config.OBS_DIM (10).
+                # Do NOT change config.OBS_DIM -- v1/v2/v3 depend on it being 10.
+                if env_part == "v4":
+                    from envs.sf2_v4 import V4_CONT_DIM
+                    n_cont = V4_CONT_DIM
+                else:
+                    n_cont = config.OBS_DIM
                 env = SelectiveVecNormalize(env,
-                                             n_continuous_dims=config.OBS_DIM, 
+                                             n_continuous_dims=n_cont,
                                              n_frames=config.NUM_FRAMES)
 
             if load_zip and load_zip != "None":
@@ -114,6 +132,22 @@ class PPOAgent(BaseAgent):
                     device=device,
                     anneal_lr=anneal_lr,
                 )
+
+                # V4 emits raw category IDs; route them through embeddings.
+                if env_part == "v4":
+                    from core.sf2_extractor import SF2FeaturesExtractor
+                    from envs.sf2_v4 import V4_FRAME_DIM, V4_CONT_DIM, V4_FLAG_DIM
+                    ppo_kwargs["policy_kwargs"] = dict(
+                        ppo_kwargs["policy_kwargs"],
+                        features_extractor_class=SF2FeaturesExtractor,
+                        features_extractor_kwargs=dict(
+                            n_frames=config.NUM_FRAMES,
+                            frame_dim=V4_FRAME_DIM,
+                            cont_dim=V4_CONT_DIM,
+                            flag_dim=V4_FLAG_DIM,
+                        ),
+                    )
+
                 model = PPO(
                     policy="MlpPolicy",
                     env=env,
@@ -121,15 +155,6 @@ class PPOAgent(BaseAgent):
                     tensorboard_log=directories["logs"],
                     **ppo_kwargs,
                 )
-
-            # Extract env_version and algo from save_dir safely
-            normalized_path = os.path.normpath(save_dir)
-            path_parts = normalized_path.split(os.sep)
-            algo_part = "ppo"
-            env_part = "v2"
-            if len(path_parts) >= 2:
-                algo_part = path_parts[-1]
-                env_part = path_parts[-2]
 
             state_name = None
             if not auto_curriculum:

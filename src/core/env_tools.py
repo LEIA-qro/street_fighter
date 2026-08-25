@@ -19,7 +19,10 @@ def SFv2_make_env(rank, **kwargs):
             print(f"[Rank {rank}] Staggering boot: waiting {delay:.1f}s...")
             time.sleep(delay)
 
-        if version == "v3":
+        if version == "v4":
+            from envs.sf2_v4 import StreetFighterEnvV4
+            env = StreetFighterEnvV4(rank=rank, player=player, verbose=(rank == 0))
+        elif version == "v3":
             from envs.sf2_v3 import StreetFighterEnvV3
             env = StreetFighterEnvV3(rank=rank, player=player, verbose=(rank == 0))
         else:
@@ -27,13 +30,15 @@ def SFv2_make_env(rank, **kwargs):
             env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
 
         if kwargs.get("macros", False):
-            if version != "v3":
+            if version not in ("v3", "v4"):
                 raise ValueError(
-                    f"macros require the MultiDiscrete([9,7]) action space of env v3, "
-                    f"got version={version!r}"
+                    f"macros require the MultiDiscrete([9,7]) action space of env "
+                    f"v3 or v4, got version={version!r}"
                 )
             from envs.macro_wrapper import MacroActionWrapper
-            env = MacroActionWrapper(env)
+            from envs.sf2_v4 import V4_FRAME_DIM
+            frame_size = V4_FRAME_DIM if version == "v4" else 554
+            env = MacroActionWrapper(env, frame_size=frame_size)
 
         log_dir = os.path.join(config.LOG_DIR, f"monitor_rank_{rank}")
         os.makedirs(log_dir, exist_ok=True)

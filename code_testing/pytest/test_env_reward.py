@@ -218,3 +218,25 @@ def test_terminal_bonus_is_applied_only_when_terminated():
     state = RewardState(20.0, 176.0, 80.0, 0, 0)
     _, _, parts = compute_reward(state, 0.0, 176.0, 80.0, True, cfg)
     assert parts["terminal"] == pytest.approx(-50.0)
+
+
+def test_v3_parses_the_expanded_24_field_payload_identically():
+    """The wider payload must not break v1/v2/v3 or any saved model."""
+    legacy = FakeBizHawkEnv([make_payload(176, 176, rel_dist=90)])
+    obs_legacy, _ = legacy.reset()
+
+    wide = FakeBizHawkEnv([make_payload(176, 176, rel_dist=90, extended=True)])
+    obs_wide, _ = wide.reset()
+
+    assert np.array_equal(obs_legacy, obs_wide)
+    assert legacy.extra_ram == {}
+    assert wide.extra_ram["p2_btn"] == 0
+
+
+def test_expanded_payload_exposes_the_recovered_fields():
+    env = FakeBizHawkEnv([make_payload(176, 176, extended=True,
+                                       p1_act_lo=5, p2_btn=8, p2_air=1)])
+    env.reset()
+    assert env.extra_ram["p1_act_lo"] == 5
+    assert env.extra_ram["p2_btn"] == 8
+    assert env.extra_ram["p2_air"] == 1

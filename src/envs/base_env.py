@@ -69,6 +69,10 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.sticky_counter = 0
         self.hp_sentinel = False
 
+        # Extra RAM fields from the 24-field payload. Empty when the Lua client
+        # is an older 13-field build. Only v4 reads these.
+        self.extra_ram: dict = {}
+
         # Macro actions need exact, unmodified input sequences; MacroActionWrapper
         # turns this off. See src/envs/macro_wrapper.py.
         self.sticky_enabled = True
@@ -290,9 +294,35 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         csv_string = data.strip().split(" ")[-1]
         parts = csv_string.split(",")
 
-        if len(parts) == 13:
+        # 13 = legacy payload, 24 = expanded payload. Fields 1-13 are identical
+        # in both, so v1/v2/v3 are unaffected by the wider one.
+        if len(parts) in (13, 24):
             try:
                 raw = [int(x) for x in parts]
+
+                if len(raw) == 24:
+                    p1_lo, p2_lo = raw[13], raw[14]
+                    p1_btn, p2_btn = raw[15], raw[16]
+                    p1_air, p2_air = raw[17], raw[18]
+                    if self.player == 2:
+                        p1_lo, p2_lo = p2_lo, p1_lo
+                        p1_btn, p2_btn = p2_btn, p1_btn
+                        p1_air, p2_air = p2_air, p1_air
+                    self.extra_ram = {
+                        "p1_act_lo": p1_lo, "p2_act_lo": p2_lo,
+                        "p1_btn": p1_btn, "p2_btn": p2_btn,
+                        "p1_air": p1_air, "p2_air": p2_air,
+                        "rel_y_dist": raw[19],
+                        "p1_chest": raw[20], "p1_head": raw[21],
+                        "p2_chest": raw[22], "p2_head": raw[23],
+                    }
+                    if self.player == 2:
+                        self.extra_ram["p1_chest"], self.extra_ram["p2_chest"] = \
+                            self.extra_ram["p2_chest"], self.extra_ram["p1_chest"]
+                        self.extra_ram["p1_head"], self.extra_ram["p2_head"] = \
+                            self.extra_ram["p2_head"], self.extra_ram["p1_head"]
+                else:
+                    self.extra_ram = {}
 
                 p1_sentinel = raw[0] > self.HP_SENTINEL_THRESHOLD
                 p2_sentinel = raw[1] > self.HP_SENTINEL_THRESHOLD

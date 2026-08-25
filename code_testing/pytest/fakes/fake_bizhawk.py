@@ -18,14 +18,21 @@ from envs.sf2_v3 import StreetFighterEnvV3
 
 def make_payload(p1_hp, p2_hp, p1_x=100, p2_x=200, p1_y=0, p2_y=0,
                  p1_act=0, p2_act=0, p1_proj=-1, p2_proj=-1,
-                 p1_char=0, p2_char=1, rel_dist=100) -> str:
-    """Builds one 13-field CSV payload in the exact Lua wire format.
+                 p1_char=0, p2_char=1, rel_dist=100,
+                 extended=False,
+                 p1_act_lo=0, p2_act_lo=0, p1_btn=0, p2_btn=0,
+                 p1_air=0, p2_air=0, rel_y_dist=0,
+                 p1_chest=192, p1_head=192, p2_chest=192, p2_head=192) -> str:
+    """Builds a payload in the exact Lua wire format.
 
-    Field order matches lua/v2.0/training_env_client.lua:112 —
-    hp1, hp2, x1, x2, y1, y2, act1, act2, proj1, proj2, char1, char2, rel_dist
+    13 fields by default (legacy), 24 when extended=True. Field order matches
+    lua/v2.0/training_env_client.lua.
     """
     fields = [p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y,
               p1_act, p2_act, p1_proj, p2_proj, p1_char, p2_char, rel_dist]
+    if extended:
+        fields += [p1_act_lo, p2_act_lo, p1_btn, p2_btn, p1_air, p2_air,
+                   rel_y_dist, p1_chest, p1_head, p2_chest, p2_head]
     return "0 " + ",".join(str(int(f)) for f in fields)
 
 
@@ -83,6 +90,7 @@ class FakeBizHawkEnv(StreetFighterEnvV3):
         self.sticky_counter = 0
         self.sticky_enabled = True
         self.hp_sentinel = False
+        self.extra_ram = {}
         self.reward_cfg = RewardConfig()
         self.reward_state = RewardState(
             prev_my_hp=176.0, prev_enemy_hp=176.0, prev_rel_dist=80.0,

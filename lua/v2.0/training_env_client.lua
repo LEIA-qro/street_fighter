@@ -82,6 +82,26 @@ while true do
     local p2_state_raw = mainmemory.read_u16_be(0x82CE)
     local p1_action_id = bit.rshift(p1_state_raw, 8)
     local p2_action_id = bit.rshift(p2_state_raw, 8)
+    -- The doc says 0x804E/0x82CE encode BOTH position-state and move. The low
+    -- byte was being discarded every frame; recover it.
+    local p1_action_lo = bit.band(p1_state_raw, 0xFF)
+    local p2_action_lo = bit.band(p2_state_raw, 0xFF)
+
+    -- Airborne flags, normalized to 0/1 here so Python stays simple.
+    -- 0x80C0: 0 = floor, 257 = air.  0x86F4: 14 = floor, 13 = air.
+    local p1_air = (mainmemory.read_u16_be(0x80C0) ~= 0) and 1 or 0
+    local p2_air = (mainmemory.read_u16_be(0x86F4) == 13) and 1 or 0
+
+    -- Raw button state of each player. 0x845E is the OPPONENT's input.
+    local p1_btn = mainmemory.read_u8(0x81E2)
+    local p2_btn = mainmemory.read_u8(0x845E)
+
+    -- Engine-native vertical separation and posture clearances.
+    local rel_y_dist = mainmemory.read_u16_be(0x834E)
+    local p1_chest   = mainmemory.read_u16_be(0x80DC)
+    local p1_head    = mainmemory.read_u16_be(0x80E0)
+    local p2_chest   = mainmemory.read_u16_be(0x835C)
+    local p2_head    = mainmemory.read_u16_be(0x8360)
 
     -- Read RAM: Projectile State & Delta Calculation
     local raw_p1_proj_x = mainmemory.read_u16_be(0x8506)
@@ -108,12 +128,18 @@ while true do
     local p2_char_id = mainmemory.read_u8(0x845B)
     local rel_dist = mainmemory.read_u16_be(0x834C)
 
-    -- Format Payload (Now 13 dimensions) & Send
-    local payload = string.format("0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", 
-        p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y, 
-        p1_action_id, p2_action_id, 
+    -- Format Payload (24 dimensions). Fields 1-13 are UNCHANGED so that
+    -- v1/v2/v3 keep parsing this payload correctly; 14-24 are additive.
+    local payload = string.format(
+        "0 %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+        p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y,
+        p1_action_id, p2_action_id,
         active_p1_proj_x, active_p2_proj_x,
-        p1_char_id, p2_char_id, rel_dist)
+        p1_char_id, p2_char_id, rel_dist,
+        p1_action_lo, p2_action_lo,
+        p1_btn, p2_btn,
+        p1_air, p2_air,
+        rel_y_dist, p1_chest, p1_head, p2_chest, p2_head)
     
     comm.socketServerSend(payload)
     

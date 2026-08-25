@@ -19,7 +19,7 @@ if hasattr(signal, "SIGBREAK"):
 def main():
     parser = argparse.ArgumentParser(description="Street Fighter II RL Single Agent Training")
     parser.add_argument("--algo", required=True, choices=["ppo", "sac", "dqn"])
-    parser.add_argument("--env",  default="v2",  choices=["v1", "v2", "v3"])
+    parser.add_argument("--env",  default="v2",  choices=["v1", "v2", "v3", "v4"])
     parser.add_argument("--steps", type=int, default=config.STARTING_TOTAL_TIMESTEPS)
     parser.add_argument("--load_zip", type=str, default=None)
     parser.add_argument("--load_pkl", type=str, default=None)
