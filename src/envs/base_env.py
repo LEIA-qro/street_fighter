@@ -157,8 +157,12 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             # Socket is dead. Return a terminal state so SB3 calls reset().
             # Do NOT let this propagate - it kills the SubprocVecEnv
             print(f"[Rank {self.port - config.PORT}] Socket error in step: {e}. Returning terminal obs.")
-            obs = self._get_obs() if len(self.frames) > 0 else np.zeros(TOTAL_OBS_DIM * config.NUM_FRAMES, dtype=np.float32)
-            return obs, 0.0, True, False, {"socket_death": True}
+            obs = self._get_obs() if len(self.frames) > 0 else np.zeros(self.observation_space.shape, dtype=np.float32)
+            return obs, 0.0, True, False, {
+                "socket_death": True,
+                "hp_sentinel": self.hp_sentinel,
+                "reward_parts": {},
+            }
 
         observation = self._parse_payload(data, is_reset=False)
         self.frames.append(observation)

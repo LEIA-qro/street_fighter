@@ -323,6 +323,35 @@ def test_expanded_payload_exposes_the_recovered_fields():
     assert env.extra_ram["p2_air"] == 1
 
 
+def test_v4_socket_death_returns_a_correctly_shaped_obs_and_full_info():
+    """The RuntimeError recovery path in step() must return an observation
+    matching the env's ACTUAL observation_space shape (92 for v4, not the
+    v2/v3-sized 2216 it used to hardcode), and an info dict carrying the same
+    hp_sentinel/reward_parts keys every other return path includes -- a shape
+    or key mismatch here surfaces as an unrelated SB3 error deep into a run.
+    """
+    # Deliberately skip reset(): self.frames is empty (its natural state
+    # before the very first successful frame), which is exactly the branch
+    # of the RuntimeError handler that hardcoded a v2/v3-sized zero array.
+    env = FakeBizHawkEnvV4([])
+    assert len(env.frames) == 0
+
+    def _dead_socket(command):
+        raise RuntimeError("socket closed")
+
+    env.send_command = _dead_socket
+    obs, reward, terminated, truncated, info = env.step(np.array([0, 0]))
+
+    assert obs.shape == env.observation_space.shape
+    assert obs.dtype == np.float32
+    assert reward == 0.0
+    assert terminated is True
+    assert truncated is False
+    assert info["socket_death"] is True
+    assert "hp_sentinel" in info
+    assert "reward_parts" in info
+
+
 def test_v4_corrupt_payload_after_a_good_frame_does_not_crash():
     """StreetFighterBaseEnv's corrupt-payload failsafe repeats the last good
     frame verbatim (self.frames[-1][:TOTAL_OBS_DIM]). For v4 that frame is
