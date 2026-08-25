@@ -8,6 +8,7 @@ from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from agents.common.action_wrappers import FlattenDiscreteActionWrapper
+from agents.dqn.config import BUFFER_SIZE
 
 from stable_baselines3.common.callbacks import BaseCallback
 from collections import deque
@@ -41,13 +42,21 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
     gamma = trial.suggest_float("gamma", 0.95, 0.9999, log=True)
     exploration_fraction = trial.suggest_float("exploration_fraction", 0.05, 0.2)
     
+    # buffer_size is not part of the search space: SB3's ReplayBuffer
+    # allocates observations AND next_observations at this width, so at the
+    # v2/v3 observation size a study that could pick 1M would risk an
+    # allocation failure mid-trial. It is memory-constrained, not
+    # performance-constrained -- see agents/dqn/config.py's BUFFER_SIZE
+    # comment. The QRDQN(...) call below passes the imported BUFFER_SIZE
+    # constant directly (not a local copy) so it stays textually identical
+    # to dqn/agent.py's call and every trial is scored against the replay
+    # depth production actually trains with (see
+    # test_dqn_qrdqn_warmup_parity.py).
     if load_zip is None or load_zip == "None":
-        buffer_size = trial.suggest_categorical("buffer_size", [50000, 100000])
         batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
         net_width = trial.suggest_categorical("net_width", [256, 512, 1024])
         net_arch = [net_width, net_width, 256]
     else:
-        buffer_size = None
         batch_size = None
         net_arch = None
     
@@ -103,16 +112,17 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 }
             )
         else:
-            # learning_starts/train_freq/gradient_steps/target_update_interval
-            # must stay in step with the QRDQN(...) call in agents/dqn/agent.py --
-            # if the tuner and the trainer warm up on different schedules, the
-            # study is scoring hyperparameters under conditions production
-            # training never sees. Keep these four in sync at both call sites.
+            # learning_starts/train_freq/gradient_steps/target_update_interval/
+            # buffer_size must stay in step with the QRDQN(...) call in
+            # agents/dqn/agent.py -- if the tuner and the trainer warm up (or
+            # replay) on different schedules, the study is scoring
+            # hyperparameters under conditions production training never
+            # sees. Keep these five in sync at both call sites.
             model = QRDQN(
                 "MlpPolicy",
                 env,
                 learning_rate=lr,
-                buffer_size=buffer_size,
+                buffer_size=BUFFER_SIZE,
                 batch_size=batch_size,
                 gamma=gamma,
                 exploration_fraction=exploration_fraction,
