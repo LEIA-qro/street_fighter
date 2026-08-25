@@ -8,7 +8,21 @@ N_HYPERPARAMETER_TRIALS = 50
 LR = 1e-4
 # With N_ENVS=16, 16 transitions land per env step, so 100k held only ~6,250
 # iterations -- minutes of wall clock against a 96-savestate curriculum.
-BUFFER_SIZE = 1_000_000
+#
+# SB3's ReplayBuffer.__init__ allocates (buffer_size // n_envs, n_envs,
+# *obs_shape) for BOTH observations and next_observations
+# (optimize_memory_usage defaults to False), so n_envs cancels out of the
+# total footprint entirely. The v2/v3 observation is 554 floats x 4 stacked
+# frames = 2216 float32:
+#   1_000_000 x 2216 x 4 bytes x 2 = 17.7 GB  <- the old value; cannot start
+#                                                alongside 16 live emulators.
+#     250_000 x 2216 x 4 bytes x 2 =  4.4 GB  <- current value, still 2.5x
+#                                                the old 100k history depth.
+# The constraint is observation WIDTH, not an arbitrary cap on this number:
+# the v4 compact observation is 92 floats (23 x 4 frames), where even
+# 1_000_000 x 92 x 4 bytes x 2 = 0.74 GB. Raising this again for v2/v3 means
+# accepting the corresponding memory cost above, or moving DQN to v4.
+BUFFER_SIZE = 250_000
 BATCH_SIZE = 256
 GAMMA = 0.99
 EXPLORATION_FRACTION = 0.1
