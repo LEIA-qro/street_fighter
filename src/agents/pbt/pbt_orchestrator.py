@@ -48,6 +48,7 @@ def run_agent_worker(config_dict):
     from core import config as core_config
     from core.env_tools import SFv2_make_env, failsafe_env
     from core.selective_norm import SelectiveVecNormalize
+    from core.rl_constants import AGENT_GAMMA
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv
     from ray import tune as ray_tune
@@ -145,7 +146,7 @@ def run_agent_worker(config_dict):
         model = PPO.load(model_path, env=env, device="cuda", tensorboard_log=trial_log_dir, custom_objects=custom_objs)
     else:
         model = PPO("MlpPolicy", env=env, learning_rate=active_lr, n_steps=FIXED_PARAMS["n_steps"], batch_size=FIXED_PARAMS["batch_size"],
-                    ent_coef=active_ent, clip_range=active_clip, n_epochs=10, gamma=0.99, target_kl=0.03,
+                    ent_coef=active_ent, clip_range=active_clip, n_epochs=10, gamma=AGENT_GAMMA, target_kl=0.03,
                     policy_kwargs=dict(net_arch=dict(pi=[512,512,256], vf=[512,512,256])), 
                     verbose=0, device="cuda", tensorboard_log=trial_log_dir)
     

@@ -14,6 +14,7 @@ sys.path.append(parent_dir)
 from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
+from core.rl_constants import AGENT_GAMMA
 from agents.league.pool_manager import LeaguePoolManager
 
 def make_league_env(rank, env_version="v2", matchup_mode="ryu_vs_ryu", custom_state=None):
@@ -243,7 +244,7 @@ def train_league():
                 ent_coef=0.015,
                 clip_range=0.20,
                 n_epochs=10,
-                gamma=0.99,
+                gamma=AGENT_GAMMA,
                 target_kl=0.03,
                 policy_kwargs=dict(net_arch=dict(pi=[512, 512, 256], vf=[512, 512, 256])),
                 verbose=1,

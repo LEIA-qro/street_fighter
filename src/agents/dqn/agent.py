@@ -10,6 +10,7 @@ from agents.manual_curriculum_callback import ManualCurriculumCallback
 from agents.base_agent import BaseAgent
 from agents.common.action_wrappers import FlattenDiscreteActionWrapper
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
+from core.rl_constants import AGENT_GAMMA
 
 
 def resolve_dqn_lr(lr, phase_params):
@@ -125,7 +126,7 @@ class DQNAgent(BaseAgent):
                     exploration_fraction=active_expl_frac,
                     exploration_initial_eps=EXPLORATION_INITIAL_EPS,
                     exploration_final_eps=EXPLORATION_FINAL_EPS,
-                    gamma=0.995,
+                    gamma=AGENT_GAMMA,
                     learning_starts=10_000,
                     train_freq=4,
                     gradient_steps=1,

@@ -13,7 +13,12 @@ LR = 3e-4
 BUFFER_SIZE = 100000 
 BATCH_SIZE = 256
 TAU = 0.005
-GAMMA = 0.99
+# GAMMA was removed from here -- it was dead (nothing imported it) and
+# contradicted the value production actually uses. SACAgent.train/tune are
+# unreachable (both raise NotImplementedError immediately -- see
+# agents/sac/agent.py's _SAC_DISCRETE_MESSAGE), so there is no live call
+# site to point at AGENT_GAMMA; if SAC is ever revived, source its gamma
+# from core.rl_constants.AGENT_GAMMA rather than reintroducing a literal.
 
 NET_ARCH = dict(pi=[512, 512, 256], qf=[512, 512, 256])
 

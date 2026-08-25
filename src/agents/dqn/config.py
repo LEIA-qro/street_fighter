@@ -24,7 +24,10 @@ LR = 1e-4
 # accepting the corresponding memory cost above, or moving DQN to v4.
 BUFFER_SIZE = 250_000
 BATCH_SIZE = 256
-GAMMA = 0.99
+# GAMMA was removed from here -- it was dead (nothing imported it) and
+# contradicted the value production actually uses. agents/dqn/agent.py
+# imports AGENT_GAMMA from core.rl_constants instead; see that module's
+# docstring for why the discount must be sourced from one place.
 EXPLORATION_FRACTION = 0.1
 EXPLORATION_INITIAL_EPS = 1.0
 EXPLORATION_FINAL_EPS = 0.05
