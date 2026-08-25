@@ -11,6 +11,7 @@
 from typing import Callable, Optional
 
 from agents.ppo.config import N_STEPS, BATCH_SIZE, NET_ARCH
+from core.rl_constants import AGENT_GAMMA
 
 
 def linear_schedule(initial: float, final: float = 0.0) -> Callable[[float], float]:
@@ -35,7 +36,7 @@ def resolve_override(cli_value: Optional[float], phase_value: float) -> float:
 def build_ppo_kwargs(lr: float, ent_coef: float, clip_range: float,
                      device: str = "cpu", anneal_lr: bool = True,
                      target_kl: Optional[float] = None,
-                     gamma: float = 0.995, gae_lambda: float = 0.95,
+                     gamma: float = AGENT_GAMMA, gae_lambda: float = 0.95,
                      n_epochs: int = 4, recurrent: bool = False) -> dict:
     """Complete PPO kwargs minus policy / env / tensorboard_log.
 
@@ -46,9 +47,12 @@ def build_ppo_kwargs(lr: float, ent_coef: float, clip_range: float,
       one or two of the ten configured epochs, so most of every 32,768-sample
       rollout was thrown away. Lower n_epochs instead of truncating them.
     * n_epochs 4 (was 10) -- the standard PPO value for on-policy control.
-    * gamma 0.995 (was 0.99) -- 0.99 gives a ~100 agent-step horizon; at
-      FRAME_SKIP=4 that is ~6.7 seconds, far short of a full SF2 round. 0.995
-      roughly doubles it so the value head can see the KO from mid-round.
+    * gamma defaults to core.rl_constants.AGENT_GAMMA (0.995, was 0.99) --
+      0.99 gives a ~100 agent-step horizon; at FRAME_SKIP=4 that is ~6.7
+      seconds, far short of a full SF2 round. 0.995 roughly doubles it so
+      the value head can see the KO from mid-round. envs/reward.py's
+      RewardConfig.gamma reads the same constant -- the two must never
+      diverge, or the distance-shaping term stops being policy-invariant.
     * learning_rate annealed by default.
     * vf_coef / max_grad_norm / normalize_advantage stated explicitly here
       rather than inherited as SB3 library defaults, so the full PPO

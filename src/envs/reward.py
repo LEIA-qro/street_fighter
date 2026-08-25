@@ -11,6 +11,8 @@
 
 from dataclasses import dataclass, replace
 
+from core.rl_constants import AGENT_GAMMA
+
 
 @dataclass
 class RewardConfig:
@@ -30,7 +32,13 @@ class RewardConfig:
     peak_dist: float = 70.0
     max_dist: float = 187.0
     spacing_weight: float = 2.5
-    gamma: float = 0.99
+    # Must equal the acting agent's discount -- see core/rl_constants.py's
+    # docstring for why a mismatch breaks the potential-based shaping
+    # guarantee. Do NOT hardcode a second literal here; if the agent's
+    # gamma ever needs to differ from AGENT_GAMMA, update the shared
+    # constant (or pass gamma= explicitly at both call sites) rather than
+    # letting the two drift apart again.
+    gamma: float = AGENT_GAMMA
 
 
 @dataclass
