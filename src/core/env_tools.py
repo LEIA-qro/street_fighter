@@ -143,6 +143,13 @@ def allow_sleep():
     except Exception:
         pass
 
-# Register failsafe_env to run automatically at exit on any process that imports env_tools
-atexit.register(failsafe_env)
+# Register failsafe_env to run automatically at exit -- but ONLY in the main
+# process. SubprocVecEnv workers import this module too (spawn re-imports
+# everything), and a worker's atexit used to run the PowerShell sniper, which
+# matches EVERY project EmuHawk: one worker dying killed all 16 emulators and
+# escalated a local failure into a full-run crash + retry cycle. Workers clean
+# up their own emulator through env.close(); orphans are the main process's
+# job.
+if multiprocessing.current_process().name == "MainProcess":
+    atexit.register(failsafe_env)
 

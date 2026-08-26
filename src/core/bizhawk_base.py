@@ -45,6 +45,10 @@ class BizHawkBaseEnv(gym.Env):
 
     def _start_emulator_bridge(self):
         """Binds the socket and launches the emulator."""
+        # A partial line left over from a dead connection would prepend
+        # garbage to the new connection's first payload (silently corrupting
+        # one observation via the corrupt-payload fallback). Start clean.
+        self.stream_buffer = ""
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind((self.host, self.port))

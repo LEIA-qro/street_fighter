@@ -9,6 +9,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from core import config
 from envs.base_env import TOTAL_OBS_DIM
+from envs.reward import compute_reward
 from envs.sf2_v2 import StreetFighterEnvV2
 from core.selective_norm import SelectiveVecNormalize
 
@@ -251,77 +252,77 @@ class StreetFighterLeagueEnv(StreetFighterEnvV2):
         self.latest_p2_stacked = self.buf_p2.push(obs_p2_raw) # Opponent stacked observation
 
         # --- 5. CALCULATE REWARD & OUTCOMES ---
-        current_my_hp, current_enemy_hp = obs_p1_raw[0], obs_p1_raw[1]
-        
-        # Clamp RAM glitches to preserve training stability
-        damage_clamp = 100
-        damage_dealt = min(max(0, self.prev_enemy_hp - current_enemy_hp), damage_clamp)
-        damage_taken = min(max(0, self.prev_my_hp - current_my_hp), damage_clamp)
-
-        self._steps += 1
-        
-        # Footsie potential-based reward shaping
-        COMBO_WINDOW = 6
-        DAMAGE_TAKEN_PENALTY = 0.70
-        FOOTSIE_RANGE_MAX = 80
-        FOOTSIE_BASE_REWARD = 0.05
-        
+        # Same pure reward module and sentinel discipline as the single-player
+        # path in base_env.step(). The league used to carry its own inline
+        # copy of the OLD reward (dead-zone potential, hardcoded 0.99 discount,
+        # -0.015/step, +/-50 terminals, no sentinel handling) -- self-play was
+        # training against the exact bug the sf2-sota-rl-upgrade branch fixed.
+        current_my_hp, current_enemy_hp = float(obs_p1_raw[0]), float(obs_p1_raw[1])
         rel_dist = float(obs_p1_raw[9])
-        def potential(d):
-            return FOOTSIE_BASE_REWARD * max(0.0, 1.0 - d / FOOTSIE_RANGE_MAX)
-            
-        phi_curr = potential(rel_dist)
-        phi_prev = potential(self.prev_rel_dist)
-        dist_reward = 0.99 * phi_curr - phi_prev
-        self.prev_rel_dist = rel_dist
+        self._steps += 1
 
-        if rel_dist <= FOOTSIE_RANGE_MAX:
+        if rel_dist <= self.reward_cfg.peak_dist:
             self.footsie_steps += 1
         else:
             self.footsie_steps = 0
 
-        if damage_dealt > 0:
-            self.footsie_steps = 0
-            if self.frames_since_last_hit <= COMBO_WINDOW:
-                self.combo_counter += 1
-            else:
-                self.combo_counter = 1
-            self.frames_since_last_hit = 0
-            combo_bonus = min(self.combo_counter * 0.5, 4.0)
-            
-            reward = float(damage_dealt) + combo_bonus - (DAMAGE_TAKEN_PENALTY * float(damage_taken)) + dist_reward
+        if not self.hp_sentinel:
+            self._ep_rel_dists.append(rel_dist)
+
+        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
+
+        if self.hp_sentinel:
+            # HP unreadable this frame (round transition / menu / KO
+            # animation): skip reward and refuse to terminate rather than
+            # diffing real HP against a fabricated zero. Without this, a
+            # single-sided sentinel fabricated a -50 "loss" out of a menu
+            # frame in every league episode.
+            reward, reward_parts = 0.0, {}
         else:
-            self.frames_since_last_hit += 1
-            if self.frames_since_last_hit > COMBO_WINDOW:
-                self.combo_counter = 0
-            reward = -(DAMAGE_TAKEN_PENALTY * float(damage_taken)) - 0.015 + dist_reward
+            reward, self.reward_state, reward_parts = compute_reward(
+                self.reward_state, current_my_hp, current_enemy_hp,
+                rel_dist, ko, self.reward_cfg,
+            )
+            self.prev_my_hp = self.reward_state.prev_my_hp
+            self.prev_enemy_hp = self.reward_state.prev_enemy_hp
+            self.prev_rel_dist = self.reward_state.prev_rel_dist
+            self.combo_counter = self.reward_state.combo_counter
+            self.frames_since_last_hit = self.reward_state.frames_since_last_hit
 
-        if current_enemy_hp <= 0: 
-            reward += 50.0
-        if current_my_hp <= 0: 
-            reward -= 50.0
+        terminated = ko if self.trainable else False
+        truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
-        self.prev_my_hp, self.prev_enemy_hp = current_my_hp, current_enemy_hp
-
-        terminated = bool(current_my_hp <= 0 or current_enemy_hp <= 0) if self.trainable else False
-        truncated = bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated
-
-        info = {}
+        info = {
+            "my_hp": current_my_hp,
+            "enemy_hp": current_enemy_hp,
+            "hp_sentinel": self.hp_sentinel,
+            "reward_parts": reward_parts,
+        }
         if terminated or truncated:
-            # Output win/loss explicitly for the League Pool Manager to record win rates
-            win_outcome = 1 if current_enemy_hp <= 0 and current_my_hp > 0 else 0
-            info["win"] = win_outcome
+            info["double_ko"] = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
+            info["timeout"] = bool(truncated)
+            info["episode_steps"] = self._steps
+            info["win"] = 1 if (terminated and current_enemy_hp <= 0 and current_my_hp > 0) else 0
+            info["loss"] = 1 if (terminated and current_my_hp <= 0 and current_enemy_hp > 0) else 0
             info["opponent_id"] = self.opponent_id
+            if hasattr(self, "current_state_file"):
+                info["state_file"] = self.current_state_file
+            self._attach_episode_spacing(info)
 
         return self._get_obs(), reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
         """Standard Gym reset: resets emulator state and primes decoupled buffers on first telemetry payload."""
         obs_p1, info = super().reset(seed=seed, options=options)
-        
-        # Cold start telemetry
-        data = self.latest_raw_payload if self.latest_raw_payload else self.receive_payload()
-        
+
+        # The base reset already drained the stale in-flight payload and read
+        # the real post-savestate-load frame; re-parse that same frame from
+        # both perspectives. (The old code re-received on cold start -- which
+        # stole the first step's payload -- and reused the PREVIOUS episode's
+        # final payload on every later reset.)
+        data = self._last_reset_payload
+        self.latest_raw_payload = data
+
         # Prime parsers
         obs_p1_raw = self.parser_p1.parse(data, is_reset=True)
         obs_p2_raw = self.parser_p2.parse(data, is_reset=True)

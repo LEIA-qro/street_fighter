@@ -92,6 +92,17 @@ def _bootstrap_common_fields(env, player, trainable):
     )
 
 
+# The payload the fake pretends Lua sent unsolicited at boot. The real client
+# sends its telemetry BEFORE waiting for a command, so exactly one payload is
+# always pending when reset() runs; reset() drains it and then reads the real
+# post-savestate-load frame. Every fake starts with this in its queue, so
+# `FakeBizHawkEnv([make_payload(...)])` still means "reset() returns an
+# observation built from make_payload(...)". A test that resets a second time
+# must queue TWO payloads for that reset: the in-flight stale one, then the
+# post-load one.
+BOOT_STALE_PAYLOAD = make_payload(176, 176)
+
+
 class _FakeSocketLayerMixin:
     """Socket layer replacement shared by every FakeBizHawkEnv* variant."""
 
@@ -129,7 +140,7 @@ class FakeBizHawkEnv(_FakeSocketLayerMixin, StreetFighterEnvV3):
     """StreetFighterEnvV3 with the emulator bridge stubbed out."""
 
     def __init__(self, payloads, **kwargs):
-        self._queue = list(payloads)
+        self._queue = [BOOT_STALE_PAYLOAD] + list(payloads)
         self.sent = []
         # Bypass StreetFighterEnvV3.__init__ -> ... -> BizHawkBaseEnv.__init__,
         # which would bind a socket and launch EmuHawk.exe.
@@ -160,7 +171,7 @@ class FakeBizHawkEnvV4(_FakeSocketLayerMixin, StreetFighterEnvV4):
     """StreetFighterEnvV4 with the emulator bridge stubbed out."""
 
     def __init__(self, payloads, **kwargs):
-        self._queue = list(payloads)
+        self._queue = [BOOT_STALE_PAYLOAD] + list(payloads)
         self.sent = []
         # Bypass StreetFighterEnvV4.__init__ -> ... -> BizHawkBaseEnv.__init__,
         # which would bind a socket and launch EmuHawk.exe.
