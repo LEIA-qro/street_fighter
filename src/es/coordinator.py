@@ -369,7 +369,21 @@ class _Handler(BaseHTTPRequestHandler):
 # laptop lost wifi to S3 or wandb rotated a key.
 # ---------------------------------------------------------------------------
 
-def make_s3_uploader(bucket):
+def normalize_s3_prefix(prefix):
+    """'es-run2' / 'es-run2/' -> 'es-run2/'. One canonical form, always slashed.
+
+    The prefix is the run's S3 namespace: giving each fresh run its own keeps
+    restore_from_s3 from ever resurrecting a PREVIOUS run's newer-numbered
+    checkpoint after an instance replacement (gen_000096 of a dead run sorts
+    above gen_000040 of the live one), and it doubles as the archive -- the
+    old run's objects simply stay under the old prefix, no deletions needed
+    (the madre's IAM role deliberately cannot delete).
+    """
+    prefix = str(prefix or "").strip().strip("/")
+    return prefix + "/" if prefix else "es/"
+
+
+def make_s3_uploader(bucket, prefix="es/"):
     if not bucket:
         return None
     try:
@@ -378,16 +392,17 @@ def make_s3_uploader(bucket):
     except Exception as e:
         print(f"[coord] S3 disabled ({e})", flush=True)
         return None
+    prefix = normalize_s3_prefix(prefix)
 
     def upload(path):
         try:
-            client.upload_file(path, bucket, "es/" + os.path.basename(path))
+            client.upload_file(path, bucket, prefix + os.path.basename(path))
         except Exception as e:
             print(f"[coord] S3 upload of {path} failed ({e}); continuing", flush=True)
     return upload
 
 
-def restore_from_s3(bucket, checkpoint_dir):
+def restore_from_s3(bucket, checkpoint_dir, prefix="es/"):
     """Pull the newest checkpoint out of S3 when the local dir has none.
 
     The madre is disposable infra: a terraform apply that touches user_data
@@ -402,9 +417,10 @@ def restore_from_s3(bucket, checkpoint_dir):
     try:
         import boto3
         client = boto3.client("s3")
+        prefix = normalize_s3_prefix(prefix)
         keys = []
         paginator = client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket, Prefix="es/"):
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for obj in page.get("Contents", []):
                 if obj["Key"].endswith(".npz"):
                     keys.append(obj["Key"])
@@ -557,7 +573,8 @@ def load_or_init_state(args, states=None):
     cli_states = openes.normalize_states(states)
     # A replaced instance has an empty local dir but a full S3 bucket.
     if openes.latest_checkpoint(args.checkpoint_dir) is None:
-        restore_from_s3(args.s3_bucket, args.checkpoint_dir)
+        restore_from_s3(args.s3_bucket, args.checkpoint_dir,
+                        prefix=getattr(args, "s3_prefix", "es/"))
     base = openes.latest_checkpoint(args.checkpoint_dir)
     if base is not None:
         state = openes.load_checkpoint(base)
@@ -610,6 +627,10 @@ def main():
     ap.add_argument("--generations", type=int, default=0, help="0 = run forever")
     ap.add_argument("--master-seed", type=int, default=20260825)
     ap.add_argument("--s3-bucket", default=None)
+    ap.add_argument("--s3-prefix", default="es/",
+                    help="S3 namespace of THIS run's checkpoints (upload and "
+                         "restore). Give every fresh run its own prefix; the "
+                         "old run's objects stay put as the archive")
     ap.add_argument("--wandb-project", default=None)
     ap.add_argument("--states", default=None,
                     help="train over a savestate SET: 'A,B,C' inline, '@file' "
@@ -643,7 +664,7 @@ def main():
                         max_concurrent_leases=args.max_chunk_leases,
                         # the run's pinned list (checkpoint wins over CLI)
                         states=state.states)
-    s3_upload = make_s3_uploader(args.s3_bucket)
+    s3_upload = make_s3_uploader(args.s3_bucket, prefix=args.s3_prefix)
     wandb_log = make_wandb_logger(args.wandb_project)
 
     server = ThreadingHTTPServer((args.host, args.port), _Handler)
