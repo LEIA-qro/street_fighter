@@ -53,3 +53,9 @@ bench_12rivals.py ahora tiene `--action-noise P` y `--desync-max K` (perturbacio
 - Paredes duras tres bancos seguidos: **Balrog, EHonda, Sagat (0 victorias)**; Bison/Ryu bailan en la frontera. ‖θ‖ crece sin freno (17.6→23.0→32.3; wd 0.005 no contiene). Mean poblacional oscila 0.6-0.8 sin tendencia desde ~g120.
 - **Palancas run 3 (orden de convicción): eps/miembro 2→4 (gradiente ruidoso), desync EN entrenamiento (worker), pop 512 cuando entre la desktop, wd mayor.** Todo flags existentes salvo el desync del worker + fix multi-lease.
 - Plan de Felipe: ES llegó a 400 → Rainbow se prueba en la Legion (3M steps, 16 envs, GPU); desktop sigue su 31M y al acabar entra de worker. Mac sigue ES sola mientras.
+
+## [2026-08-26 noche-2] Run 2 CERRADA en gen 754 — acta de randomness final
+
+- La "meseta" de g407 era transitoria: cerró subiendo (mean poblacional ~0.82; banco g751: desync 81.9%, Sagat cayó, EHonda regresó). Archivo: benchmarks/run2_final/ (theta gen 754 + checkpoint), S3 es-run2-onehot/ intacto, coordinator y workers detenidos limpio (madre viva para run 3).
+- **Matriz de randomness θ754**: limpio 75.0 / desync 75.0 (**brecha CERO — cero coreografía**, vs −19pts de run 1) / ruido 5% 65.3 / ruido 10% 66.7 (**sin dosis-respuesta**: el primer ruido rompe combos, más ya no empeora) / combinada 66.7. Número honesto de run 2: ~75-80% (varianza muestral ±5). El PPO campeón sigue siendo inmune al ruido (90.3% con 10%) por entrenar estocástico.
+- Palanca extra run 3 confirmada por esto: ruido de acciones EN los episodios de evaluación del ES (además del desync), para presionar la motricidad fina.
