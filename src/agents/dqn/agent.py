@@ -7,6 +7,7 @@ from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from agents.manual_curriculum_callback import ManualCurriculumCallback
+from agents.metrics_callback import MetricsCallback
 from agents.base_agent import BaseAgent
 from agents.common.action_wrappers import FlattenDiscreteActionWrapper
 from agents.dqn.config import PHASE_HYPERPARAMS, BUFFER_SIZE, BATCH_SIZE, EXPLORATION_INITIAL_EPS, EXPLORATION_FINAL_EPS
@@ -128,8 +129,14 @@ class DQNAgent(BaseAgent):
                     exploration_final_eps=EXPLORATION_FINAL_EPS,
                     gamma=AGENT_GAMMA,
                     learning_starts=10_000,
+                    # train_freq counts VecEnv steps: 4 calls x N_ENVS=16 = 64
+                    # transitions collected per training trigger. At
+                    # gradient_steps=1 the replay ratio was 1/64 = 0.016 --
+                    # each transition replayed ~0.016 times, discarding the
+                    # entire point of a value-based method while the GPU idled.
+                    # 8 brings the ratio to 1/8; measure before going higher.
                     train_freq=4,
-                    gradient_steps=1,
+                    gradient_steps=8,
                     target_update_interval=10_000,
                     policy_kwargs=dict(net_arch=[512, 512, 256], n_quantiles=51),
                     verbose=1,
@@ -186,8 +193,8 @@ class DQNAgent(BaseAgent):
                 reset_timesteps = False
 
             model.learn(
-                total_timesteps=steps, 
-                callback=callback,
+                total_timesteps=steps,
+                callback=[callback, MetricsCallback()],
                 tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}",
                 reset_num_timesteps=reset_timesteps
             )

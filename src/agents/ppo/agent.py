@@ -7,6 +7,7 @@ from core import config
 from core.selective_norm import SelectiveVecNormalize
 from core.env_tools import failsafe_env
 from agents.manual_curriculum_callback import ManualCurriculumCallback
+from agents.metrics_callback import MetricsCallback
 from agents.base_agent import BaseAgent
 from agents.ppo.config import PHASE_HYPERPARAMS
 from agents.ppo.hyperparams import build_ppo_kwargs, resolve_override
@@ -203,8 +204,11 @@ class PPOAgent(BaseAgent):
                 reset_timesteps = False
 
             model.learn(
-                total_timesteps=steps, 
-                callback=callback,
+                total_timesteps=steps,
+                # The curriculum callback stays a bare variable because the
+                # final-save block below reads its attributes; SB3 wraps the
+                # list into a CallbackList internally.
+                callback=[callback, MetricsCallback()],
                 tb_log_name=f"{algo_part}_{env_part}_{config.MODEL_NAME}",
                 reset_num_timesteps=reset_timesteps
             )

@@ -17,6 +17,12 @@ ONE_HOT_ACT_DIM = ACT_CATEGORIES * 2
 ONE_HOT_CHAR_DIM = CHAR_CATEGORIES * 2
 TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32 = 554
 
+# Boundary of the OLD shaping potential's dead zone (Phi was identically zero
+# for d >= 80). The measured baseline had 52.2% of steps at or past it; the
+# per-episode fraction reported in info["ep_rel_dist_frac_far"] is judged
+# against that number.
+FAR_DIST_THRESHOLD = 80.0
+
 
 class StreetFighterBaseEnv(BizHawkBaseEnv):
     """Abstract Base Gym Environment for Street Fighter II.
@@ -29,7 +35,10 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
     # HP reads above this are round-transition sentinels (0xFF etc.), not health.
     HP_SENTINEL_THRESHOLD = 200
 
-    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=True, player=1, verbose=True):
+    # debug_mode defaults to False: the every-10k-steps payload print is a
+    # diagnostic, and building its f-string on every step of every worker is
+    # measurable waste. Pass debug_mode=True to re-enable it.
+    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=False, player=1, verbose=True):
         assigned_port = config.PORT + rank
 
         super().__init__(
@@ -70,6 +79,15 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.hp_sentinel = False
         self.p1_sentinel = False
         self.p2_sentinel = False
+
+        # Per-episode rel_dist samples (non-sentinel frames only). Summarized
+        # into info on the terminal step so the metrics callback can log the
+        # spacing distribution without any per-step info traffic.
+        self._ep_rel_dists: list = []
+
+        # The post-savestate-load payload of the most recent reset. League
+        # play re-parses it from the P2 perspective.
+        self._last_reset_payload: str = ""
 
         # Extra RAM fields from the 24-field payload. Empty when the Lua client
         # is an older 13-field build. Only v4 reads these.
@@ -146,12 +164,23 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
 
             full_command = (action_string + "0000000000\n") if self.player == 1 else ("0000000000" + action_string + "\n")
             self.send_command(full_command)
-            # 2. Receive State via Parent Method
+            # 2. Receive State via Parent Method.
+            #
+            # PROTOCOL PHASE NOTE: the Lua client sends its payload BEFORE
+            # waiting for our command, so the payload received here was
+            # produced before `action` was applied -- observations (and the
+            # HP diffs the reward is computed on) lag actions by exactly one
+            # agent step (4 emulator frames). This is a deliberate, consistent
+            # property: it pipelines the policy forward pass with emulation
+            # (per-step wall time is max(emulation, python), not the sum).
+            # Receiving after sending without that pending payload would
+            # serialize the loop. reset() keeps the offset primed.
             data = self.receive_payload()
 
-            self.debug_print(
-                f"Command Sent: '{full_command}' | Raw Payload: '{data}'"
-            )
+            if self.debug_mode:
+                self.debug_print(
+                    f"Command Sent: '{full_command}' | Raw Payload: '{data}'"
+                )
 
         except RuntimeError as e:
             # Socket is dead. Return a terminal state so SB3 calls reset().
@@ -177,6 +206,9 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             self.footsie_steps += 1
         else:
             self.footsie_steps = 0
+
+        if not self.hp_sentinel:
+            self._ep_rel_dists.append(rel_dist)
 
         ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
 
@@ -220,8 +252,22 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             info["loss"] = 1 if (terminated and current_my_hp <= 0 and current_enemy_hp > 0) else 0
             if hasattr(self, "current_state_file"):
                 info["state_file"] = self.current_state_file
+            self._attach_episode_spacing(info)
 
         return self._get_obs(), reward, terminated, truncated, info
+
+    def _attach_episode_spacing(self, info: dict) -> None:
+        """Summarizes this episode's rel_dist samples into the terminal info.
+
+        Baseline to beat (random policy, 2026-08-24 telemetry run): median 83,
+        52.2% of steps at rel_dist >= 80. A working spacing fix shifts the
+        distribution toward peak_dist=70 and drops that fraction.
+        """
+        if self._ep_rel_dists:
+            arr = np.asarray(self._ep_rel_dists, dtype=np.float32)
+            info["ep_rel_dist_mean"] = float(arr.mean())
+            info["ep_rel_dist_median"] = float(np.median(arr))
+            info["ep_rel_dist_frac_far"] = float((arr >= FAR_DIST_THRESHOLD).mean())
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -239,8 +285,25 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 if self.trainable:
                     self.send_command(f"RESET {full_state_path}\n")
 
-                # Wait for resulting state
-                data = self.receive_payload()
+                    # PROTOCOL PHASE NOTE: exactly one payload is always
+                    # pending when reset() runs -- the unsolicited boot
+                    # payload on a fresh emulator, or the in-flight payload
+                    # produced after the previous step's action. It describes
+                    # the PREVIOUS episode's final frame (or the ROM boot
+                    # screen), not the state we just asked Lua to load.
+                    # Drain it, then read the real post-savestate-load frame.
+                    self.receive_payload()          # stale pre-RESET payload
+                    data = self.receive_payload()   # fresh post-load payload
+
+                    # Re-prime the one-message offset that pipelines the
+                    # policy forward pass with emulation (see step()): send a
+                    # neutral 20-bit command so Lua emulates 4 no-op frames
+                    # and queues the payload step() will consume first.
+                    self.send_command("0" * (2 * config.ACTION_DIM) + "\n")
+                else:
+                    data = self.receive_payload()
+
+                self._last_reset_payload = data
                 observation = self._parse_payload(data, is_reset=True)
 
                 self.prev_my_hp    = float(observation[0]) if observation[0] > 0 else 176.0
@@ -275,6 +338,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.hp_sentinel = False
                 self.p1_sentinel = False
                 self.p2_sentinel = False
+                self._ep_rel_dists = []
 
                 self.frames.clear()
                 for _ in range(config.NUM_FRAMES): self.frames.append(observation)
