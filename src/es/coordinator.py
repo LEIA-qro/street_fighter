@@ -12,6 +12,18 @@
 # coordinator process itself is also expendable.
 #
 #   python src/es/coordinator.py --pop-size 256 --checkpoint-dir models/es
+#   python src/es/coordinator.py --states manifest --difficulty 1,2   # curriculum
+#
+# --states rotates evaluation over a set of savestates (see resolve_states):
+# the list rides on every /work lease and each antithetic pair draws its
+# per-episode opponents from the pair seed (openes.states_for_member), so
+# +eps and -eps always fight the same sequence. The list is run identity:
+# it is pinned in the checkpoint sidecar and wins over the CLI on resume.
+# While a rotation is active, /result is only accepted from workers that echo
+# the rotation's fingerprint (protocol.states_fingerprint) -- a stale
+# pre-rotation worker cannot, so it is refused loudly per chunk instead of
+# silently mixing default-state fitnesses into the run. Update every worker
+# before enabling --states, or watch those machines sit benched.
 #
 # Fleet visibility: /result may carry an optional "stats" block
 # ({"procs", "steps_per_s", "episodes_per_s", "host"}); workers that never
@@ -79,13 +91,21 @@ class Coordinator:
 
     def __init__(self, state, pop_size, chunk_size, episodes, lease_seconds,
                  speculative_after=None, speculative_when_remaining_below=2,
-                 max_concurrent_leases=2):
+                 max_concurrent_leases=2, states=None):
         self.lock = threading.Lock()
         self.state = state
         self.pop_size = pop_size
         self.chunk_size = chunk_size
         self.episodes = episodes
         self.lease_seconds = lease_seconds
+        # Savestate rotation, already resolved to the run's pinned list (main
+        # constructs with state.states so a resume serves the checkpoint's
+        # list, not the CLI's). None -> /work carries no "states" key and
+        # every worker behaves exactly as before the rotation existed.
+        self.states = list(states) if states else None
+        # what a current worker must echo in every /result while the rotation
+        # is on (None = no rotation, and the echo then decides nothing)
+        self.states_fingerprint = protocol.states_fingerprint(self.states)
         self.speculative_after = speculative_after
         self.speculative_when_remaining_below = speculative_when_remaining_below
         self.max_concurrent_leases = max_concurrent_leases
@@ -133,11 +153,18 @@ class Coordinator:
             if leased is None:
                 return None
             cid, members, _deadline = leased
-            return {"generation": self.state.generation,
+            work = {"generation": self.state.generation,
                     "theta_version": self.state.generation,
                     "chunk_id": cid, "sigma": self.state.sigma,
                     "episodes": self.episodes, "lease_seconds": self.lease_seconds,
                     "members": members}
+            if self.states:
+                # full ordered list on every lease: index->name is the wire
+                # contract behind states_for_member, and it is tiny. A COPY,
+                # because the handler serialises the lease outside the lock:
+                # nothing downstream may hold (or mutate) the rotation itself.
+                work["states"] = list(self.states)
+            return work
 
     @staticmethod
     def _absorb_stats(record, stats):
@@ -163,6 +190,26 @@ class Coordinator:
             self._absorb_stats(record, body.get("stats"))
             if self.queue is None or body.get("generation") != self.state.generation:
                 return False  # stale worker finishing last generation's chunk
+            if self.states is not None:
+                # Rotation runs only accept results that PROVE they evaluated
+                # this rotation (the worker echoes the fingerprint of the
+                # "states" list it received). A stale pre-rotation worker
+                # ignores that key, fights its default state, and used to be
+                # accepted indistinguishably -- mixing default-state
+                # fitnesses into the run and, worse, splitting antithetic
+                # pairs across different opponents (breaking common random
+                # numbers). Refusing keeps the chunk leased until expiry
+                # re-serves it to a current worker; the print names the
+                # machine that needs its worker code updated.
+                echo = body.get("states_fingerprint")
+                if echo != self.states_fingerprint:
+                    why = ("echoes a different rotation" if echo
+                           else "has no rotation echo (pre-rotation worker?)")
+                    print(f"[coord] refused {body.get('chunk_id')} from "
+                          f"{str(body.get('worker', '?'))}: rotation active "
+                          f"but the result {why} -- update that machine's "
+                          f"worker before it can contribute", flush=True)
+                    return False
             fits = dict(zip(body["member_idx"], body["fitnesses"]))
             accepted = self.queue.complete(body["chunk_id"], fits)
             if accepted:
@@ -388,7 +435,124 @@ def make_wandb_logger(project):
         return None
 
 
-def load_or_init_state(args):
+# ---------------------------------------------------------------------------
+# --states resolution. Three spellings, one output: the ordered list of
+# savestate names the whole run trains over (or None = single default state).
+# ---------------------------------------------------------------------------
+
+STATES_MANIFEST_PATH = os.path.join("retro_integration", "states_manifest.json")
+
+
+def parse_difficulty_filter(value):
+    """--difficulty '1,2' -> {1, 2}; None/empty -> None (no filter)."""
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return {int(part) for part in str(value).split(",") if part.strip()}
+    except ValueError:
+        raise SystemExit(f"[coord] --difficulty must be a comma list of ints, "
+                         f"got {value!r}")
+
+
+def _entry_is_verified(entry):
+    """Has this manifest entry passed the emulator checks?
+
+    tools/verify_states.py writes "verified" as a measurement block
+    ({"loads", "fight_alive", "p2_char_id", "hp_start"}); its own pass gate
+    -- the tool's exit code -- is loads AND fight_alive, so that is the gate
+    here too: a state that merely loads but shows a dead fight would train
+    on nothing. A plain boolean "verified" (hand-written manifests) is
+    taken at its word. Absent/unrecognised counts as NOT verified: an
+    unchecked state silently measures nothing.
+    """
+    verified = entry.get("verified")
+    if isinstance(verified, dict):
+        return bool(verified.get("loads")) and bool(verified.get("fight_alive"))
+    return bool(verified) and not isinstance(verified, (list, str))
+
+
+def _manifest_state_names(doc, difficulties=None):
+    """states_manifest.json content -> ordered verified-1P state names.
+
+    The manifest is produced/measured by the savestate-generation track
+    (tools/verify_states.py documents the schema); this reader is
+    deliberately conservative: an entry counts only when it EXPLICITLY
+    passed verification (see _entry_is_verified). Entries flagged as 2P are
+    skipped -- P2 is a human port there, not an opponent; entries with no
+    players/mode marking are assumed 1P, the only kind the generation track
+    produces. Manifest order is kept: it is deterministic and part of the
+    run identity (index->name is the wire map).
+    """
+    entries = doc.get("states", doc) if isinstance(doc, dict) else doc
+    if isinstance(entries, dict):  # {name: {attrs...}} spelling
+        entries = [{"name": name, **(attrs if isinstance(attrs, dict) else {})}
+                   for name, attrs in entries.items()]
+    if not isinstance(entries, list):
+        raise SystemExit("[coord] states manifest: expected a list of state "
+                         "entries or a {'states': {...}} object")
+    names = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue  # a bare string cannot claim it was verified
+        name = entry.get("name") or entry.get("state") or entry.get("file")
+        if not name or not _entry_is_verified(entry):
+            continue
+        players = entry.get("players")
+        if players is not None and str(players) != "1":
+            continue
+        mode = str(entry.get("mode", "1p")).lower()
+        if not (mode.startswith("1") or mode == "single"):
+            continue
+        if difficulties is not None:
+            level = entry.get("difficulty", entry.get("level"))
+            if level is None or int(level) not in difficulties:
+                continue
+        name = str(name)
+        if name.endswith(".state"):
+            name = name[:-len(".state")]
+        names.append(name)
+    return names
+
+
+def resolve_states(spec, difficulty=None, manifest_path=STATES_MANIFEST_PATH):
+    """--states value -> ordered de-duplicated name list, or None when unset.
+
+    'A,B,C' inline, '@file' one name per line (blank/# lines skipped), or
+    'manifest' for the verified 1P states of the retro-integration manifest.
+    An explicitly requested but empty set is a hard error: silently falling
+    back to the default state would run a different experiment than asked.
+    """
+    if spec is None or str(spec).strip() == "":
+        return None
+    spec = str(spec).strip()
+    if spec == "manifest":
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                doc = json.load(f)
+        except (OSError, ValueError) as e:
+            raise SystemExit(f"[coord] --states manifest: cannot read "
+                             f"{manifest_path} ({e})")
+        names = _manifest_state_names(doc, parse_difficulty_filter(difficulty))
+    elif spec.startswith("@"):
+        try:
+            with open(spec[1:], "r", encoding="utf-8") as f:
+                lines = f.read().splitlines()
+        except OSError as e:
+            raise SystemExit(f"[coord] --states {spec}: {e}")
+        names = [ln.strip() for ln in lines
+                 if ln.strip() and not ln.lstrip().startswith("#")]
+    else:
+        names = [part.strip() for part in spec.split(",") if part.strip()]
+    deduped = list(dict.fromkeys(names))  # keep first occurrence's position
+    if not deduped:
+        raise SystemExit(f"[coord] --states {spec} resolved to an empty set; "
+                         f"refusing to silently train on the default state")
+    return deduped
+
+
+def load_or_init_state(args, states=None):
+    """`states` is the CLI's resolved rotation (resolve_states output)."""
+    cli_states = openes.normalize_states(states)
     # A replaced instance has an empty local dir but a full S3 bucket.
     if openes.latest_checkpoint(args.checkpoint_dir) is None:
         restore_from_s3(args.s3_bucket, args.checkpoint_dir)
@@ -397,9 +561,13 @@ def load_or_init_state(args):
         state = openes.load_checkpoint(base)
         print(f"[coord] resumed generation {state.generation} from {base}", flush=True)
         # Determinism rule: the checkpoint's hyperparameters win on resume.
+        # The state rotation is identity too: generations before and after a
+        # resume must be measured against the same opponents, or the fitness
+        # curve compares apples to a different set of apples.
         for name, cli_val in (("sigma", args.sigma), ("lr", args.lr),
                               ("weight_decay", args.weight_decay),
-                              ("master_seed", args.master_seed)):
+                              ("master_seed", args.master_seed),
+                              ("states", cli_states)):
             ckpt_val = getattr(state, name)
             if cli_val != ckpt_val:
                 print(f"[coord] WARNING: --{name.replace('_', '-')}={cli_val} ignored; "
@@ -409,7 +577,8 @@ def load_or_init_state(args):
     theta = policy.init_flat(args.master_seed)
     print(f"[coord] fresh start: {theta.shape[0]} params, master_seed {args.master_seed}",
           flush=True)
-    return openes.init_state(theta, args.sigma, args.lr, args.weight_decay, args.master_seed)
+    return openes.init_state(theta, args.sigma, args.lr, args.weight_decay,
+                             args.master_seed, states=cli_states)
 
 
 def main():
@@ -439,15 +608,32 @@ def main():
     ap.add_argument("--master-seed", type=int, default=20260825)
     ap.add_argument("--s3-bucket", default=None)
     ap.add_argument("--wandb-project", default=None)
+    ap.add_argument("--states", default=None,
+                    help="train over a savestate SET: 'A,B,C' inline, '@file' "
+                         "(one name per line), or 'manifest' (verified 1P states "
+                         f"from {STATES_MANIFEST_PATH}). Unset = workers' default "
+                         "state. Pinned by the checkpoint on resume, like --sigma.")
+    ap.add_argument("--difficulty", default=None,
+                    help="with --states manifest: keep only these difficulty "
+                         "levels, e.g. '1,2'")
     args = ap.parse_args()
 
+    if args.difficulty is not None and args.states != "manifest":
+        print("[coord] NOTE: --difficulty only filters '--states manifest'; "
+              "ignored for explicit state lists", flush=True)
+    cli_states = resolve_states(args.states, args.difficulty)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
-    state = load_or_init_state(args)
+    state = load_or_init_state(args, states=cli_states)
+    if state.states:
+        print(f"[coord] state rotation ({len(state.states)}): "
+              f"{', '.join(state.states)}", flush=True)
     coord = Coordinator(state, args.pop_size, args.chunk_size,
                         args.episodes_per_eval, args.lease_seconds,
                         speculative_after=args.speculative_after,
                         speculative_when_remaining_below=args.speculative_tail_chunks,
-                        max_concurrent_leases=args.max_chunk_leases)
+                        max_concurrent_leases=args.max_chunk_leases,
+                        # the run's pinned list (checkpoint wins over CLI)
+                        states=state.states)
     s3_upload = make_s3_uploader(args.s3_bucket)
     wandb_log = make_wandb_logger(args.wandb_project)
 
@@ -480,6 +666,12 @@ def main():
                        "theta/norm": float(np.linalg.norm(coord.state.theta)),
                        "time/generation_seconds": dt}
             metrics.update(fleet_metrics(report))
+            if coord.states:
+                # per-state fitness breakdowns would be N extra panels of
+                # noise; the one cheap number that matters on a chart is how
+                # many opponents the rotation spans (it changes on resume
+                # pinning, and 0/absent flags a single-state run at a glance)
+                metrics["fleet/states_in_rotation"] = len(coord.states)
             if wandb_log:
                 wandb_log(metrics, step=g)
             print(fleet_summary_line(report, g), flush=True)

@@ -7,7 +7,14 @@
 # (theta, pair_seed, sign) alone, evaluate it for the requested episodes on
 # a stable-retro env, POST the fitnesses, repeat. All state of value lives
 # on the coordinator: killing a worker at ANY point loses at most one
-# chunk's lease, which expires and is re-served to someone else.
+# chunk's lease, which expires and is re-served to someone else. A lease
+# that carries a "states" rotation picks each episode's savestate from the
+# PAIR seed (openes.states_for_member), so a member and its antithetic twin
+# always fight the same opponent sequence; without the key, every episode
+# runs on this worker's --state default exactly as before. Rotation results
+# echo protocol.states_fingerprint of the list actually evaluated -- the
+# coordinator refuses rotation results without it, which is what keeps a
+# stale pre-rotation worker from silently poisoning a rotation run.
 #
 # Robustness contract: any network error backs off exponentially (capped)
 # and retries -- an unreachable coordinator (restart, sleeping laptop,
@@ -38,7 +45,7 @@ if __package__ in (None, ""):  # `python src/es/worker.py`
 import numpy as np
 
 from es import protocol, resources
-from es.openes import fitness_from_episode, perturbation
+from es.openes import fitness_from_episode, perturbation, states_for_member
 from es.policy import MLPPolicy, NUM_PARAMS
 
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
@@ -76,8 +83,11 @@ def _pool_init(env_kwargs, nice_delta):
         resources.apply_nice(nice_delta, warn=_log)
 
 
-def _run_episode(env, policy):
-    obs, _ = env.reset()
+def _run_episode(env, policy, state=None):
+    # options={"state": name} pins THIS episode's savestate (RetroSF2Env's
+    # per-reset override); None keeps the env's own default, which is the
+    # entire pre-rotation behaviour.
+    obs, _ = env.reset(options={"state": state} if state else None)
     steps, info = 0, {}
     while steps < MAX_EPISODE_STEPS:
         obs, _reward, terminated, truncated, info = env.step(policy.act(obs))
@@ -88,19 +98,30 @@ def _run_episode(env, policy):
 
 
 def evaluate_member(task):
-    """(theta, sigma, seed, sign, episodes) -> (mean fitness, agent steps).
+    """(theta, sigma, seed, sign, episodes, states) -> (mean fitness, agent steps).
 
     Pool-callable. The step count rides along because it is free here and is
     the only honest measure of how fast this machine emulates -- wall time per
     chunk conflates throughput with how long the episodes happened to last.
+
+    `states` is the coordinator's rotation (or None = default state). The
+    episode->state map comes from states_for_member(seed, ...) with the PAIR
+    seed, so this member's antithetic twin -- evaluated who-knows-where on
+    the fleet -- derives the identical opponent sequence from the same seed:
+    the pair's fitness difference measures the perturbation, not the luck of
+    the opponent draw. Fitness stays the plain per-member mean either way.
     """
     global _ENV
-    theta, sigma, seed, sign, episodes = task
+    theta, sigma, seed, sign, episodes, states = task
     if _ENV is None:
         _ENV = _make_env()
     eps = perturbation(theta.shape[0], seed)
     policy = MLPPolicy(theta + np.float32(sign) * np.float32(sigma) * eps)
-    runs = [_run_episode(_ENV, policy) for _ in range(episodes)]
+    if states:
+        picks = states_for_member(seed, episodes, len(states))
+        runs = [_run_episode(_ENV, policy, state=states[i]) for i in picks]
+    else:
+        runs = [_run_episode(_ENV, policy) for _ in range(episodes)]
     return float(np.mean([f for f, _s in runs])), int(sum(s for _f, s in runs))
 
 
@@ -280,7 +301,10 @@ def main():
             backoff.reset()
 
             episodes = int(work.get("episodes", 1) or 1)
-            tasks = [(theta, work["sigma"], seed, sign, episodes)
+            # no "states" key (older coordinator, or a run without a rotation)
+            # -> None -> every episode on this worker's default state
+            states = work.get("states") or None
+            tasks = [(theta, work["sigma"], seed, sign, episodes, states)
                      for _idx, seed, sign in work["members"]]
             t0 = time.monotonic()
             if pool is not None:
@@ -299,6 +323,12 @@ def main():
                       "member_idx": [idx for idx, _s, _g in work["members"]],
                       "fitnesses": fitnesses,
                       "stats": make_stats(procs, host, step_rate, ep_rate)}
+            if states:
+                # prove which rotation these fitnesses were measured against:
+                # computed from the list this loop actually evaluated, not
+                # blindly acknowledged. The coordinator refuses rotation
+                # results without a matching echo (see protocol.py).
+                result["states_fingerprint"] = protocol.states_fingerprint(states)
             # result POSTs retry harder than /work: the evaluation is paid for
             for _ in range(5):
                 resp = _http_json(f"{coordinator}/result", body=result)

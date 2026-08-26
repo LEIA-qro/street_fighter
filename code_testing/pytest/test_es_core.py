@@ -512,12 +512,17 @@ def _coordinator(pop_size=4, chunk_size=2, lease_seconds=10.0, **kwargs):
     return coord
 
 
-def _submit(coord, work, worker, fitnesses=None, **extra):
+def _submit(coord, work, worker, fitnesses=None, echo_states=True, **extra):
     idx = [m[0] for m in work["members"]]
     body = {"chunk_id": work["chunk_id"], "generation": work["generation"],
             "worker": worker, "member_idx": idx,
             "fitnesses": [1.0] * len(idx) if fitnesses is None else fitnesses}
-    body.update(extra)
+    if echo_states and work.get("states"):
+        # what a current worker does with a rotation lease: prove which
+        # rotation it evaluated. echo_states=False simulates a stale
+        # pre-rotation worker, which ignores the key entirely.
+        body["states_fingerprint"] = protocol.states_fingerprint(work["states"])
+    body.update(extra)  # after the echo, so a test can override it with junk
     return coord.submit_result(body)
 
 
@@ -679,3 +684,327 @@ def test_coordinator_wires_speculative_releasing_into_its_queue():
     raced = coord.lease_work("idle")
     assert raced is not None and raced["chunk_id"] == first
     assert coord.status()["speculative_leases"] == 1
+
+
+# --------------------------------------------------------------------------
+# Savestate rotation (curriculum over a SET of states). The scientific core
+# is states_for_member: episode e of a member plays a state derived from the
+# PAIR seed -- never the member index or sign -- so +eps and -eps face the
+# identical opponent sequence and their fitness difference isolates the
+# perturbation (common random numbers). Wire rule: /work carries the full
+# "states" list only when a rotation is configured; a worker that sees no
+# key behaves exactly as before (its own default state).
+# --------------------------------------------------------------------------
+
+def test_states_for_member_is_deterministic_and_pair_symmetric():
+    members = members_for_generation(_toy_state(), pop_size=8)
+    for p in range(4):
+        _ip, seed_pos, _sp = members[2 * p]
+        _in, seed_neg, _sn = members[2 * p + 1]
+        # both halves hold the SAME pair seed, so symmetry is by construction:
+        # the map is a function of the seed alone
+        assert seed_pos == seed_neg
+        assert (openes.states_for_member(seed_pos, 4, 5)
+                == openes.states_for_member(seed_neg, 4, 5))
+    picks = openes.states_for_member(members[0][1], 6, 3)
+    assert picks == openes.states_for_member(members[0][1], 6, 3)
+    assert len(picks) == 6
+    assert all(0 <= i < 3 for i in picks)
+
+
+def test_states_for_member_varies_across_pairs_and_is_roughly_uniform():
+    n_states = 4
+    seeds = pair_seeds_for_generation(master_seed=7, generation=0, n_pairs=500)
+    sequences = [tuple(openes.states_for_member(s, 2, n_states)) for s in seeds]
+    # different pairs draw different sequences (a constant map would be
+    # "fair" but would collapse the curriculum to one opponent)
+    assert len(set(sequences)) > 1
+    counts = np.zeros(n_states)
+    for seq in sequences:
+        for i in seq:
+            counts[i] += 1
+    assert counts.sum() == 1000
+    expected = 1000 / n_states
+    # deterministic input -> this is a fixed outcome, not a flaky sample;
+    # +-20% around uniform is ~3.6 sigma of slack for 1000 draws
+    assert counts.min() > 0.8 * expected
+    assert counts.max() < 1.2 * expected
+
+
+def test_states_for_member_rejects_an_empty_state_set():
+    with pytest.raises(ValueError):
+        openes.states_for_member(1234, 3, 0)
+
+
+def test_work_lease_carries_the_full_state_list_once_configured():
+    coord = _coordinator(states=["Ryu_vs_Guile_lvl1", "Ryu_vs_Ken_lvl2"])
+    work = coord.lease_work("m4")
+    assert work["states"] == ["Ryu_vs_Guile_lvl1", "Ryu_vs_Ken_lvl2"]
+    # the members payload itself is untouched by the rotation
+    assert [len(m) for m in work["members"]] == [3, 3]
+
+
+def test_work_lease_has_no_states_key_without_a_rotation():
+    # back-compat is mandatory: a coordinator constructed exactly like the
+    # pre-rotation production one must produce byte-identical leases
+    work = _coordinator().lease_work("m4")
+    assert "states" not in work
+
+
+def test_worker_pair_members_face_identical_state_sequences():
+    from es import worker
+
+    class _FakeEnv:
+        """Records which state every reset pinned; each episode ends at once."""
+
+        def __init__(self):
+            self.states_seen = []
+
+        def reset(self, seed=None, options=None):
+            self.states_seen.append(options.get("state") if options else None)
+            return np.zeros(OBS_DIM, dtype=np.float32), {}
+
+        def step(self, _action):
+            info = {"win": 1, "my_hp": 176.0, "enemy_hp": 0.0}
+            return np.zeros(OBS_DIM, dtype=np.float32), 0.0, True, False, info
+
+    theta = init_flat(3)
+    states = ["S0", "S1", "S2"]
+    pair_seed = 987654321
+    try:
+        sequences = []
+        for sign in (1, -1):
+            fake = _FakeEnv()
+            worker._ENV = fake  # module-global env slot; no emulator offline
+            fitness, steps = worker.evaluate_member(
+                (theta, 0.02, pair_seed, sign, 5, states))
+            assert fitness == pytest.approx(fitness_from_episode(
+                {"win": 1, "my_hp": 176.0, "enemy_hp": 0.0}, steps=1))
+            assert steps == 5  # one step per episode from the fake env
+            sequences.append(fake.states_seen)
+        # the fairness rule end-to-end: both signs, same opponents, and the
+        # sequence is exactly what the shared pure function says it is
+        assert sequences[0] == sequences[1]
+        expected = [states[i] for i in openes.states_for_member(pair_seed, 5, 3)]
+        assert sequences[0] == expected
+
+        # no rotation -> reset is never pinned to a state (default behaviour)
+        fake = _FakeEnv()
+        worker._ENV = fake
+        worker.evaluate_member((theta, 0.02, pair_seed, 1, 2, None))
+        assert fake.states_seen == [None, None]
+    finally:
+        worker._ENV = None  # leave the module the way we found it
+
+
+def test_states_survive_checkpoint_roundtrip_and_es_update(tmp_path):
+    state = init_state(np.zeros(16, dtype=np.float32), 0.1, 0.05, 0.0, 1234,
+                       states=["A", "B"])
+    assert state.states == ("A", "B")
+    state = es_update(state, np.random.default_rng(5).normal(size=32))
+    assert state.states == ("A", "B")  # replace() must carry the rotation
+    base = str(tmp_path / "gen_000001")
+    save_checkpoint(state, base)
+    assert load_checkpoint(base).states == ("A", "B")
+
+
+def test_pre_rotation_checkpoint_resumes_as_a_single_state_run(tmp_path):
+    import json
+    base = str(tmp_path / "gen_000000")
+    save_checkpoint(_toy_state(), base)
+    # a checkpoint written before rotation existed has no "states" key at all
+    with open(base + ".json") as f:
+        meta = json.load(f)
+    meta.pop("states")
+    with open(base + ".json", "w") as f:
+        json.dump(meta, f)
+    assert load_checkpoint(base).states is None
+
+
+def _cli_args(tmp_path, **overrides):
+    """A namespace matching _toy_state's hyperparameters (no spurious pins)."""
+    import argparse
+    kwargs = dict(checkpoint_dir=str(tmp_path), s3_bucket=None, sigma=0.1,
+                  lr=0.05, weight_decay=0.0, master_seed=1234)
+    kwargs.update(overrides)
+    return argparse.Namespace(**kwargs)
+
+
+def test_resume_with_a_different_state_set_warns_and_the_checkpoint_wins(
+        tmp_path, capsys):
+    from es.coordinator import load_or_init_state
+    state = init_state(np.zeros(16, dtype=np.float32), 0.1, 0.05, 0.0, 1234,
+                       states=["A", "B"])
+    save_checkpoint(state, str(tmp_path / "gen_000000"))
+    resumed = load_or_init_state(_cli_args(tmp_path), states=["A", "C"])
+    assert resumed.states == ("A", "B")  # determinism rule: checkpoint pins
+    out = capsys.readouterr().out
+    assert "WARNING" in out and "states" in out
+
+
+def test_resume_with_the_same_state_set_is_silent(tmp_path, capsys):
+    from es.coordinator import load_or_init_state
+    state = init_state(np.zeros(16, dtype=np.float32), 0.1, 0.05, 0.0, 1234,
+                       states=["A", "B"])
+    save_checkpoint(state, str(tmp_path / "gen_000000"))
+    # the CLI hands a list, the checkpoint a tuple: normalisation must make
+    # a legitimate resume compare equal, not warn on every restart
+    resumed = load_or_init_state(_cli_args(tmp_path), states=["A", "B"])
+    assert resumed.states == ("A", "B")
+    assert "WARNING" not in capsys.readouterr().out
+
+
+def test_states_flag_accepts_comma_lists_and_at_files(tmp_path):
+    from es.coordinator import resolve_states
+    assert resolve_states(None) is None
+    assert resolve_states("  ") is None
+    # order kept, duplicates dropped at first occurrence
+    assert resolve_states("A, B ,A,C") == ["A", "B", "C"]
+    listing = tmp_path / "states.txt"
+    listing.write_text("A\n# a comment line\n\n  B  \n")
+    assert resolve_states("@" + str(listing)) == ["A", "B"]
+    with pytest.raises(SystemExit):
+        resolve_states(",,,")  # explicitly asked for a set, resolved to none
+    with pytest.raises(SystemExit):
+        resolve_states("@" + str(tmp_path / "missing.txt"))
+
+
+def test_states_manifest_picks_verified_1p_states_with_difficulty_filter(tmp_path):
+    import json
+    from es.coordinator import resolve_states
+    manifest = {"states": [
+        {"name": "Ryu_vs_Guile_lvl1", "verified": True, "mode": "1p",
+         "difficulty": 1},
+        {"name": "Ryu_vs_Ken_lvl2.state", "verified": True, "difficulty": 2},
+        {"name": "Ryu_vs_Blanka_lvl1", "verified": False, "mode": "1p",
+         "difficulty": 1},                                  # never checked
+        {"name": "Ryu_vs_Human", "verified": True, "mode": "2p",
+         "difficulty": 1},                                  # not the game we train
+        "bare-string-cannot-claim-verified",
+    ]}
+    path = tmp_path / "states_manifest.json"
+    path.write_text(json.dumps(manifest))
+    # no filter: every verified 1P state, manifest order, .state suffix dropped
+    assert resolve_states("manifest", manifest_path=str(path)) == [
+        "Ryu_vs_Guile_lvl1", "Ryu_vs_Ken_lvl2"]
+    assert resolve_states("manifest", difficulty="1",
+                          manifest_path=str(path)) == ["Ryu_vs_Guile_lvl1"]
+    assert resolve_states("manifest", difficulty="1,2",
+                          manifest_path=str(path)) == [
+        "Ryu_vs_Guile_lvl1", "Ryu_vs_Ken_lvl2"]
+    with pytest.raises(SystemExit):  # filter matches nothing -> refuse, not fall back
+        resolve_states("manifest", difficulty="7", manifest_path=str(path))
+    with pytest.raises(SystemExit):  # missing manifest is a hard error too
+        resolve_states("manifest", manifest_path=str(tmp_path / "nope.json"))
+
+
+def test_chunk_queue_is_untouched_by_state_rotation():
+    # the rotation lives in the lease payload, not the queue: chunk ids,
+    # leasing, stealing and completion must be byte-identical either way
+    coord = _coordinator(states=["A", "B"])
+    plain = _coordinator()
+    work_rot, work_plain = coord.lease_work("w"), plain.lease_work("w")
+    assert work_rot["chunk_id"] == work_plain["chunk_id"]
+    assert work_rot["members"] == work_plain["members"]
+    assert _submit(coord, work_rot, "w") is True
+    assert _submit(coord, work_rot, "w") is False  # duplicates still refused
+
+
+def test_states_manifest_real_schema_dict_of_measured_entries(tmp_path):
+    # the shape tools/verify_states.py actually writes: {"states": {name:
+    # entry}} with "verified" as a measurement block; the pass gate is that
+    # tool's own exit-code rule (loads AND fight_alive), 2P entries excluded
+    import json
+    from es.coordinator import resolve_states
+    manifest = {"states": {
+        "FL_Level1.1": {"opponent": "GUILE", "difficulty": None,
+                        "source": "fightladder",
+                        "verified": {"loads": True, "p2_char_id": 3,
+                                     "hp_start": [176, 176],
+                                     "fight_alive": True}},
+        "FL_Level1.16": {"opponent": "GUILE", "difficulty": None,
+                         "source": "fightladder",
+                         "verified": {"loads": True, "p2_char_id": 3,
+                                      "hp_start": [176, 176],
+                                      "fight_alive": False}},  # dead fight
+        "FL_2Player.align": {"opponent": "RYU", "players": 2,
+                             "verified": {"loads": True, "p2_char_id": 0,
+                                          "hp_start": [176, 176],
+                                          "fight_alive": True}},  # human port
+        "Never.Checked": {"opponent": "KEN"},  # no verified block at all
+    }}
+    path = tmp_path / "states_manifest.json"
+    path.write_text(json.dumps(manifest))
+    assert resolve_states("manifest", manifest_path=str(path)) == ["FL_Level1.1"]
+    with pytest.raises(SystemExit):  # difficulty is null everywhere -> no match
+        resolve_states("manifest", difficulty="3", manifest_path=str(path))
+
+
+# --------------------------------------------------------------------------
+# Rotation fingerprint (/result "states_fingerprint"). The mixed-version
+# hole this closes: a stale pre-rotation worker ignores the lease's
+# "states", fights its default state, and used to be accepted
+# indistinguishably -- mixing default-state fitnesses into the run and
+# splitting antithetic pairs across different opponents (breaking CRN).
+# A current worker echoes the fingerprint of the list it ACTUALLY evaluated;
+# a rotation coordinator refuses everything else, loudly.
+# --------------------------------------------------------------------------
+
+def test_states_fingerprint_is_order_sensitive_and_none_without_a_rotation():
+    fp = protocol.states_fingerprint(["A", "B", "C"])
+    assert fp == protocol.states_fingerprint(("A", "B", "C"))  # spelling-blind
+    # index->name is the wire map behind states_for_member: a reordered or
+    # truncated list is a DIFFERENT experiment, so the digest must move
+    assert fp != protocol.states_fingerprint(["C", "B", "A"])
+    assert fp != protocol.states_fingerprint(["A", "B"])
+    assert protocol.states_fingerprint(None) is None
+    assert protocol.states_fingerprint([]) is None
+    assert isinstance(fp, str) and len(fp) == 16  # short: rides every /result
+
+
+def test_rotation_run_refuses_results_that_cannot_prove_the_rotation(capsys):
+    coord = _coordinator(states=["A", "B"])
+    work = coord.lease_work("stale")
+    # no echo at all = pre-rotation worker code
+    assert _submit(coord, work, "stale", echo_states=False) is False
+    # wrong echo = a worker that evaluated some OTHER rotation
+    assert _submit(coord, work, "stale",
+                   states_fingerprint="feedfacefeedface") is False
+    out = capsys.readouterr().out
+    assert "refused" in out and "stale" in out
+    # the chunk was refused, not consumed: the same lease, properly echoed,
+    # still lands -- expiry/re-lease to a current worker keeps the run alive
+    assert _submit(coord, work, "current") is True
+    # and refused results never credit the machine that sent them
+    assert coord.status()["workers"]["stale"]["members_done"] == 0
+    assert coord.status()["workers"]["current"]["members_done"] == 2
+
+
+def test_result_echo_decides_nothing_without_a_rotation():
+    # back-compat matrix, non-rotation side: pre- and post-rotation workers
+    # both interoperate with a coordinator that has no rotation configured
+    coord = _coordinator()
+    junk = protocol.states_fingerprint(["X"])
+    assert _submit(coord, coord.lease_work("w"), "w",
+                   states_fingerprint=junk) is True
+    assert _submit(coord, coord.lease_work("w"), "w", echo_states=False) is True
+
+
+def test_work_lease_hands_out_a_copy_of_the_rotation():
+    # the HTTP handler serialises the lease OUTSIDE the coordinator lock, so
+    # the lease must never alias the coordinator's own list: a mutation by
+    # anything downstream would corrupt every later lease and the fingerprint
+    coord = _coordinator(states=["A", "B"])
+    work = coord.lease_work("w")
+    work["states"].append("EVIL")
+    assert coord.states == ["A", "B"]
+    assert coord.lease_work("w2")["states"] == ["A", "B"]
+
+
+def test_fingerprint_agrees_across_the_json_wire():
+    import json
+    coord = _coordinator(states=["A", "B", "C"])
+    work = json.loads(json.dumps(coord.lease_work("w")))  # a real round-trip
+    # what the worker computes from the lease it RECEIVED must equal what the
+    # coordinator demands -- this equality is the mixed-version detector
+    assert protocol.states_fingerprint(work["states"]) == coord.states_fingerprint

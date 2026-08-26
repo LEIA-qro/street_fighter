@@ -45,14 +45,32 @@ class ESState:
     adam_m: np.ndarray      # float32 (dim,)
     adam_v: np.ndarray      # float32 (dim,)
     adam_t: int             # Adam step counter
+    # Savestate rotation the run trains over (None = each worker's default
+    # state, the pre-rotation behaviour). Part of the run's identity exactly
+    # like sigma/lr: which opponents the fitnesses were measured against is
+    # not a knob you can flip mid-run without invalidating the comparison.
+    states: tuple = None
 
 
-def init_state(theta, sigma, lr, weight_decay, master_seed):
+def normalize_states(states):
+    """State list from any source (CLI, json.load) -> canonical tuple or None.
+
+    One canonical form makes the resume identity check a plain equality:
+    argparse hands lists, json hands lists, ESState carries tuples, and
+    ['A'] != ('A',) would otherwise "differ" on every legitimate resume.
+    """
+    if not states:
+        return None
+    return tuple(str(s) for s in states)
+
+
+def init_state(theta, sigma, lr, weight_decay, master_seed, states=None):
     theta = np.asarray(theta, dtype=np.float32)
     zeros = np.zeros_like(theta)
     return ESState(theta=theta, sigma=float(sigma), lr=float(lr),
                    weight_decay=float(weight_decay), master_seed=int(master_seed),
-                   generation=0, adam_m=zeros.copy(), adam_v=zeros.copy(), adam_t=0)
+                   generation=0, adam_m=zeros.copy(), adam_v=zeros.copy(), adam_t=0,
+                   states=normalize_states(states))
 
 
 def pair_seeds_for_generation(master_seed, generation, n_pairs):
@@ -77,6 +95,34 @@ def members_for_generation(state, pop_size):
         raise ValueError("pop_size must be even (antithetic pairs)")
     seeds = pair_seeds_for_generation(state.master_seed, state.generation, pop_size // 2)
     return [(i, seeds[i // 2], 1 if i % 2 == 0 else -1) for i in range(pop_size)]
+
+
+# Child-stream key for the episode->state draw. Any fixed value works; what
+# matters is that it is NOT the bare pair seed: perturbation() consumes
+# default_rng(pair_seed)'s stream directly, and drawing state indices from
+# that same stream start would correlate WHICH opponent an episode gets with
+# the perturbation's leading components -- exactly the confound this function
+# exists to remove.
+_STATE_STREAM_KEY = 0x57A7E
+
+
+def states_for_member(pair_seed, episodes, n_states):
+    """Which state index each of a member's episodes plays: [i0, i1, ...].
+
+    Derived from the PAIR seed -- never the member index or sign -- so both
+    halves of an antithetic pair (+eps and -eps) face the identical opponent
+    sequence by construction. The pair's fitness DIFFERENCE then isolates the
+    perturbation's effect: the opponent draw cancels out of the gradient
+    term (shaped[+] - shaped[-]) instead of confounding it (classic common
+    random numbers variance reduction). Pure function shared by the worker
+    (to pick the states) and the tests (to assert what it picked).
+    """
+    if int(n_states) <= 0:
+        raise ValueError("n_states must be positive")
+    ss = np.random.SeedSequence(entropy=int(pair_seed),
+                                spawn_key=(_STATE_STREAM_KEY,))
+    rng = np.random.default_rng(ss)
+    return [int(i) for i in rng.integers(0, int(n_states), size=int(episodes))]
 
 
 def member_theta(state, seed, sign):
@@ -158,7 +204,10 @@ def save_checkpoint(state, path_base):
                         adam_m=state.adam_m, adam_v=state.adam_v)
     meta = {"sigma": state.sigma, "lr": state.lr, "weight_decay": state.weight_decay,
             "master_seed": state.master_seed, "generation": state.generation,
-            "adam_t": state.adam_t, "dim": int(state.theta.shape[0])}
+            "adam_t": state.adam_t, "dim": int(state.theta.shape[0]),
+            # run identity like sigma/lr: which savestates the fitnesses were
+            # measured against (null = workers' default state)
+            "states": None if state.states is None else list(state.states)}
     tmp = path_base + ".json.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -175,7 +224,10 @@ def load_checkpoint(path_base):
                     lr=float(meta["lr"]), weight_decay=float(meta["weight_decay"]),
                     master_seed=int(meta["master_seed"]), generation=int(meta["generation"]),
                     adam_m=arrays["adam_m"].astype(np.float32),
-                    adam_v=arrays["adam_v"].astype(np.float32), adam_t=int(meta["adam_t"]))
+                    adam_v=arrays["adam_v"].astype(np.float32), adam_t=int(meta["adam_t"]),
+                    # .get(): checkpoints written before state rotation existed
+                    # have no key at all and resume as single-state runs
+                    states=normalize_states(meta.get("states")))
     if state.theta.shape[0] != int(meta["dim"]):
         raise ValueError(f"checkpoint dim mismatch: json says {meta['dim']}, "
                          f"npz has {state.theta.shape[0]}")

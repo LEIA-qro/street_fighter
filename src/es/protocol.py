@@ -8,13 +8,35 @@
 #       -> {"work": {"generation": g, "theta_version": g,
 #                    "chunk_id": "g000012-c003", "sigma": s,
 #                    "episodes": e, "lease_seconds": L,
-#                    "members": [[member_idx, pair_seed, sign], ...]}}
+#                    "members": [[member_idx, pair_seed, sign], ...],
+#                    "states": ["Ryu_vs_X_lvl3", ...]}}
+#          "states" (2026-08-26) appears only when the run trains over a
+#          savestate rotation: the FULL ordered list rides on every lease (a
+#          few short strings -- a stateless worker must never need a second
+#          round-trip to know its index->name map). Episode e of a member
+#          plays states[openes.states_for_member(pair_seed, episodes,
+#          len(states))[e]] -- derived from the PAIR seed so both antithetic
+#          halves face the identical opponent sequence. A worker that sees no
+#          "states" key (or an older worker that ignores it) evaluates on its
+#          default state exactly as before.
 #
 #   POST /result
 #       <- {"chunk_id": ..., "generation": g, "worker": <name>,
-#           "member_idx": [...], "fitnesses": [...]}
+#           "member_idx": [...], "fitnesses": [...],
+#           "states_fingerprint": <hex>}
 #       -> {"accepted": true|false}     false = duplicate or stale generation;
 #                                       the worker just moves on either way
+#          "states_fingerprint" (2026-08-26) is attached only when the lease
+#          carried a "states" rotation: states_fingerprint(states) computed
+#          from the list the worker ACTUALLY evaluated. While a rotation is
+#          active the coordinator refuses any result whose echo does not
+#          match -- a stale pre-rotation worker ignores the "states" key,
+#          fights its default state and cannot produce the echo, so a
+#          mixed-version fleet degrades to loud per-chunk refusals (that
+#          machine contributes nothing until its worker code is updated)
+#          instead of silently mixing default-state fitnesses into the run
+#          and splitting antithetic pairs across different opponents.
+#          Without a rotation the key decides nothing, in either direction.
 #
 #   GET  /theta?version=<g>
 #       -> {"version": <current g>, "npz_b64": <base64 of np.savez bytes>}
@@ -42,10 +64,28 @@
 # first-result-wins rule also powers speculative re-leasing (see ChunkQueue).
 
 import base64
+import hashlib
 import io
 import time
 
 import numpy as np
+
+
+def states_fingerprint(states):
+    """Order-sensitive digest of a savestate rotation; None without one.
+
+    The /result echo that proves a worker evaluated THIS rotation (see the
+    wire doc above): the worker computes it from the "states" list of the
+    lease it received, the coordinator from its own pinned rotation, and the
+    comparison is a single ==. Order matters because index->name is the wire
+    map behind openes.states_for_member -- a reordered list is a different
+    experiment, not the same one spelled differently. A short hex digest
+    instead of echoing the list keeps the POST body small.
+    """
+    if not states:
+        return None
+    joined = "\n".join(str(s) for s in states)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:16]
 
 
 class ChunkQueue:
