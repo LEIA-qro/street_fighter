@@ -83,6 +83,8 @@ class FrozenNorm:
 _ENV = None
 _ES_POLICY = None
 _MODEL = _NORM = _FRAMES = None
+_RAINBOW = None
+_RAINBOW_ONEHOT = True
 _NOISE = 0.0    # prob. de reemplazar la accion de la politica por una aleatoria
 _DESYNC = 0     # frames neutrales (0..K, sorteados) antes de soltar el control
 
@@ -141,6 +143,54 @@ def _episode_es(task):
             action = _random_action(rng)
         else:
             action = _ES_POLICY.act(obs)
+        obs, _r, term, trunc, info = _ENV.step(action)
+        steps += 1
+        if term or trunc:
+            break
+    return (state_name, ep, openes.fitness_from_episode(info, steps),
+            int(info.get("win", 0)), steps)
+
+
+def _init_rainbow(ckpt_path, nice_delta, noise, desync):
+    global _ENV, _RAINBOW, _RAINBOW_ONEHOT, _NOISE, _DESYNC
+    resources.apply_nice(nice_delta)
+    _NOISE, _DESYNC = float(noise), int(desync)
+    import torch
+    torch.set_num_threads(1)
+    from agents.rainbow import QRDuelingNet
+    from envs.retro_env import RetroSF2Env
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    meta = ckpt["meta"]
+    _RAINBOW = QRDuelingNet(meta["in_dim"], n_quantiles=meta["quantiles"],
+                            hidden=meta["hidden"])
+    _RAINBOW.load_state_dict(ckpt["state_dict"])
+    _RAINBOW.eval()
+    _RAINBOW_ONEHOT = bool(meta.get("onehot", True))
+    _ENV = RetroSF2Env()
+
+
+def _episode_rainbow(task):
+    state_name, state_idx, ep = task
+    import torch
+    from es.policy import expand_char_onehot
+    rng = _perturb_rng(state_idx, ep)
+    obs, _ = _ENV.reset(options={"state": state_name})
+    steps, info = 0, {}
+    for _ in range(int(rng.integers(0, _DESYNC + 1)) if _DESYNC else 0):
+        obs, _r, term, trunc, info = _ENV.step(NEUTRAL_ACTION)
+        steps += 1
+        if term or trunc:
+            break
+    while steps < MAX_EPISODE_STEPS:
+        if _NOISE and rng.random() < _NOISE:
+            action = _random_action(rng)
+        else:
+            feats = expand_char_onehot(obs) if _RAINBOW_ONEHOT else obs
+            with torch.no_grad():
+                q = _RAINBOW.q_values(torch.as_tensor(
+                    feats, dtype=torch.float32).unsqueeze(0))
+            move, attack = divmod(int(q.argmax(dim=1).item()), 7)
+            action = np.array([move, attack], dtype=np.int64)
         obs, _r, term, trunc, info = _ENV.step(action)
         steps += 1
         if term or trunc:
@@ -219,7 +269,9 @@ def report(tag, states, rows, meta, out_path):
 
 def main():
     ap = argparse.ArgumentParser(description="Banco limpio sobre los 12 rivales lvl1 de la run")
-    ap.add_argument("--arm", choices=["es", "ppo"], required=True)
+    ap.add_argument("--arm", choices=["es", "ppo", "rainbow"], required=True)
+    ap.add_argument("--ckpt", default=None,
+                    help="rainbow: ruta al .pt guardado por train_rainbow.py")
     ap.add_argument("--theta-url", default="http://madre:8080/theta")
     ap.add_argument("--theta-npz", default=None,
                     help="alternativa offline: .npz de checkpoint con clave theta")
@@ -248,7 +300,10 @@ def main():
         print(f"[bench] PERTURBADO: action_noise={args.action_noise} "
               f"desync_max={args.desync_max}")
 
-    eps = args.eps_per_state or (2 if args.arm == "es" and not perturbed else 8)
+    # es y rainbow son deterministas (argmax): 2 eps solo verifican; ppo
+    # muestrea y necesita mas. Con perturbaciones todos necesitan muestra.
+    eps = args.eps_per_state or (2 if args.arm in ("es", "rainbow") and not perturbed
+                                 else 8)
     tasks = [(s, i, e) for i, s in enumerate(states) for e in range(eps)]
     ctx = mp.get_context("spawn")
     t0 = time.time()
@@ -274,6 +329,21 @@ def main():
         # verificacion de determinismo: mismo estado -> episodios identicos.
         # Solo aplica SIN perturbaciones (con ellas, variar es el punto).
         if eps >= 2 and not perturbed:
+            drift = [s for s in states
+                     if len({(f, st) for s2, _e, f, _w, st in rows if s2 == s}) > 1]
+            print("[bench] determinismo: " +
+                  ("OK (todas las repeticiones identicas)" if not drift
+                   else f"OJO, {len(drift)} estados variaron: {drift}"))
+    elif args.arm == "rainbow":
+        if not args.ckpt:
+            raise SystemExit("[bench] --arm rainbow requiere --ckpt")
+        pool = ctx.Pool(args.procs, initializer=_init_rainbow,
+                        initargs=(args.ckpt, args.nice,
+                                  args.action_noise, args.desync_max))
+        rows = pool.map(_episode_rainbow, tasks)
+        meta = {"model": "rainbow", "ckpt": os.path.basename(args.ckpt)}
+        tag = f"Rainbow {os.path.basename(args.ckpt)} greedy"
+        if eps >= 2 and not perturbed:  # greedy = determinista, igual que es
             drift = [s for s in states
                      if len({(f, st) for s2, _e, f, _w, st in rows if s2 == s}) > 1]
             print("[bench] determinismo: " +
