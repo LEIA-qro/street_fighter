@@ -124,6 +124,58 @@ class TestWire:
         assert coord.submit_result(body) is True
 
 
+class TestBenching:
+    def _coord(self, **state_kw):
+        theta = MLPPolicy.init_flat(1)
+        state = openes.init_state(theta, 0.02, 0.01, 0.0, 1, states=("A",),
+                                  **state_kw)
+        coord = Coordinator(state, pop_size=4, chunk_size=4, episodes=1,
+                            lease_seconds=60, states=state.states)
+        coord.start_generation()
+        return coord
+
+    def test_capless_worker_is_benched_and_steals_no_chunk(self, capsys):
+        coord = self._coord(eval_desync_max=30, eval_action_noise=0.05)
+        pending_before = coord.queue.pending_count
+        resp = coord.lease_response("viejo-1", caps=None)
+        assert resp["work"] is None
+        assert resp["retry_in"] == 60.0
+        assert "desactualizado" in resp["reason"]
+        assert coord.queue.pending_count == pending_before  # ni un lease
+        assert coord.status()["workers"]["viejo-1"]["benched"] is True
+        assert "benched viejo-1" in capsys.readouterr().out
+
+    def test_bench_logged_once_per_worker(self, capsys):
+        coord = self._coord(eval_desync_max=30, eval_action_noise=0.05)
+        coord.lease_response("viejo-1", caps=None)
+        coord.lease_response("viejo-1", caps=None)
+        assert capsys.readouterr().out.count("benched viejo-1") == 1
+
+    def test_current_worker_gets_work(self):
+        coord = self._coord(eval_desync_max=30, eval_action_noise=0.05)
+        resp = coord.lease_response("nuevo-1", caps="states,eval")
+        assert resp["work"] is not None
+        assert coord.status()["workers"]["nuevo-1"]["benched"] is False
+
+    def test_partial_caps_still_benched(self):
+        coord = self._coord(eval_desync_max=30, eval_action_noise=0.05)
+        resp = coord.lease_response("medio-1", caps="states")
+        assert resp["work"] is None and "eval" in resp["reason"]
+
+    def test_rotation_only_run_requires_states_only(self):
+        coord = self._coord()  # rotacion sin perturbaciones
+        assert coord.lease_response("v", caps="states")["work"] is not None
+
+    def test_clean_run_serves_capless_workers(self):
+        # sin rotacion ni perturbaciones: un worker prehistorico sigue valiendo
+        theta = MLPPolicy.init_flat(1)
+        state = openes.init_state(theta, 0.02, 0.01, 0.0, 1)
+        coord = Coordinator(state, pop_size=4, chunk_size=4, episodes=1,
+                            lease_seconds=60)
+        coord.start_generation()
+        assert coord.lease_response("fosil-1", caps=None)["work"] is not None
+
+
 class _CountingEnv:
     """Registra las acciones de cada episodio para comparar gemelos."""
 

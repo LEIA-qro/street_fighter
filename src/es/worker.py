@@ -51,6 +51,12 @@ from es.policy import DEFAULT_POLICY, POLICIES
 
 NEUTRAL_ACTION = np.array([0, 0], dtype=np.int64)  # sin direccion, sin boton
 
+# Capacidades que ESTE codigo sabe honrar, anunciadas en cada /work. La
+# madre banca a los workers que no anuncien lo que su run requiere (codigo
+# viejo = sin query param = banca): mejor un "espera y actualizate" que
+# quemar CPU evaluando mal para ser rechazado por los fingerprints.
+WORKER_CAPS = "states,eval"
+
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
 RATE_WINDOW_S = 120.0      # rolling window behind the steps/s we report
 _STOP = False
@@ -335,17 +341,25 @@ def main():
     theta_cache = {}
     step_rate = resources.RollingRate(RATE_WINDOW_S)
     ep_rate = resources.RollingRate(RATE_WINDOW_S)
+    last_reason = None
     try:
         while not _STOP:
-            msg = _http_json(f"{coordinator}/work?worker={name}")
+            msg = _http_json(f"{coordinator}/work?worker={name}&caps={WORKER_CAPS}")
             if msg is None:
                 backoff.sleep()  # coordinator down/restarting: poll until it is back
                 continue
             backoff.reset()
             work = msg.get("work")
             if work is None:
+                # "reason" = la madre nos banco (o informa algo); una vez por
+                # razon distinta, no cada poll
+                reason = msg.get("reason")
+                if reason and reason != last_reason:
+                    _log(f"madre dice: {reason}")
+                    last_reason = reason
                 time.sleep(float(msg.get("retry_in", 2.0)))
                 continue
+            last_reason = None
 
             fetched = fetch_theta(coordinator, work["theta_version"], theta_cache)
             if fetched is None:

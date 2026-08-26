@@ -530,7 +530,8 @@ def test_status_worker_entry_shape_without_any_stats():
     coord = _coordinator()
     assert _submit(coord, coord.lease_work("m4"), "m4") is True
     entry = coord.status()["workers"]["m4"]
-    assert set(entry) == {"age", "members_done", "members_total", "steps_per_s", "procs"}
+    assert set(entry) == {"age", "members_done", "members_total", "steps_per_s",
+                          "procs", "benched"}
     assert entry["members_done"] == 2 and entry["members_total"] == 2
     assert entry["steps_per_s"] is None and entry["procs"] is None  # never reported
     assert entry["age"] >= 0.0

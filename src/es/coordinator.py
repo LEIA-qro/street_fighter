@@ -77,7 +77,7 @@ def _finite_number(value):
 
 def _new_worker_record():
     return {"last_seen": 0.0, "members_gen": 0, "members_total": 0,
-            "steps_per_s": None, "procs": None}
+            "steps_per_s": None, "procs": None, "benched": False}
 
 
 class Coordinator:
@@ -112,6 +112,18 @@ class Coordinator:
         self.eval_action_noise = float(getattr(state, "eval_action_noise", 0.0) or 0.0)
         self.eval_fingerprint = protocol.eval_fingerprint(self.eval_desync_max,
                                                           self.eval_action_noise)
+        # La banca (2026-08-26): que features del run debe SABER honrar un
+        # worker para recibir trabajo. Un worker viejo evaluaria mal (estado
+        # default, sin perturbaciones), sus resultados serian rechazados por
+        # los fingerprints, y su maquina quemaria CPU en un loop inutil
+        # secuestrando leases. Mejor no prestarle nada: /work le contesta
+        # "espera 60s, actualizate" hasta que un worker nuevo de esa maquina
+        # anuncie las capacidades en el query (?caps=states,eval).
+        self.required_caps = set()
+        if self.states:
+            self.required_caps.add("states")
+        if self.eval_fingerprint is not None:
+            self.required_caps.add("eval")
         self.speculative_after = speculative_after
         self.speculative_when_remaining_below = speculative_when_remaining_below
         self.max_concurrent_leases = max_concurrent_leases
@@ -151,6 +163,36 @@ class Coordinator:
                 record["members_gen"] = 0  # cumulative counts survive, per-gen resets
             print(f"[coord] generation {g}: {self.pop_size} members, "
                   f"{len(self.queue.results) + self.queue.pending_count} chunks", flush=True)
+
+    def lease_response(self, worker_name, caps=None):
+        """El cuerpo completo de la respuesta /work, banca incluida.
+
+        `caps` es el valor crudo del query param (?caps=states,eval): lo que
+        el worker ANUNCIA saber honrar. Un worker viejo no manda el param ->
+        conjunto vacio -> banca inmediata si el run requiere algo. El
+        "reason" viaja en la respuesta para workers nuevos (lo loguean); los
+        viejos lo ignoran y simplemente duermen el retry_in largo -- que es
+        exactamente el comportamiento deseado para una maquina desactualizada.
+        """
+        caps_set = {c for c in str(caps or "").split(",") if c}
+        missing = self.required_caps - caps_set
+        if missing:
+            with self.lock:
+                record = self._touch(worker_name)
+                if not record["benched"]:
+                    record["benched"] = True
+                    print(f"[coord] benched {str(worker_name)}: no anuncia "
+                          f"{sorted(missing)} que este run requiere (codigo "
+                          f"desactualizado) -- git pull + relanzar el worker "
+                          f"en esa maquina para reincorporarla", flush=True)
+            return {"work": None, "retry_in": 60.0,
+                    "reason": f"worker desactualizado: faltan capacidades "
+                              f"{sorted(missing)}; git pull + relanzar"}
+        work = self.lease_work(worker_name)
+        if work is not None:
+            with self.lock:
+                self._touch(worker_name)["benched"] = False
+        return {"work": None, "retry_in": 2.0} if work is None else {"work": work}
 
     def lease_work(self, worker_name):
         with self.lock:
@@ -265,7 +307,8 @@ class Coordinator:
                                     "members_total": w["members_total"],
                                     "steps_per_s": (None if w["steps_per_s"] is None
                                                     else round(w["steps_per_s"], 1)),
-                                    "procs": w["procs"]}
+                                    "procs": w["procs"],
+                                    "benched": w.get("benched", False)}
                                 for n, w in self.workers.items()}}
 
     def fleet_report(self, seconds=None):
@@ -359,9 +402,10 @@ class _Handler(BaseHTTPRequestHandler):
         coord = self.server.coordinator
         url = urlparse(self.path)
         if url.path == "/work":
-            name = parse_qs(url.query).get("worker", ["?"])[0]
-            work = coord.lease_work(name)
-            self._send({"work": work, "retry_in": 2.0} if work is None else {"work": work})
+            query = parse_qs(url.query)
+            name = query.get("worker", ["?"])[0]
+            caps = query.get("caps", [None])[0]
+            self._send(coord.lease_response(name, caps=caps))
         elif url.path == "/theta":
             with coord.lock:
                 self._send(coord.theta_payload)
