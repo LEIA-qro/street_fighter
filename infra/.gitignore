@@ -1,0 +1,16 @@
+# Estado local: contiene el auth key de Tailscale y la W&B key en claro. Jamas al repo.
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Secretos por variable (terraform.tfvars.example, con placeholders, SI se commitea:
+# el patron *.tfvars no lo alcanza porque termina en .example).
+*.tfvars
+*.tfvars.json
+
+# Directorio de trabajo de terraform (providers descargados, ~500MB)
+.terraform/
+
+# Crash logs pueden volcar variables sensibles
+crash.log
+crash.*.log
