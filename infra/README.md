@@ -20,7 +20,7 @@ perfil SSO (una sola vez):
 ```bash
 # macOS: brew install awscli | Windows: winget install Amazon.AWSCLI | WSL: sudo apt install awscli
 aws configure sso   # con el start URL / credenciales de la cuenta de educacion
-                    # (hoy ese acceso lo tiene Felipe); profile name: awsedu; region: us-west-2
+                    # (hoy ese acceso lo tiene Felipe); profile name: awsedu; region: us-east-1
 ```
 
 Antes de cualquier `terraform`, asegurate (y re-corre `aws sso login --profile awsedu`
@@ -123,7 +123,7 @@ justo el residuo permanente que queremos que no exista. Consecuencia: **quien ha
 ## 5. Verificar
 
 ```bash
-# En la consola AWS (region us-west-2): EC2 → Instances → filtra por tag
+# En la consola AWS (region us-east-1): EC2 → Instances → filtra por tag
 #   Project = leia-sf2-es
 # Todo lo de este proyecto (instancia, volumen, SG, bucket, rol) trae ese tag.
 
