@@ -13,8 +13,30 @@ SRC_PATH = os.path.join(PROJECT_ROOT, "src")
 if SRC_PATH not in sys.path:
     sys.path.insert(0, SRC_PATH)
 
+from envs.league_env import StreetFighterLeagueEnv
 from envs.sf2_v3 import StreetFighterEnvV3
 from envs.sf2_v4 import StreetFighterEnvV4, V4_CONT_DIM, V4_FLAG_DIM, V4_ID_DIM
+
+
+# What a KO'd fighter's HP word holds, as it arrives over the wire. The ROM
+# stores a SMALL NEGATIVE number; the Lua client reads it with
+# mainmemory.read_u16_be, so the payload carries the unsigned image of it.
+#
+# It is NOT always -1. Measured over 160,000 emulator frames on this Mac the
+# negative set was {-1, -10}; two independent adversarial re-measurements over
+# 250,000+ frames and all 12 characters saw {-1, -4, -5, -6, -7, -8, -9, -10,
+# -11, -13, -27} -- the killing blow's damage is subtracted past zero before
+# the ROM freezes the word. Read unsigned, -13 is 65523 and -27 is 65509, i.e.
+# INSIDE the 177..65525 interval an earlier comment claimed was empty. The
+# invariant that holds is the SIGN, nothing narrower. KO_HP_DEEP exists so
+# fixtures exercise a KO value that is not the convenient 0xFFFF.
+#
+# Fixtures must use these rather than 0 -- HP == 0 is an ordinary live reading
+# (a fighter was measured alive at 0 for 221 consecutive frames), and during
+# round transitions BOTH words sit at exactly 0, which is why `hp <= 0` was
+# never a usable death test.
+KO_HP = 65535        # -1
+KO_HP_DEEP = 65509   # -27, the deepest overkill observed
 
 
 def make_payload(p1_hp, p2_hp, p1_x=100, p2_x=200, p1_y=0, p2_y=0,
@@ -23,17 +45,26 @@ def make_payload(p1_hp, p2_hp, p1_x=100, p2_x=200, p1_y=0, p2_y=0,
                  extended=False,
                  p1_act_lo=0, p2_act_lo=0, p1_btn=0, p2_btn=0,
                  p1_air=0, p2_air=0, rel_y_dist=0,
-                 p1_chest=192, p1_head=192, p2_chest=192, p2_head=192) -> str:
+                 p1_chest=192, p1_head=192, p2_chest=192, p2_head=192,
+                 counters=False, matches_won=0, enemy_matches_won=0,
+                 clock=False, round_timer=0x99) -> str:
     """Builds a payload in the exact Lua wire format.
 
-    13 fields by default (legacy), 24 when extended=True. Field order matches
+    13 fields by default (legacy), 24 when extended=True, 26 when counters=True
+    as well (the two round-win counters), 27 when clock=True as well (the round
+    clock). None of the widths above 24 is emitted by the deployed Lua client
+    yet -- see agent/stage0-runbook.md 6.5. Field order matches
     lua/v2.0/training_env_client.lua.
     """
     fields = [p1_hp, p2_hp, p1_x, p2_x, p1_y, p2_y,
               p1_act, p2_act, p1_proj, p2_proj, p1_char, p2_char, rel_dist]
-    if extended:
+    if extended or counters or clock:
         fields += [p1_act_lo, p2_act_lo, p1_btn, p2_btn, p1_air, p2_air,
                    rel_y_dist, p1_chest, p1_head, p2_chest, p2_head]
+    if counters or clock:
+        fields += [matches_won, enemy_matches_won]
+    if clock:
+        fields += [round_timer]
     return "0 " + ",".join(str(int(f)) for f in fields)
 
 
@@ -45,7 +76,7 @@ def _bootstrap_common_fields(env, player, trainable, ground_gate=False):
     import gymnasium as gym
     from collections import deque
     import core.config as config
-    from envs.reward import RewardConfig, RewardState
+    from envs.reward import RewardConfig, RewardState, RoundTracker
 
     gym.Env.__init__(env)
 
@@ -84,6 +115,16 @@ def _bootstrap_common_fields(env, player, trainable, ground_gate=False):
     env.hp_sentinel = False
     env.p1_sentinel = False
     env.p2_sentinel = False
+    env.p1_ko = False
+    env.p2_ko = False
+    env.my_ko = False
+    env.enemy_ko = False
+    env.matches_won = 0
+    env.enemy_matches_won = 0
+    env.p1_matches_won = 0
+    env.p2_matches_won = 0
+    env.round_timer = None
+    env._round = RoundTracker()
     env.extra_ram = {}
     env._ep_rel_dists = []
     env._ep_air_steps = 0
@@ -203,3 +244,53 @@ class FakeBizHawkEnvV4(_FakeSocketLayerMixin, StreetFighterEnvV4):
             dtype=np.float32,
         )
         self.action_space = spaces.MultiDiscrete([9, 7])
+
+
+class FakeLeagueEnv(_FakeSocketLayerMixin, StreetFighterLeagueEnv):
+    """StreetFighterLeagueEnv with the emulator bridge stubbed out.
+
+    Self-play is the path that has now silently kept the OLD round semantics
+    TWICE (first its own inline copy of the reward, then its own inline
+    `hp <= 0` KO test), each time because nothing in the suite could drive it
+    without a socket. This closes that hole.
+    """
+
+    def __init__(self, payloads, **kwargs):
+        self._queue = [BOOT_STALE_PAYLOAD] + list(payloads)
+        self.sent = []
+        self._bootstrap_without_emulator(**kwargs)
+
+    def _bootstrap_without_emulator(self, player=1, trainable=True,
+                                    ground_gate=False):
+        from gymnasium import spaces
+        import numpy as np
+        import core.config as config
+        from envs.base_env import ONE_HOT_ACT_DIM, ONE_HOT_CHAR_DIM, TOTAL_OBS_DIM
+        from envs.league_env import _FrameBuffer, _PerspectiveParser
+
+        _bootstrap_common_fields(self, player, trainable, ground_gate)
+
+        cont_low = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.]
+        cont_high = [176., 176., 500., 200., 250., 500., 500., 100., 100., 187.]
+        single_low = cont_low + [0.] * (ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM)
+        single_high = cont_high + [1.] * (ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM)
+        self.observation_space = spaces.Box(
+            low=np.array(single_low * config.NUM_FRAMES, dtype=np.float32),
+            high=np.array(single_high * config.NUM_FRAMES, dtype=np.float32),
+            dtype=np.float32,
+        )
+        self.action_space = spaces.MultiBinary(config.ACTION_DIM)
+
+        self.version = "v2"
+        self.parser_p1 = _PerspectiveParser(self, player=1)
+        self.parser_p2 = _PerspectiveParser(self, player=2)
+        self.buf_p1 = _FrameBuffer(n_frames=config.NUM_FRAMES, obs_dim=TOTAL_OBS_DIM)
+        self.buf_p2 = _FrameBuffer(n_frames=config.NUM_FRAMES, obs_dim=TOTAL_OBS_DIM)
+        self.opponent_id = "fake-opponent"
+        self.opponent_model = None
+        self.opponent_vec_norm = None
+        self.opponent_version = "v2"
+        self.latest_p2_stacked = None
+        self.latest_raw_payload = None
+        self._last_reset_payload = BOOT_STALE_PAYLOAD
+        self.current_state_file = "FAKE.State"

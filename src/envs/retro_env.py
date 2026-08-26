@@ -29,7 +29,8 @@ import numpy as np
 import gymnasium
 from gymnasium import spaces
 
-from envs.reward import RewardConfig, RewardState, compute_reward
+from envs.reward import (RewardConfig, RewardState, RoundTracker,
+                         compute_reward, hp_to_signed)
 
 # --------------------------------------------------------------------------
 # Constants duplicated from core/config.py and envs/base_env.py, NOT imported:
@@ -42,7 +43,15 @@ from envs.reward import RewardConfig, RewardState, compute_reward
 FRAME_SKIP = 4              # emulator frames per agent step (Lua client's loop cadence)
 NUM_FRAMES = 4              # config.NUM_FRAMES: stacked agent frames per observation
 MAX_STEPS_PER_ROUND = 1500  # config.MAX_STEPS_PER_ROUND: artificial round timeout
-HP_SENTINEL_THRESHOLD = 200  # StreetFighterBaseEnv.HP_SENTINEL_THRESHOLD
+# StreetFighterBaseEnv.HP_SENTINEL_THRESHOLD. Kept for the obs clamp only:
+# death is decided by the SIGN of the HP word (envs.reward.hp_to_signed), never
+# by this threshold. A LIVE fighter's HP is always 0..176, so nothing real ever
+# trips it; a dead one's word is negative, which the sign test catches first
+# (and which, read unsigned, can be as low as 65509 -- see hp_to_signed for why
+# "no reading ever lands in 177..65525" is NOT the invariant). The threshold's
+# only surviving job is keeping synthetic or corrupt out-of-range values out of
+# the observation.
+HP_SENTINEL_THRESHOLD = 200
 FAR_DIST_THRESHOLD = 80.0   # base_env.FAR_DIST_THRESHOLD (old shaping dead zone boundary)
 ACT_CATEGORIES = 256        # base_env.ACT_CATEGORIES
 CHAR_CATEGORIES = 16        # base_env.CHAR_CATEGORIES
@@ -170,12 +179,13 @@ def assemble_v4_frame(ram: dict, track: RamTrack, is_reset: bool = False):
       [15-16] act_hi       [17-18] act_lo       [19-20] btn   [21-22] chars
     """
     p1_hp_raw, p2_hp_raw = int(ram["p1_hp"]), int(ram["p2_hp"])
-    # HP reads above the threshold are round-transition sentinels (0xFFFF
-    # etc.), not health. Zero them in the obs; the CALLER must also skip
-    # reward and refuse termination on any sentinel frame (base_env.step's
-    # discipline, mirrored in RetroSF2Env.step).
-    p1_sentinel = p1_hp_raw > HP_SENTINEL_THRESHOLD
-    p2_sentinel = p2_hp_raw > HP_SENTINEL_THRESHOLD
+    # A NEGATIVE HP word means that fighter has just been KO'd -- it is the
+    # cleanest death signal the ROM emits, not an unreadable frame (see
+    # hp_to_signed's docstring for the measurements). The obs still shows 0,
+    # because V4_SINGLE_LOW pins the HP floor at 0; the SIGN is what callers
+    # need, and RetroSF2Env._ingest re-derives it from the same raw words.
+    p1_sentinel = hp_to_signed(p1_hp_raw) < 0 or p1_hp_raw > HP_SENTINEL_THRESHOLD
+    p2_sentinel = hp_to_signed(p2_hp_raw) < 0 or p2_hp_raw > HP_SENTINEL_THRESHOLD
     p1_hp = 0 if p1_sentinel else p1_hp_raw
     p2_hp = 0 if p2_sentinel else p2_hp_raw
 
@@ -329,6 +339,14 @@ class RetroSF2Env(gymnasium.Env):
         self.hp_sentinel = False
         self.p1_sentinel = False
         self.p2_sentinel = False
+        self.p1_ko = False
+        self.p2_ko = False
+        self.matches_won = 0
+        self.enemy_matches_won = 0
+        self.round_timer = None
+        # Counter baseline, clock arming and the once-per-round edge latch all
+        # live here so base_env / league_env / this backend cannot drift.
+        self._round = RoundTracker()
         self._ep_rel_dists: list = []
         self._ep_air_steps = 0
 
@@ -354,6 +372,32 @@ class RetroSF2Env(gymnasium.Env):
         frame, self._track, self.p1_sentinel, self.p2_sentinel = assemble_v4_frame(
             ram, self._track, is_reset=is_reset)
         self.hp_sentinel = self.p1_sentinel or self.p2_sentinel
+
+        # Death flags off the SIGNED HP words -- the authoritative round result
+        # (see hp_to_signed). Strictly `< 0`: HP == 0 is a live reading, and
+        # treating it as death is what let round-transition frames masquerade
+        # as double KOs.
+        self.p1_ko = hp_to_signed(ram["p1_hp"]) < 0
+        self.p2_ko = hp_to_signed(ram["p2_hp"]) < 0
+
+        # Independent winner counters (0xFF81DA / 0xFF845A). They tick exactly
+        # +1 emulator frame after the loser's HP goes negative -- confirmed on
+        # every one of the 8 + 21 KOs across two live runs -- so they are a
+        # cross-check on the HP-derived result, never the trigger: at
+        # FRAME_SKIP=4 the sampled frame can be the death frame itself, one
+        # frame before the counter moves. .get() keeps an older data.json
+        # without these variables working (the cross-check just goes silent).
+        self.matches_won = int(ram.get("matches_won", 0))
+        self.enemy_matches_won = int(ram.get("enemy_matches_won", 0))
+
+        # ROUND CLOCK (0xFF972A, one BCD byte, 0x99 -> 0x00). The PRIMARY
+        # time-over signal: it reads 0 for 91-131 agent steps at every time
+        # over, ~10 agent steps before the winner's counter moves, and it is
+        # the ONLY marker of a DRAW GAME (equal HP on the buzzer), where no
+        # counter ticks at all. .get() keeps an older data.json working -- the
+        # clock rule just goes silent and detection falls back to the counters.
+        self.round_timer = (int(ram["round_timer"])
+                            if "round_timer" in ram else None)
         return frame
 
     def step(self, action):
@@ -393,19 +437,57 @@ class RetroSF2Env(gymnasium.Env):
             self.footsie_steps = 0
 
         airborne = bool(observation[13])  # frame index 13 = p1_air
-        if not self.hp_sentinel:
+
+        # BOTH words reading exactly 0 is the ROM blanking the bars between
+        # rounds -- one side at 0 is an ordinary live reading, both at once
+        # never is -- and diffing that against the last real HP invents ~+73
+        # of damage out of a blank screen. Together with the sentinel flag it
+        # defines "this frame's HP is not a health value", which the round
+        # rules, the reward and the spacing aggregates all share so they can
+        # never disagree about which frames count.
+        blanked = bool(current_my_hp == 0 and current_enemy_hp == 0)
+        hp_readable = not (self.hp_sentinel or blanked)
+
+        # A round ends by KO (HP word negative, window 33-457 emulator frames,
+        # so a 4-frame sampler cannot miss it) or on the CLOCK -- decisively,
+        # or level, which is a DRAW GAME the counters never report. The rules
+        # live in resolve_round_result and the per-episode state (counter
+        # baseline, clock arming, once-per-round latch) in RoundTracker; both
+        # are shared with base_env and league_env.
+        #
+        # The latch is what keeps a trainable=False env honest: `terminated`
+        # is forced False there, so without it nothing ever consumes the
+        # result and the terminal payoff is paid on every step of a window
+        # that is hundreds of frames wide (measured: 1,773 payments in 2,500
+        # steps, episode return -22,290).
+        my_ko, enemy_ko = self._round.resolve(
+            self.p1_ko, self.p2_ko,
+            my_hp=current_my_hp, enemy_hp=current_enemy_hp,
+            hp_readable=hp_readable,
+            matches_won=self.matches_won,
+            enemy_matches_won=self.enemy_matches_won,
+            timer=self.round_timer)
+        ko = bool(my_ko or enemy_ko)
+        mw_delta, emw_delta = self._round.mw_delta, self._round.emw_delta
+
+        # A KO frame carries a sentinel HP word (that IS the negative value),
+        # but it is the single most informative frame of the round: both
+        # fighters are on screen at real positions and the winner's HP is
+        # intact and frozen. "Unreadable" therefore means "not a health value
+        # AND no round result".
+        unreadable = bool(not hp_readable and not ko)
+
+        if not unreadable:
             self._ep_rel_dists.append(rel_dist)
             if airborne:
                 self._ep_air_steps += 1
 
-        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
-
-        if self.hp_sentinel:
-            # HP is unknown on this frame (round transition, KO animation on at
-            # least one side) -- do NOT diff a real previous HP against a
-            # fabricated sentinel-derived zero. Skip reward computation and
-            # leave reward_state untouched so the next real frame diffs
-            # against the last real HP.
+        if unreadable:
+            # Do NOT diff a real previous HP against a fabricated zero. Skip
+            # reward and leave reward_state untouched so the next real frame
+            # diffs against the last real HP. A KO frame no longer lands here:
+            # it used to, which is why the terminal payoff was never paid on
+            # the frame that earned it.
             reward, reward_parts = 0.0, {}
         else:
             reward, self.reward_state, reward_parts = compute_reward(
@@ -413,6 +495,7 @@ class RetroSF2Env(gymnasium.Env):
                 rel_dist, ko, self.reward_cfg,
                 airborne=airborne,
                 prev_airborne=self.reward_state.prev_airborne,
+                my_ko=my_ko, enemy_ko=enemy_ko,
             )
             # Mirror into the legacy attributes other modules still read.
             self.prev_my_hp = self.reward_state.prev_my_hp
@@ -421,7 +504,6 @@ class RetroSF2Env(gymnasium.Env):
             self.combo_counter = self.reward_state.combo_counter
             self.frames_since_last_hit = self.reward_state.frames_since_last_hit
 
-        # A sentinel frame is a round transition, not a KO -- never terminate on it.
         terminated = ko if self.trainable else False
         truncated = (bool(self._steps >= MAX_STEPS_PER_ROUND) and not terminated) \
             if self.trainable else False
@@ -433,15 +515,29 @@ class RetroSF2Env(gymnasium.Env):
             "reward_parts": reward_parts,
         }
         if terminated or truncated:
-            double_ko = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
-            info["double_ko"] = double_ko
+            draw = bool(terminated and my_ko and enemy_ko)
+            info["draw"] = draw
+            # double_ko is the legacy name for the same event; metrics_callback
+            # and every saved TensorBoard run key off it, so it stays.
+            info["double_ko"] = draw
             info["timeout"] = bool(truncated)
             info["episode_steps"] = self._steps
-            info["win"] = 1 if (terminated and current_enemy_hp <= 0
-                                and current_my_hp > 0) else 0
-            info["loss"] = 1 if (terminated and current_my_hp <= 0
-                                 and current_enemy_hp > 0) else 0
+            info["win"] = 1 if (terminated and enemy_ko and not my_ko) else 0
+            info["loss"] = 1 if (terminated and my_ko and not enemy_ko) else 0
             info["state_file"] = self.current_state_file
+            # Winner counters as an independent audit trail. The env does NOT
+            # branch on them (they lag the HP sign by one emulator frame and
+            # the sampler can land on the death frame itself), but logging the
+            # deltas makes a future disagreement between the two signals
+            # visible instead of silent.
+            info["matches_won_delta"] = mw_delta
+            info["enemy_matches_won_delta"] = emw_delta
+            # True when the round was decided on the clock rather than by a KO
+            # (no HP word went negative). Lets the outcome rates be split by
+            # cause without changing the win/loss/draw/timeout partition.
+            info["time_over"] = bool(terminated
+                                     and not (self.p1_ko or self.p2_ko))
+            info["round_timer"] = self.round_timer
             attach_episode_spacing(info, self._ep_rel_dists, self._ep_air_steps)
 
         return self._get_obs(), reward, terminated, truncated, info
@@ -486,7 +582,19 @@ class RetroSF2Env(gymnasium.Env):
         self.sticky_direction = None
         self._ep_rel_dists = []
         self._ep_air_steps = 0
-        # Match base_env.reset: a fresh episode never starts flagged sentinel.
+        # Re-baseline the round bookkeeping on the post-savestate-load frame
+        # that _read_ram_frame just parsed: counter baseline, clock arming,
+        # and -- if that frame is itself inside a KO window, i.e. the savestate
+        # was captured mid-KO -- the latch, so the stale result is swallowed
+        # instead of terminating the new episode on step 1.
+        self._round.reset(matches_won=self.matches_won,
+                          enemy_matches_won=self.enemy_matches_won,
+                          timer=self.round_timer,
+                          ko=bool(self.p1_ko or self.p2_ko))
+        # Match base_env.reset: a fresh episode never starts FLAGGED sentinel.
+        # (Clearing p1_ko/p2_ko here would be theatre -- the next _ingest
+        # re-derives them from the same still-negative HP word. The latch
+        # above is what actually protects step 1.)
         self.hp_sentinel = False
         self.p1_sentinel = False
         self.p2_sentinel = False

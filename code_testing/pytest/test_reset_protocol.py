@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 import core.config as config
-from fakes.fake_bizhawk import FakeBizHawkEnv, make_payload
+from fakes.fake_bizhawk import KO_HP, FakeBizHawkEnv, make_payload
 
 
 def test_reset_returns_post_load_frame_not_stale():
@@ -67,7 +67,7 @@ def test_episode_spacing_aggregates_reach_terminal_info():
     env.queue([
         make_payload(176, 176, rel_dist=100),
         make_payload(176, 176, rel_dist=60),
-        make_payload(176, 0, rel_dist=60),   # KO ends the episode
+        make_payload(176, KO_HP, rel_dist=60),   # KO ends the episode
     ])
     for _ in range(2):
         _, _, terminated, _, info = env.step(env.action_space.sample())
@@ -83,13 +83,13 @@ def test_episode_spacing_aggregates_reach_terminal_info():
 def test_spacing_samples_reset_between_episodes():
     env = FakeBizHawkEnv([make_payload(176, 176)])
     env.reset()
-    env.queue([make_payload(176, 0, rel_dist=150)])  # instant KO at far range
+    env.queue([make_payload(176, KO_HP, rel_dist=150)])  # instant KO at far range
     _, _, terminated, _, info = env.step(env.action_space.sample())
     assert terminated and info["ep_rel_dist_frac_far"] == 1.0
 
     env.queue([make_payload(176, 176), make_payload(176, 176)])  # stale + fresh
     env.reset()
-    env.queue([make_payload(176, 0, rel_dist=10)])  # instant KO at close range
+    env.queue([make_payload(176, KO_HP, rel_dist=10)])  # instant KO at close range
     _, _, terminated, _, info = env.step(env.action_space.sample())
     assert terminated and info["ep_rel_dist_frac_far"] == 0.0
 
@@ -99,7 +99,7 @@ def test_sentinel_frames_excluded_from_spacing_stats():
     env.reset()
     env.queue([
         make_payload(255, 255, rel_dist=187),  # sentinel frame: excluded
-        make_payload(176, 0, rel_dist=20),
+        make_payload(176, KO_HP, rel_dist=20),
     ])
     env.step(env.action_space.sample())
     _, _, terminated, _, info = env.step(env.action_space.sample())

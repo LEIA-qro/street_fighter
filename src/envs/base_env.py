@@ -8,7 +8,8 @@ from collections import deque
 
 import core.config as config
 from core.bizhawk_base import BizHawkBaseEnv
-from envs.reward import RewardConfig, RewardState, compute_reward
+from envs.reward import (RewardConfig, RewardState, RoundTracker,
+                         compute_reward, hp_to_signed)
 
 CONTINUOUS_DIM = config.OBS_DIM  # HP(2), RelX(1), RelY(1), WallDist(1), Proj_X(2), Vel_X(2), RelDist(1) = 10
 ACT_CATEGORIES = 256
@@ -22,6 +23,13 @@ TOTAL_OBS_DIM = CONTINUOUS_DIM + ONE_HOT_ACT_DIM + ONE_HOT_CHAR_DIM  # 10+512+32
 # per-episode fraction reported in info["ep_rel_dist_frac_far"] is judged
 # against that number.
 FAR_DIST_THRESHOLD = 80.0
+
+# Lua payload widths this parser accepts. 13 = legacy, 24 = expanded,
+# 26 = + round-win counters, 27 = + round clock. Anything else is treated as a
+# corrupt frame. Only the SET is exact-matched; every optional field block
+# inside _parse_payload is gated with `>=` so widening the payload again can
+# never silently drop the blocks below it.
+ACCEPTED_PAYLOAD_WIDTHS = (13, 24, 26, 27)
 
 
 class StreetFighterBaseEnv(BizHawkBaseEnv):
@@ -83,6 +91,28 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.hp_sentinel = False
         self.p1_sentinel = False
         self.p2_sentinel = False
+        # Death flags: p1_/p2_ in raw payload order, my_/enemy_ in the acting
+        # player's perspective. Set together by _parse_payload; on a corrupt
+        # payload they stay stale from the last good frame, the same discipline
+        # extra_ram follows (the repeated frame is internally consistent).
+        self.p1_ko = False
+        self.p2_ko = False
+        self.my_ko = False
+        self.enemy_ko = False
+        # Round-win counters, in the acting player's perspective, plus the
+        # same pair in RAW p1/p2 order (league_env re-parses one payload from
+        # both perspectives, so it can only trust the raw-order copies).
+        # Present only in a 26-field payload; narrower clients leave them at 0.
+        self.matches_won = 0
+        self.enemy_matches_won = 0
+        self.p1_matches_won = 0
+        self.p2_matches_won = 0
+        # Round clock (field 27). None on every payload the rig sends today,
+        # which switches the clock rule off rather than misfiring it.
+        self.round_timer = None
+        # Counter baseline, clock arming and the once-per-round edge latch.
+        # Shared implementation with retro_env and league_env.
+        self._round = RoundTracker()
 
         # Per-episode rel_dist samples (non-sentinel frames only). Summarized
         # into info on the terminal step so the metrics callback can log the
@@ -232,19 +262,57 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         # potential is evaluated on stays internally consistent.
         airborne = bool(self.extra_ram.get("p1_air", 0))
 
-        if not self.hp_sentinel:
+        # BOTH words reading exactly 0 is the ROM blanking the bars between
+        # rounds; one side at 0 is an ordinary live reading, both at once never
+        # is, and diffing that against the last real HP invents ~+73 of damage
+        # out of a blank screen. Together with the sentinel flag this is the
+        # single "these are not health values" predicate that the round rules,
+        # the reward and the spacing aggregates all share.
+        blanked = bool(current_my_hp == 0 and current_enemy_hp == 0)
+        hp_readable = not (self.hp_sentinel or blanked)
+
+        # A round ends by KO -- the loser's HP word goes NEGATIVE and stays
+        # there for 33-457 emulator frames (measured; a normal round is 33,
+        # only the match-ending KO runs into the hundreds), so no sampling
+        # cadence can miss it -- or on the CLOCK. The previous test
+        # (`hp <= 0 and not hp_sentinel`) could never fire on a real KO: the
+        # Lua client sends HP unsigned, so a KO arrives as 65535, which tripped
+        # the sentinel and BLOCKED termination for the whole KO window. By the
+        # time the flag cleared the ROM had reset both HP words and the
+        # identity of the winner was gone.
+        #
+        # The clock (field 27) and the win counters (fields 25-26) are BOTH
+        # absent from the 24-field Lua client deployed on the rig today, so
+        # there time-over detection is simply inactive and the rules degrade
+        # to KO-only. agent/stage0-runbook.md 6.5 carries the exact, additive
+        # Lua edit that closes the gap; until it lands, a rig episode that
+        # runs out the clock still truncates as a TIMEOUT.
+        my_ko, enemy_ko = self._round.resolve(
+            self.my_ko, self.enemy_ko,
+            my_hp=current_my_hp, enemy_hp=current_enemy_hp,
+            hp_readable=hp_readable,
+            matches_won=self.matches_won,
+            enemy_matches_won=self.enemy_matches_won,
+            timer=self.round_timer)
+        ko = bool(my_ko or enemy_ko)
+
+        # A KO frame carries a sentinel HP word (that IS the negative value),
+        # but it is the single most informative frame of the round: both
+        # fighters are on screen at real positions and the winner's HP is
+        # intact. "Unreadable" means "not a health value AND no round result"
+        # -- a menu or round-transition frame.
+        unreadable = bool(not hp_readable and not ko)
+
+        if not unreadable:
             self._ep_rel_dists.append(rel_dist)
             if airborne:
                 self._ep_air_steps += 1
 
-        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
-
-        if self.hp_sentinel:
-            # HP is unknown on this frame (round transition, menu, KO
-            # animation on at least one side) -- do NOT diff a real previous
-            # HP against a fabricated sentinel-derived zero. Skip reward
-            # computation and leave reward_state untouched so the next real
-            # frame diffs against the last real HP.
+        if unreadable:
+            # Do NOT diff a real previous HP against a fabricated
+            # sentinel-derived zero. Skip reward computation and leave
+            # reward_state untouched so the next real frame diffs against the
+            # last real HP.
             reward, reward_parts = 0.0, {}
         else:
             reward, self.reward_state, reward_parts = compute_reward(
@@ -252,6 +320,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 rel_dist, ko, self.reward_cfg,
                 airborne=airborne,
                 prev_airborne=self.reward_state.prev_airborne,
+                my_ko=my_ko, enemy_ko=enemy_ko,
             )
 
             # Mirror into the legacy attributes other modules still read.
@@ -261,8 +330,6 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             self.combo_counter = self.reward_state.combo_counter
             self.frames_since_last_hit = self.reward_state.frames_since_last_hit
 
-        # A frame where either HP read is a sentinel is a round transition,
-        # not a KO. Terminating there fabricates episodes out of menu frames.
         terminated = ko if self.trainable else False
         truncated = (bool(self._steps >= config.MAX_STEPS_PER_ROUND) and not terminated) if self.trainable else False
 
@@ -273,12 +340,25 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             "reward_parts": reward_parts,
         }
         if terminated or truncated:
-            double_ko = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
-            info["double_ko"] = double_ko
+            draw = bool(terminated and my_ko and enemy_ko)
+            info["draw"] = draw
+            # double_ko is the legacy name for the same event; metrics_callback
+            # and every saved TensorBoard run key off it, so it stays.
+            info["double_ko"] = draw
             info["timeout"] = bool(truncated)
             info["episode_steps"] = self._steps
-            info["win"] = 1 if (terminated and current_enemy_hp <= 0 and current_my_hp > 0) else 0
-            info["loss"] = 1 if (terminated and current_my_hp <= 0 and current_enemy_hp > 0) else 0
+            info["win"] = 1 if (terminated and enemy_ko and not my_ko) else 0
+            info["loss"] = 1 if (terminated and my_ko and not enemy_ko) else 0
+            # Same audit trail retro_env emits, so outcome-by-cause splitting
+            # exists on BOTH backends rather than only on the one nobody
+            # trains on. On a 24-field payload these are constant (0, 0,
+            # False, None) -- which is itself the signal that the rig cannot
+            # see a time over yet.
+            info["matches_won_delta"] = self._round.mw_delta
+            info["enemy_matches_won_delta"] = self._round.emw_delta
+            info["time_over"] = bool(terminated
+                                     and not (self.p1_ko or self.p2_ko))
+            info["round_timer"] = self.round_timer
             if hasattr(self, "current_state_file"):
                 info["state_file"] = self.current_state_file
             self._attach_episode_spacing(info)
@@ -379,6 +459,19 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.hp_sentinel = False
                 self.p1_sentinel = False
                 self.p2_sentinel = False
+                # Re-baseline the round bookkeeping on the post-load frame
+                # _parse_payload just read: counter baseline, clock arming,
+                # and -- if that frame is itself inside a KO window, i.e. the
+                # savestate was captured mid-KO -- the latch, so the stale
+                # result is swallowed instead of terminating on step 1.
+                # (The previous code "cleared" p1_ko/p2_ko here and claimed
+                # that protected step 1. It did not: step() re-derives them
+                # from the same still-negative HP word on the next payload,
+                # so the flags were clear for exactly zero steps.)
+                self._round.reset(matches_won=self.matches_won,
+                                  enemy_matches_won=self.enemy_matches_won,
+                                  timer=self.round_timer,
+                                  ko=bool(self.p1_ko or self.p2_ko))
                 self._ep_rel_dists = []
                 self._ep_air_steps = 0
 
@@ -416,13 +509,28 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         csv_string = data.strip().split(" ")[-1]
         parts = csv_string.split(",")
 
-        # 13 = legacy payload, 24 = expanded payload. Fields 1-13 are identical
-        # in both, so v1/v2/v3 are unaffected by the wider one.
-        if len(parts) in (13, 24):
+        # 13 = legacy payload, 24 = expanded, 26 = expanded + the two round-win
+        # counters, 27 = + the round clock. Fields 1-13 are identical in all
+        # of them, so v1/v2/v3 are unaffected by the wider ones. The widths
+        # above 13 are accepted AHEAD of the Lua client that emits them: the
+        # rig is production hardware owned by another track and cannot be
+        # tested here, so the Python side is made ready first and the Lua
+        # change stays an additive edit (agent/stage0-runbook.md 6.5 has it
+        # verbatim).
+        #
+        # EVERY optional block below is gated with `>=`, never `==`. It was
+        # `if len(raw) == 24:` for one revision, which meant the 26-field
+        # payload this code was written to accept fell straight through to
+        # `extra_ram = {}` -- silently zeroing 8 of the 23 v4 observation dims
+        # (rel_y_dist, p1/p2 chest+head, p1/p2 air, both act_lo, p1_btn) and
+        # pinning `airborne` False so the anti-jump ground gate stopped
+        # gating. It would have detonated on the day the Lua edit landed, on
+        # the rig, with nothing on this machine able to reproduce it.
+        if len(parts) in ACCEPTED_PAYLOAD_WIDTHS:
             try:
                 raw = [int(x) for x in parts]
 
-                if len(raw) == 24:
+                if len(raw) >= 24:
                     p1_lo, p2_lo = raw[13], raw[14]
                     p1_btn, p2_btn = raw[15], raw[16]
                     p1_air, p2_air = raw[17], raw[18]
@@ -456,20 +564,54 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 else:
                     self.extra_ram = {}
 
-                p1_sentinel = raw[0] > self.HP_SENTINEL_THRESHOLD
-                p2_sentinel = raw[1] > self.HP_SENTINEL_THRESHOLD
+                # Fields 25-26: matches_won (0xFF81DA) / enemy_matches_won
+                # (0xFF845A), in RAW P1/P2 order, flipped to the acting
+                # player's perspective like every other paired field. The raw
+                # order is ALSO kept, because league_env parses one payload
+                # from both perspectives through this same method and the
+                # perspective-flipped copies are whichever parse ran last.
+                if len(raw) >= 26:
+                    self.p1_matches_won, self.p2_matches_won = raw[24], raw[25]
+                    mw, emw = raw[24], raw[25]
+                    if self.player == 2:
+                        mw, emw = emw, mw
+                    self.matches_won, self.enemy_matches_won = mw, emw
+
+                # Field 27: the round clock (0xFF972A, one BCD byte,
+                # 0x99 -> 0x00). Perspective-free. See
+                # envs.reward.resolve_round_result for why it, and not the
+                # counters, is the primary time-over signal.
+                if len(raw) >= 27:
+                    self.round_timer = raw[26]
+
+                # The Lua client sends mainmemory.read_u16_be, i.e. UNSIGNED,
+                # so a KO'd fighter (-1 in RAM) arrives here as 65535. Decode
+                # the sign before anything else: that is the death signal.
+                p1_dead = hp_to_signed(raw[0]) < 0
+                p2_dead = hp_to_signed(raw[1]) < 0
+                p1_sentinel = p1_dead or raw[0] > self.HP_SENTINEL_THRESHOLD
+                p2_sentinel = p2_dead or raw[1] > self.HP_SENTINEL_THRESHOLD
                 self.p1_sentinel = p1_sentinel
                 self.p2_sentinel = p2_sentinel
-                # A sentinel on EITHER side means that side's HP is unreadable
-                # this frame (round transition, menu, KO animation) -- not
-                # that HP is actually zero. step() treats any sentinel frame
-                # as "HP unknown": it refuses to terminate and skips reward
-                # computation entirely, rather than diffing a real HP against
-                # a fabricated zero (a false KO when only one side sentinels,
-                # or ~+23 reward of pure noise when both do).
+                # Per-side death flags, in RAW P1/P2 order. step() flips them
+                # to the acting player's perspective the same way the HP words
+                # are flipped below.
+                self.p1_ko = p1_dead
+                self.p2_ko = p2_dead
+                # A sentinel on either side means that side's HP is not a live
+                # health value this frame. step() still skips reward on such a
+                # frame -- UNLESS it is a KO, which is the one case where the
+                # frame is fully informative and must terminate the episode.
                 self.hp_sentinel = p1_sentinel or p2_sentinel
                 raw[0] = 0 if p1_sentinel else raw[0]
                 raw[1] = 0 if p2_sentinel else raw[1]
+
+                # Death flags in the ACTING player's perspective, flipped by
+                # the same rule as the HP words just below.
+                if self.player == 2:
+                    self.my_ko, self.enemy_ko = p2_dead, p1_dead
+                else:
+                    self.my_ko, self.enemy_ko = p1_dead, p2_dead
 
                 # PERSPECTIVE FLIP
                 if self.player == 2:

@@ -266,22 +266,44 @@ class StreetFighterLeagueEnv(StreetFighterEnvV2):
         else:
             self.footsie_steps = 0
 
-        if not self.hp_sentinel:
+        # SAME round rules as base_env.step and RetroSF2Env.step, via the same
+        # shared objects -- self-play used to carry its own inline copy of the
+        # OLD `hp <= 0 and not hp_sentinel` test, which is how it kept training
+        # against a bug the single-player path had already fixed. Twice.
+        #
+        # The flags read here are the RAW p1/p2 ones, NOT self.my_ko /
+        # self.enemy_ko: _PerspectiveParser drives one shared env through
+        # _parse_payload twice, so every perspective-flipped attribute holds
+        # whichever parse ran LAST (P2's). The reward below is P1's, so using
+        # the flipped copies would invert every win and loss in the league.
+        blanked = bool(current_my_hp == 0 and current_enemy_hp == 0)
+        hp_readable = not (self.hp_sentinel or blanked)
+        my_ko, enemy_ko = self._round.resolve(
+            self.p1_ko, self.p2_ko,
+            my_hp=current_my_hp, enemy_hp=current_enemy_hp,
+            hp_readable=hp_readable,
+            matches_won=self.p1_matches_won,
+            enemy_matches_won=self.p2_matches_won,
+            timer=self.round_timer)
+        ko = bool(my_ko or enemy_ko)
+        unreadable = bool(not hp_readable and not ko)
+
+        if not unreadable:
             self._ep_rel_dists.append(rel_dist)
 
-        ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
-
-        if self.hp_sentinel:
-            # HP unreadable this frame (round transition / menu / KO
-            # animation): skip reward and refuse to terminate rather than
-            # diffing real HP against a fabricated zero. Without this, a
-            # single-sided sentinel fabricated a -50 "loss" out of a menu
-            # frame in every league episode.
+        if unreadable:
+            # HP is not a health value this frame (round transition / menu /
+            # the [0, 0] blank the ROM paints between rounds): skip reward and
+            # refuse to terminate rather than diffing real HP against a
+            # fabricated zero. Without this, a single-sided sentinel
+            # fabricated a -50 "loss" out of a menu frame in every league
+            # episode, and the [0, 0] blank scored as a DRAW.
             reward, reward_parts = 0.0, {}
         else:
             reward, self.reward_state, reward_parts = compute_reward(
                 self.reward_state, current_my_hp, current_enemy_hp,
                 rel_dist, ko, self.reward_cfg,
+                my_ko=my_ko, enemy_ko=enemy_ko,
             )
             self.prev_my_hp = self.reward_state.prev_my_hp
             self.prev_enemy_hp = self.reward_state.prev_enemy_hp
@@ -299,11 +321,17 @@ class StreetFighterLeagueEnv(StreetFighterEnvV2):
             "reward_parts": reward_parts,
         }
         if terminated or truncated:
-            info["double_ko"] = bool(terminated and current_my_hp <= 0 and current_enemy_hp <= 0)
+            draw = bool(terminated and my_ko and enemy_ko)
+            info["draw"] = draw
+            info["double_ko"] = draw   # legacy alias, same event
             info["timeout"] = bool(truncated)
             info["episode_steps"] = self._steps
-            info["win"] = 1 if (terminated and current_enemy_hp <= 0 and current_my_hp > 0) else 0
-            info["loss"] = 1 if (terminated and current_my_hp <= 0 and current_enemy_hp > 0) else 0
+            info["win"] = 1 if (terminated and enemy_ko and not my_ko) else 0
+            info["loss"] = 1 if (terminated and my_ko and not enemy_ko) else 0
+            info["matches_won_delta"] = self._round.mw_delta
+            info["enemy_matches_won_delta"] = self._round.emw_delta
+            info["time_over"] = bool(terminated
+                                     and not (self.p1_ko or self.p2_ko))
             info["opponent_id"] = self.opponent_id
             if hasattr(self, "current_state_file"):
                 info["state_file"] = self.current_state_file
@@ -342,7 +370,15 @@ class StreetFighterLeagueEnv(StreetFighterEnvV2):
         self.footsie_steps = 0
         self.combo_counter = 0
         self.frames_since_last_hit = 0
-        
+        # super().reset() already baselined the round tracker, but it did so
+        # from whatever perspective self.player happened to hold; the two
+        # re-parses above left it at P2. Re-baseline in RAW p1/p2 order, which
+        # is the order step() resolves in.
+        self._round.reset(matches_won=self.p1_matches_won,
+                          enemy_matches_won=self.p2_matches_won,
+                          timer=self.round_timer,
+                          ko=bool(self.p1_ko or self.p2_ko))
+
         # Fill standard SB3 frame stack
         self.frames.clear()
         for _ in range(config.NUM_FRAMES): 

@@ -2,11 +2,11 @@
   "info": {
     "p1_hp": {
       "address": 16744514,
-      "type": ">u2"
+      "type": ">i2"
     },
     "p2_hp": {
       "address": 16745154,
-      "type": ">u2"
+      "type": ">i2"
     },
     "p1_x": {
       "address": 16744454,
@@ -87,6 +87,18 @@
     "p2_head": {
       "address": 16745312,
       "type": ">u2"
+    },
+    "matches_won": {
+      "address": 16744922,
+      "type": "|u1"
+    },
+    "enemy_matches_won": {
+      "address": 16745562,
+      "type": "|u1"
+    },
+    "round_timer": {
+      "address": 16750378,
+      "type": "|u1"
     }
   }
 }

@@ -18,7 +18,14 @@
 #   macros/*      fraction of agent actions that are macros, plus per-macro
 #                 usage. If ~0 after 1M steps, raise ent_coef before
 #                 concluding macros do not help.
-#   episodes/*    win rate, double-KO rate, timeout rate, mean length.
+#   episodes/*    win / loss / draw / timeout rate and mean length. The four
+#                 rates partition the episodes, so they must sum to 1.0 -- if
+#                 they do not, an outcome is being misclassified. (draw_rate
+#                 and double_ko_rate are the same number under two names; the
+#                 legacy tag is kept so old dashboards keep resolving.)
+#                 time_over_rate cuts the SAME episodes by cause instead of by
+#                 outcome: the share decided on the round clock rather than by
+#                 a KO. It is not part of the partition.
 #   env/*         hp_sentinel frame rate, socket deaths.
 #   throughput/*  aggregate agent steps/s overall and during collection only,
 #                 plus seconds spent in the gradient phase. The number the
@@ -66,8 +73,10 @@ class MetricsCallback(BaseCallback):
         self._ep_air_fracs = []
         self._ep_lengths = []
         self._ep_wins = []
+        self._ep_losses = []
         self._ep_double_kos = []
         self._ep_timeouts = []
+        self._ep_time_overs = []
 
     # ------------------------------------------------------------------ ingest
 
@@ -94,8 +103,21 @@ class MetricsCallback(BaseCallback):
 
             if "win" in info:
                 self._ep_wins.append(info["win"])
-                self._ep_double_kos.append(1 if info.get("double_ko") else 0)
+                self._ep_losses.append(info.get("loss", 0))
+                # "draw" is the current key; "double_ko" is its legacy alias
+                # and is still emitted, so either one alone is enough.
+                self._ep_double_kos.append(
+                    1 if (info.get("draw") or info.get("double_ko")) else 0)
                 self._ep_timeouts.append(1 if info.get("timeout") else 0)
+                # Which CAUSE ended the round, orthogonal to the outcome
+                # partition above. A round decided on the clock is invisible
+                # in win/loss/draw alone, and its share grows exactly as the
+                # policy gets better at not dying -- so a run whose
+                # time_over_rate is pinned at 0 late in training is reporting
+                # that its transport cannot see the clock, not that time overs
+                # stopped happening.
+                if "time_over" in info:
+                    self._ep_time_overs.append(1 if info["time_over"] else 0)
                 if "episode_steps" in info:
                     self._ep_lengths.append(info["episode_steps"])
                 if "ep_rel_dist_mean" in info:
@@ -126,8 +148,16 @@ class MetricsCallback(BaseCallback):
                 records[f"macros/use_{name}"] = self._macro_counts[idx] / self._actions_seen
         if self._ep_wins:
             records["episodes/win_rate"] = float(np.mean(self._ep_wins))
-            records["episodes/double_ko_rate"] = float(np.mean(self._ep_double_kos))
+            # loss_rate used to be underivable: reading Run A required
+            # reconstructing it as 1 - win - double_ko - timeout, which silently
+            # assumed the four outcomes partition the episodes. Log it directly
+            # so the partition is checkable instead of assumed.
+            records["episodes/loss_rate"] = float(np.mean(self._ep_losses))
+            records["episodes/draw_rate"] = float(np.mean(self._ep_double_kos))
+            records["episodes/double_ko_rate"] = records["episodes/draw_rate"]
             records["episodes/timeout_rate"] = float(np.mean(self._ep_timeouts))
+            if self._ep_time_overs:
+                records["episodes/time_over_rate"] = float(np.mean(self._ep_time_overs))
         if self._ep_lengths:
             records["episodes/len_mean"] = float(np.mean(self._ep_lengths))
         if self._steps_seen:
