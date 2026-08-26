@@ -505,14 +505,24 @@ def restore_from_s3(bucket, checkpoint_dir, prefix="es/"):
         print(f"[coord] S3 restore skipped ({e}); starting fresh", flush=True)
 
 
-def make_wandb_logger(project):
+def make_wandb_logger(project, run_id=None):
+    """W&B logger con identidad ESTABLE y sin metricas de sistema.
+
+    run_id (el slug del --s3-prefix): cada reinicio del coordinator RESUME el
+    mismo run de W&B en vez de parir uno nuevo con nombre de jardin -- un run
+    de entrenamiento = un run de W&B, como debe ser. x_disable_stats apaga el
+    colector de metricas de sistema (CPU/red de la madre): nadie las quiere,
+    y su canal de telemetria era el que se ahogaba ("too many concurrent
+    telemetry requests") dejando la HISTORIA (fitness/*) varada en memoria.
+    """
     if not project:
         return None
     try:
         import wandb  # lazy; WANDB_MODE=offline works without a key
         default_mode = "online" if os.environ.get("WANDB_API_KEY") else "offline"
-        run = wandb.init(project=project, resume="allow",
-                         mode=os.environ.get("WANDB_MODE", default_mode))
+        run = wandb.init(project=project, id=run_id, name=run_id, resume="allow",
+                         mode=os.environ.get("WANDB_MODE", default_mode),
+                         settings=wandb.Settings(x_disable_stats=True))
         return lambda metrics, step: run.log(metrics, step=step)
     except Exception as e:
         print(f"[coord] wandb disabled ({e})", flush=True)
@@ -743,7 +753,10 @@ def main():
                         # the run's pinned list (checkpoint wins over CLI)
                         states=state.states)
     s3_upload = make_s3_uploader(args.s3_bucket, prefix=args.s3_prefix)
-    wandb_log = make_wandb_logger(args.wandb_project)
+    # el slug del prefijo S3 ES la identidad del run: mismo run de W&B a
+    # traves de todos los reinicios del servicio
+    wandb_id = normalize_s3_prefix(args.s3_prefix).strip("/").replace("/", "-") or None
+    wandb_log = make_wandb_logger(args.wandb_project, run_id=wandb_id)
 
     server = ThreadingHTTPServer((args.host, args.port), _Handler)
     server.coordinator = coord
@@ -780,6 +793,15 @@ def main():
                 # many opponents the rotation spans (it changes on resume
                 # pinning, and 0/absent flags a single-state run at a glance)
                 metrics["fleet/states_in_rotation"] = len(coord.states)
+            # Observabilidad a prueba de wandb: cada generacion tambien se
+            # appendea a un JSONL local que sube a S3 -- graficable siempre,
+            # aunque el sidecar de W&B amanezca de malas.
+            row = dict(metrics, generation=g, wall_time=time.time())
+            metrics_path = os.path.join(args.checkpoint_dir, "metrics.jsonl")
+            with open(metrics_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(row) + "\n")
+            if s3_upload:
+                s3_upload(metrics_path)
             if wandb_log:
                 wandb_log(metrics, step=g)
             print(fleet_summary_line(report, g), flush=True)
