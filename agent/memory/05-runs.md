@@ -34,3 +34,9 @@ bench_12rivals.py ahora tiene `--action-noise P` y `--desync-max K` (perturbacio
 | Desfase ≤30f | **+0.785 / 63.9%** | +1.188 / 93.1% |
 
 **El PPO es a prueba de balas** (entrenó estocástico; ninguna perturbación lo mueve). El ES pierde 19 pts de wr con solo desfasar el arranque ≤30 frames. Por rival bajo desfase: 7 victorias son ESTRATEGIA real (Balrog, Blanka, Guile, Ken, Ryu, Vega, Zangief: 6/6 todas), 3 eran coreografía total o parcial (**Sagat 0/6, Dhalsim 1/6, EHonda 3/6** — la "paliza" a EHonda era mitad guión). Implicación: NO tocar la run 2 (experimento de una variable: one-hot); si run 2 también sale frágil, la palanca de run 3 es **desync aleatorio en entrenamiento** (domain randomization barata). Protocolo de banco de ahora en adelante: reportar limpio + desync en cada checkpoint.
+
+## [2026-08-26 tarde-2] Run 2 gen 42 + fix de chunks + flota 2 máquinas
+
+- **Banco run 2 gen 42 (v4onehot): 66.7% limpio / 65.3% desync — brecha ~1pt, robusto de fábrica.** ¡CHUN-LI Y M.BISON CAYERON! (+1.424 y +1.371, los imposibles históricos del escalar). Pierde: Balrog, Dhalsim, Ryu, Sagat. En números ROBUSTOS, gen 42 de run 2 ≈ gen 95 de run 1. Protocolo permanente: doble curva (limpio+desync) por checkpoint; la métrica de fiteo es LA BRECHA entre ambas (caveat de Felipe: puede ser general ahora y fitearse después).
+- **Cuello de botella cazado: chunk_size 8 limitaba a CUALQUIER worker a 8 miembros concurrentes** — la Legion (22 procs) trabajaba al 36% (4.2k steps/s de sus 16k). Fix: `--chunk-size 24` en el unit (resume del checkpoint sin pérdida; chunk size NO es identidad del run). Resultado: **15s/gen, 12.4k steps/s de flota** (Legion 8.6k + Mac 3.8k), reparto 160/96. Pendiente el fix estructural: worker que tome ceil(procs/chunk) leases concurrentes para autollenarse en cualquier máquina.
+- El env NO cambió con v4onehot (pregunta de Diego): obs 92 y MultiDiscrete([9,7]) congelados; el one-hot es feature map interno de la política.
