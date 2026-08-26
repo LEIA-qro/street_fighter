@@ -10,6 +10,11 @@
 > el lag de un paso durante el episodio es deliberado y pipelinea emulación con
 > inferencia). Suite: 126 tests. Instrucciones de ejecución en la 13900K:
 > `agent/stage0-runbook.md`.
+>
+> **Addendum 2026-08-26:** el estado VIVO del proyecto se mantiene ahora en
+> **`agent/memory/`** (INDEX.md primero) — arquitectura de dos backends + flota ES,
+> bugs cazados, decisiones, infra y bitácora de runs. Este handoff queda como
+> referencia histórica profunda; para retomar trabajo, empieza por la memoria.
 
 **Last updated:** 2026-08-25
 **Branch:** `sf2-sota-rl-upgrade` (from `main` at `11552e8c`, 24 commits, **not merged**)
