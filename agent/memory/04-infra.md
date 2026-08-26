@@ -27,3 +27,11 @@
 - desktop "SSS" (i9-13900K/4090, Windows, D:\GitHub\Street\street_fighter): rig BizHawk + PPO. Pendiente su WSL2 para ser worker.
 - Omen (275HX/5080M) y Legion (275HX/5070TiM): pendientes de alta completa (tools/setup_worker.md).
 - M4 (mini-fzamorano, 24GB): worker retro + máquina de Felipe. Stub ~/TEC/LEIA/EmuHawk.exe permite importar core.config aquí.
+
+## [2026-08-26 tarde] Run 2 (v4onehot) — cambios de operación
+
+- El unit de madre ahora corre: `--states manifest --difficulty 1 --policy v4onehot --s3-prefix es-run2-onehot`.
+- **[OBSOLETO el "fresh run = aws s3 rm"]** — la IAM de madre NO puede borrar S3 (a propósito). Receta nueva de run fresca: limpiar `/opt/leia/checkpoints/gen_*` + **prefijo S3 NUEVO** vía `--s3-prefix` (el prefijo viejo queda como archivo tal cual). Sin prefijo nuevo, restore_from_s3 resucitaría el gen más alto de la run muerta tras reemplazo de instancia.
+- Archivo run 1 (policy escalar, 96 gens): S3 `es/` intacto + local `benchmarks/run1_final/` (gen_000096 + theta final).
+- Worker M4 ahora a `--cpu-share 0.8` (8 procs, ~3,700 steps/s). Log: scratchpad/worker-run2.log.
+- Tailnet: Diego tiene DOS nodos (perea-1=Windows host, **legion-wsl=el bueno** para worker; WSL y Windows son máquinas distintas para Tailscale, no es error).

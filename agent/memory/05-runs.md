@@ -14,3 +14,10 @@
 | Banco gen 74 — **CICLADO de estrategias** | mismo banco, 10 gens después | wr limpio IGUAL (66.7%) pero rotó rivales: craqueó Balrog/Ken/Sagat y PERDIÓ MBison/Ryu/Vega (ChunLi sigue invicta). El mean poblacional sube (~0.95) por victorias más limpias, no por más rivales. **Hipótesis arquitectónica: el char ID del rival entra como escalar /15 (frame v4 idx 22) — el MLP 64x64 no puede ramificar por matchup; el PPO lo recibe one-hot de 16.** Cambio propuesto: policy ES con char one-hot (frame 23→53, obs 212, ~22k params) = run nueva; momento natural, cuando entre la flota. |
 
 Ritual de análisis: la desktop exporta tfevents a ~/Downloads de la M4; script de análisis por cuartos en la historia de la sesión (pandas + EventAccumulator).
+
+## [2026-08-26 tarde] Cierre run 1 + arranque run 2 + Glaber
+
+- **Run 1 (escalar) CERRADA en gen 96.** Acta final (banco gen 95): **+1.079 / 83.3% (10/12)** — salió del ciclo 8/12: recuperó Ryu y Vega sin soltar Balrog/Ken/Sagat; solo Chun-Li y M.Bison invictos. El ciclado NO era techo duro, era interferencia lenta (Bison entra/sale, Dhalsim degradó 1.48→1.01). De −0.11 a +1.08 en ~2h de una M4 sola.
+- **Modelo sorpresa del equipo: "Glaber Xtreme V1"** — PPO v3 de **104.7M steps, llegó a lvl5**, WR rolling 76% (archivos en ~/Downloads de la M4). En el banco 12 rivales lvl1: **+1.044 / 85.4%** — PEOR que el campeón de 39.7M (+1.152/90.6%) en lvl1 (se especializó arriba; este banco solo mide el piso). ES gen 95 quedó a 0.07 de fitness del 100M.
+- **Run 2 lanzada: policy v4onehot** (char IDs one-hot, 21887 params, obs de wire igual 92). Fresh start verificado, S3 `es-run2-onehot/`, W&B run `pious-sea-6`. M4 al 80% (8 procs, ~3,700 steps/s). Hipótesis a validar: sin interferencia de matchup, debería acumular rivales en vez de rotarlos y pasar 10/12.
+- Pendientes de la verificación adversarial (menores): theta_cache del worker puede cruzar runs si colisionan números de gen en swap de coordinator (mitigado hoy: worker reiniciado a mano; fix real = nonce de run en el wire); load_checkpoint no valida dim vs policy (falla ruidoso en worker de todos modos).
