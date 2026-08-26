@@ -665,12 +665,17 @@ def test_coordinator_does_not_speculate_by_default():
 
 
 def test_coordinator_wires_speculative_releasing_into_its_queue():
-    # lease_work() uses the real monotonic clock, so a threshold of ~0 (not a
-    # sleep) is what makes the tail race observable in a unit test
+    # lease_work() uses the real monotonic clock, so instead of racing it (a
+    # 1e-9 threshold lost that race on Windows, where consecutive calls can
+    # land on one clock tick) the leases' recorded hand-out times are rewound
+    # a full second -- deterministic staleness on any platform, no sleeps.
     coord = _coordinator(pop_size=4, chunk_size=2, lease_seconds=1000.0,
-                         speculative_after=1e-9, speculative_when_remaining_below=2)
+                         speculative_after=0.5, speculative_when_remaining_below=2)
     first = coord.lease_work("slow")["chunk_id"]
     assert coord.lease_work("also-slow")["chunk_id"] != first
+    with coord.lock:
+        for cid in coord.queue._leased_at:
+            coord.queue._leased_at[cid] -= 1.0
     raced = coord.lease_work("idle")
     assert raced is not None and raced["chunk_id"] == first
     assert coord.status()["speculative_leases"] == 1
