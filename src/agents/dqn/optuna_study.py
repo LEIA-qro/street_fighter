@@ -128,7 +128,7 @@ def objective(trial, env_fn, load_zip=None, load_pkl=None, start_phase=0, tuning
                 exploration_fraction=exploration_fraction,
                 learning_starts=10_000,
                 train_freq=4,
-                gradient_steps=1,
+                gradient_steps=8,
                 target_update_interval=10_000,
                 policy_kwargs=dict(net_arch=net_arch, n_quantiles=51),
                 verbose=0,

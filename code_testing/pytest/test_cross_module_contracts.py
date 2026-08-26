@@ -50,6 +50,23 @@ def test_reward_config_gamma_matches_the_ppo_agents_discount():
     )
 
 
+def test_selective_norm_return_gamma_matches_the_agents_discount():
+    # SelectiveVecNormalize scales rewards by a running estimate of the
+    # discounted return; that estimate's discount must track the acting
+    # agent's (same reasoning as SB3's VecNormalize(gamma=...)). It was a
+    # hardcoded 0.99 -- a discount literal the AST guard below cannot see,
+    # because it appeared as `self._returns * 0.99`, not as a gamma= kwarg.
+    import inspect
+    from core.rl_constants import AGENT_GAMMA
+    from core.selective_norm import SelectiveVecNormalize
+
+    default = inspect.signature(SelectiveVecNormalize.__init__).parameters["gamma"].default
+    assert default == pytest.approx(AGENT_GAMMA), (
+        "SelectiveVecNormalize's default return-estimation gamma has drifted "
+        "from AGENT_GAMMA."
+    )
+
+
 # --------------------------------------------------------------------------
 # v4 frame index contract: SF2FeaturesExtractor slices the tail of each
 # 23-float v4 frame at fixed offsets (p1_act_hi=15, p1_act_lo=17, p1_btn=19,

@@ -24,7 +24,7 @@ class MacroActionWrapper(gym.Wrapper):
             rel_x = p2_x - p1_x, so rel_x >= 0 means the opponent is to the
             agent's right and macros are used unmirrored.
         frame_size: length of a single observation frame. 554 for v2/v3,
-            14 for v4 (see src/envs/sf2_v4.py).
+            23 (V4_FRAME_DIM) for v4 (see src/envs/sf2_v4.py).
     """
 
     def __init__(self, env, obs_rel_x_index: int = 2, frame_size: int = 554):

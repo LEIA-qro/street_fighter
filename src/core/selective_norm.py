@@ -2,20 +2,27 @@
 import pickle
 import numpy as np
 import core.config as config
+from core.rl_constants import AGENT_GAMMA
 from stable_baselines3.common.vec_env import VecEnvWrapper
 
 class SelectiveVecNormalize(VecEnvWrapper):
     """
     Normalizes only the continuous dimensions of a mixed continuous/one-hot
     observation vector. One-hot dimensions are passed through unchanged.
- 
+
     Now includes Reward Normalization (Fix A) and proper state persistence.
     """
-    def __init__(self, venv, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES, 
-                 clip=10.0, training=True, norm_reward=True, reward_clip=10.0):
+    def __init__(self, venv, n_continuous_dims=config.OBS_DIM, n_frames=config.NUM_FRAMES,
+                 clip=10.0, training=True, norm_reward=True, reward_clip=10.0,
+                 gamma=AGENT_GAMMA):
         super().__init__(venv)
         self.n_cont = n_continuous_dims
         self.n_frames = n_frames
+        # Discount for the internal return estimate used to scale rewards.
+        # Must track the acting agent's discount (same reasoning as SB3's
+        # VecNormalize(gamma=...) parameter); a hardcoded 0.99 here quietly
+        # mis-scaled normalized rewards while the agent ran at 0.995.
+        self.gamma = gamma
         
         obs_shape = venv.observation_space.shape[0]
         if obs_shape % n_frames != 0:
@@ -93,8 +100,7 @@ class SelectiveVecNormalize(VecEnvWrapper):
 
     def _normalize_reward(self, rews: np.ndarray, dones: np.ndarray) -> np.ndarray:
         """Discounted return running estimate (Welford online)."""
-        # Note: Using a fixed 0.99 gamma for internal return estimation
-        self._returns = self._returns * 0.99 + rews
+        self._returns = self._returns * self.gamma + rews
         
         batch_mean = self._returns.mean()
         batch_var  = self._returns.var()
@@ -154,6 +160,7 @@ class SelectiveVecNormalize(VecEnvWrapper):
             "ret_rms_count":  self.ret_rms_count,
             "norm_reward":    self._norm_reward,
             "reward_clip":    self.reward_clip,
+            "gamma":          self.gamma,
         }
         with open(path, "wb") as f:
             pickle.dump(stats, f)
@@ -184,6 +191,7 @@ class SelectiveVecNormalize(VecEnvWrapper):
             clip=stats["clip"],
             norm_reward=stats.get("norm_reward", False), # Default for old pkls
             reward_clip=stats.get("reward_clip", 10.0),
+            gamma=stats.get("gamma", AGENT_GAMMA),  # old pkls predate the field
         )
         wrapper.running_mean  = stats["running_mean"]
         wrapper.running_var   = stats["running_var"]
