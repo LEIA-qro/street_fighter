@@ -207,3 +207,78 @@ http://madre:8080 --procs 8`.
 | Worker conecta pero fps bajísimos | Demasiados `--procs`, laptop en batería, o power mode en balanced. |
 | La madre no existe / todo muerto | Alguien hizo `terraform destroy`, o la instancia está apagada. Ver `infra/README.md` — se relevanta en ~3 min. |
 | Se fue la luz a media corrida | Nada que hacer: la madre reasignó tus chunks. Reconecta cuando vuelvas y ya. |
+
+---
+
+## Parte D — Cuánto de tu máquina prestar (`--procs`, `--cpu-share`, `nice`)
+
+En el paso B5 el `--procs` era una adivinanza a mano ("núcleos menos 2-4"). Ya no hace
+falta: **el worker se mide solo al arrancar** e imprime UNA línea con lo que decidió.
+Si algo se ve raro, esa línea es la primera pista:
+
+```
+[worker] omen-wsl-4821 -> http://madre:8080 | wsl 24cpu/24core | procs=22 (auto: 24 cores - 2 reserved) | nice=+10 | power=ac
+```
+
+Se lee: plataforma detectada (`wsl` / `linux` / `darwin`), CPUs lógicas y núcleos
+físicos, cuántos procesos eligió **y de dónde salió ese número**, la prioridad, y si la
+laptop está en corriente o en batería.
+
+> Si ves `24core?` **con signo de interrogación**, no hay `psutil` instalado y está
+> contando hyperthreads como núcleos. En el 13900K eso es 32 en vez de 24 — 8 procesos
+> de más peleándose entre ellos. Arréglalo con `pip install psutil` (dentro del venv) y
+> vuelve a arrancar. En las 275HX y en la M4 da igual: no tienen SMT.
+
+### Las banderas
+
+| Bandera | Qué hace | Cuándo usarla |
+|---|---|---|
+| `--procs auto` *(default)* | `núcleos físicos − reserve-cores` | casi siempre; máquina dedicada o casi |
+| `--reserve-cores K` *(default 2)* | cuántos núcleos NO toca el worker | sube a 4 si la máquina es tu daily driver |
+| `--cpu-share F` | presta esa fracción de la máquina (`0.5` = mitad) | "presto la mitad y ya", sin hacer cuentas |
+| `--max-procs N` | tope duro sobre cualquiera de las anteriores | RAM corta o la laptop se calienta feo |
+| `--procs 12` | exactamente 12, aunque no quepan | sabes algo que el worker no (p. ej. tu slice de WSL) |
+
+Un `--procs` explícito **gana siempre** — el worker solo te avisa si le pides más
+procesos que núcleos y te los da igual. Valores absurdos no tumban nada: `--procs 0`
+arranca con 1 y `--procs banana` cae a `auto`, con su warning. Un worker en autostart
+no se debe morir por un typo.
+
+### Lo importante: `nice` pesa más que bajar `--procs`
+
+El worker corre cada emulador con **`nice 10`** por default (POSIX; en WSL sí aplica).
+Esa es la perilla real de "que la máquina siga usable", no el número de procesos:
+
+- **Bajar `--procs` apaga núcleos por adelantado.** Los deja libres las 24 horas,
+  aunque estés dormido y nadie los quiera. Pagas throughput todo el día para comprar
+  fluidez en los 20 minutos que de veras estás tecleando.
+- **`nice 10` los cede cuando hacen falta y los recupera en microsegundos.** Al primer
+  scroll, keystroke o compilación, el scheduler le quita el CPU a los emuladores y se
+  lo da a lo interactivo; cuando sueltas el teclado, los emuladores vuelven a llenar la
+  máquina. Corres a `--procs` completos y la máquina *se siente* idle.
+
+O sea: usa `--max-procs` / `--reserve-cores` para RAM, temperatura y cortesía; usa
+`nice` para que la máquina responda. `--nice 0` desactiva el renice (máquina dedicada);
+si el sistema no deja renicear, el worker lo dice y sigue — nunca truena por eso.
+
+### Ejemplo concreto: la M4 (daily driver de Felipe)
+
+10 núcleos (4P + 6E) y es la máquina en la que trabaja todo el día:
+
+```bash
+# día normal: auto → 10 − 2 = 8 procesos a nice 10.
+# Se siente idle mientras aporta ~8 emuladores.
+tools/run_worker.sh --coordinator http://madre:8080
+
+# en junta con video, o compilando algo pesado: presta la mitad y ponle tope
+tools/run_worker.sh --coordinator http://madre:8080 --cpu-share 0.5 --max-procs 5
+
+# desconectada del cargador: el worker avisa (`power=battery`) y sigue.
+# No lo bloquea a propósito — aporta menos, pero aporta; y lo que se le caiga
+# cuando cierres la laptop la madre lo re-asigna sola.
+```
+
+Para el desktop 13900K y las laptops (dedicadas a la flota mientras corre): `auto` tal
+cual, o `--reserve-cores 4` si alguien las está usando. Recuerda el paso B4: si el
+throughput no sube al subir procesos, ya saturaste la máquina — el `steps/s` que el
+worker reporta en cada chunk (y que la madre muestra en `/status`) es la medida buena.

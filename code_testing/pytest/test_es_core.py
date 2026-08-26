@@ -313,3 +313,364 @@ def test_full_generation_loop_improves_a_quadratic_objective():
     end = objective(state.theta)
     assert end > start
     assert end > 0.25 * start  # at least 75% of the initial squared error gone
+
+
+# --------------------------------------------------------------------------
+# S3 restore. The madre is disposable: `terraform apply` on changed user_data
+# REPLACES the instance and the local checkpoint dir dies with it. S3 used to
+# be write-only, so a replaced madre silently restarted from generation 0 --
+# the exact failure the uploads exist to prevent.
+# --------------------------------------------------------------------------
+
+class _FakeS3Client:
+    def __init__(self, keys):
+        self._keys = keys
+        self.downloaded = []
+
+    def get_paginator(self, _op):
+        keys = self._keys
+
+        class _P:
+            def paginate(self, **kwargs):
+                prefix = kwargs.get("Prefix", "")
+                yield {"Contents": [{"Key": k} for k in keys if k.startswith(prefix)]}
+        return _P()
+
+    def download_file(self, bucket, key, dest):
+        self.downloaded.append((key, dest))
+        with open(dest, "w") as f:
+            f.write("x")
+
+
+def _install_fake_boto3(monkeypatch, client):
+    import types
+    fake = types.ModuleType("boto3")
+    fake.client = lambda *a, **k: client
+    monkeypatch.setitem(sys.modules, "boto3", fake)
+
+
+def test_restore_from_s3_pulls_the_newest_generation(monkeypatch, tmp_path):
+    from es import coordinator
+    client = _FakeS3Client(["es/gen_000001.npz", "es/gen_000001.json",
+                            "es/gen_000012.npz", "es/gen_000012.json",
+                            "es/gen_000009.npz", "es/gen_000009.json"])
+    _install_fake_boto3(monkeypatch, client)
+    coordinator.restore_from_s3("bucket", str(tmp_path))
+    # Fixed-width digits make a plain max() the newest generation, not gen_9.
+    assert sorted(k for k, _ in client.downloaded) == [
+        "es/gen_000012.json", "es/gen_000012.npz"]
+    assert (tmp_path / "gen_000012.npz").exists()
+    assert (tmp_path / "gen_000012.json").exists()
+
+
+def test_restore_from_s3_is_a_noop_without_a_bucket(tmp_path):
+    from es import coordinator
+    coordinator.restore_from_s3(None, str(tmp_path))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_restore_from_s3_survives_an_empty_bucket(monkeypatch, tmp_path):
+    from es import coordinator
+    _install_fake_boto3(monkeypatch, _FakeS3Client([]))
+    coordinator.restore_from_s3("bucket", str(tmp_path))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_restore_from_s3_never_raises(monkeypatch, tmp_path):
+    """Any S3 failure must degrade to a fresh start, never kill the madre."""
+    from es import coordinator
+
+    class _Boom:
+        def get_paginator(self, _op):
+            raise RuntimeError("credentials expired")
+    _install_fake_boto3(monkeypatch, _Boom())
+    coordinator.restore_from_s3("bucket", str(tmp_path))  # must not raise
+
+
+# --------------------------------------------------------------------------
+# Speculative re-leasing. A generation is a BARRIER: it ends only when the
+# last member has a fitness, so on a 4-machine fleet with a 10x spread in
+# throughput the slowest box holding the final chunk idles everyone else, and
+# plain lease expiry only reacts after the full lease_seconds (300s in prod).
+# At the tail, an idle worker may take a SECOND live lease and race it.
+# --------------------------------------------------------------------------
+
+def _spec_queue(n_chunks=1, lease_seconds=1000.0, **kwargs):
+    """Queue of 2-member chunks with the tail race armed by default."""
+    chunks = {f"g000000-c{i:03d}": [[2 * i, 111 + i, 1], [2 * i + 1, 111 + i, -1]]
+              for i in range(n_chunks)}
+    kwargs.setdefault("speculative_after", 5.0)
+    kwargs.setdefault("speculative_when_remaining_below", 2)
+    return ChunkQueue(chunks, lease_seconds, clock=lambda: 0.0, **kwargs)
+
+
+def test_speculation_is_off_unless_asked_for():
+    q = _queue(lease_seconds=10.0)  # constructed exactly like production used to
+    q.lease(now=0.0)
+    q.lease(now=0.0)
+    assert q.lease(now=9.9) is None  # stale, tail reached -- but no speculation
+    assert q.speculative_leases == 0
+
+
+def test_speculative_release_hands_a_straggler_to_a_second_worker():
+    q = _spec_queue(n_chunks=2, speculative_after=5.0)
+    first = q.lease(now=0.0)[0]
+    q.lease(now=1.0)
+    assert q.lease(now=4.9) is None            # nothing outstanding long enough
+    cid, _payload, deadline = q.lease(now=5.0)
+    assert cid == first                        # the stalest chunk is the one raced
+    assert deadline == pytest.approx(1005.0)
+    assert q.speculative_leases == 1
+    # a race, not an expiry: the original lease is untouched and still live
+    assert q.requeue_expired(now=6.0) == []
+    assert q.pending_count == 0
+
+
+def test_speculation_waits_until_the_generation_is_nearly_drained():
+    q = _spec_queue(n_chunks=5, speculative_after=5.0,
+                    speculative_when_remaining_below=2)
+    leases = [q.lease(now=0.0) for _ in range(5)]
+    assert all(l is not None for l in leases)
+    # every chunk is stale by now, but 5 are still unfinished: duplicating work
+    # while the fleet has plenty ahead of it slows the generation down
+    assert q.lease(now=100.0) is None
+    for cid, members, _deadline in leases[:3]:
+        assert q.complete(cid, {int(m[0]): 0.0 for m in members}) is True
+    assert q.remaining_count == 2
+    raced = q.lease(now=101.0)
+    assert raced is not None and raced[0] == leases[3][0]
+
+
+def test_speculation_never_preempts_fresh_pending_work():
+    q = _spec_queue(n_chunks=3, speculative_after=5.0,
+                    speculative_when_remaining_below=3)
+    first = q.lease(now=0.0)[0]
+    assert q.lease(now=100.0)[0] != first  # un-evaluated members come first,
+    assert q.lease(now=100.0)[0] != first  # however stale the straggler is
+    assert q.speculative_leases == 0
+    assert q.lease(now=100.0)[0] == first  # only now, with nothing else to hand out
+    assert q.speculative_leases == 1
+
+
+def test_speculative_leases_are_capped():
+    q = _spec_queue(n_chunks=1, speculative_after=5.0, max_concurrent_leases=2)
+    cid = q.lease(now=0.0)[0]
+    assert q.lease(now=10.0)[0] == cid   # one racer allowed
+    assert q.lease(now=100.0) is None    # a third live lease would be wasted work
+    assert q.lease(now=200.0) is None
+    assert q.speculative_leases == 1
+
+
+def test_expiry_still_requeues_a_chunk_whose_every_lease_died():
+    q = _spec_queue(n_chunks=1, lease_seconds=10.0, speculative_after=5.0)
+    cid = q.lease(now=0.0)[0]              # deadline 10
+    assert q.lease(now=5.0)[0] == cid      # racer, deadline 15
+    assert q.requeue_expired(now=12.0) == []  # racer still holds a live lease
+    assert q.pending_count == 0
+    assert q.requeue_expired(now=15.0) == [cid]  # both dead: genuinely orphaned
+    assert q.pending_count == 1
+    # the cap counts LIVE leases only -- if it counted lifetime ones, a chunk
+    # whose workers keep dying would become unleasable and hang the barrier
+    fresh = q.lease(now=16.0)
+    assert fresh is not None and fresh[0] == cid
+
+
+def test_first_racer_wins_and_the_loser_is_refused():
+    q = _spec_queue(n_chunks=1, speculative_after=5.0)
+    cid, members, _deadline = q.lease(now=0.0)
+    assert q.lease(now=10.0)[0] == cid
+    winner = {int(m[0]): 7.0 for m in members}
+    assert q.complete(cid, winner) is True
+    assert q.complete(cid, {int(m[0]): -1.0 for m in members}) is False
+    assert q.results[cid] == winner
+    assert q.done and q.pending_count == 0 and q.remaining_count == 0
+    assert q.lease(now=500.0) is None  # nothing leasable, nothing corrupted
+
+
+def test_a_racers_result_still_needs_the_exact_member_set():
+    q = _spec_queue(n_chunks=1, speculative_after=5.0)
+    cid, members, _deadline = q.lease(now=0.0)
+    q.lease(now=10.0)
+    full = {int(m[0]): 1.0 for m in members}
+    assert q.complete(cid, dict(list(full.items())[:-1])) is False  # truncated
+    assert q.complete(cid, {**full, 9999: 1.0}) is False            # foreign index
+    assert not q.done
+    assert q.complete(cid, full) is True
+
+
+# --------------------------------------------------------------------------
+# Coordinator fleet accounting. Constructed in-process: no socket is bound,
+# no server thread runs -- submit_result/status/fleet_report are the whole
+# surface the HTTP handler calls into anyway.
+# --------------------------------------------------------------------------
+
+def _coordinator(pop_size=4, chunk_size=2, lease_seconds=10.0, **kwargs):
+    from es.coordinator import Coordinator
+    coord = Coordinator(_toy_state(dim=8), pop_size, chunk_size, 1, lease_seconds,
+                        **kwargs)
+    coord.start_generation()
+    return coord
+
+
+def _submit(coord, work, worker, fitnesses=None, **extra):
+    idx = [m[0] for m in work["members"]]
+    body = {"chunk_id": work["chunk_id"], "generation": work["generation"],
+            "worker": worker, "member_idx": idx,
+            "fitnesses": [1.0] * len(idx) if fitnesses is None else fitnesses}
+    body.update(extra)
+    return coord.submit_result(body)
+
+
+def test_status_worker_entry_shape_without_any_stats():
+    coord = _coordinator()
+    assert _submit(coord, coord.lease_work("m4"), "m4") is True
+    entry = coord.status()["workers"]["m4"]
+    assert set(entry) == {"age", "members_done", "members_total", "steps_per_s", "procs"}
+    assert entry["members_done"] == 2 and entry["members_total"] == 2
+    assert entry["steps_per_s"] is None and entry["procs"] is None  # never reported
+    assert entry["age"] >= 0.0
+
+
+def test_status_reports_per_worker_throughput_when_stats_are_sent():
+    coord = _coordinator()
+    _submit(coord, coord.lease_work("m4"), "m4",
+            stats={"procs": 6, "steps_per_s": 3700.5, "episodes_per_s": 1.2,
+                   "host": "m4.local"})
+    entry = coord.status()["workers"]["m4"]
+    assert entry["procs"] == 6
+    assert entry["steps_per_s"] == pytest.approx(3700.5)
+
+
+def test_last_known_throughput_survives_a_post_without_stats():
+    coord = _coordinator(pop_size=8, chunk_size=2)
+    _submit(coord, coord.lease_work("m4"), "m4", stats={"procs": 6, "steps_per_s": 3700.0})
+    _submit(coord, coord.lease_work("m4"), "m4")  # older worker build, no stats
+    entry = coord.status()["workers"]["m4"]
+    assert entry["steps_per_s"] == pytest.approx(3700.0) and entry["procs"] == 6
+    assert entry["members_done"] == 4
+
+
+def test_garbage_worker_stats_never_crash_the_coordinator():
+    coord = _coordinator(pop_size=8, chunk_size=2)
+    accepted = _submit(coord, coord.lease_work("junk"), "junk",
+                       stats={"procs": "eight", "steps_per_s": "fast"})
+    assert accepted is True  # the fitnesses were fine; only the telemetry was junk
+    entry = coord.status()["workers"]["junk"]
+    assert entry["members_done"] == 2
+    assert entry["steps_per_s"] is None and entry["procs"] is None
+
+    for stats in ({}, None, "not-a-dict", [1, 2], {"steps_per_s": float("nan")},
+                  {"steps_per_s": float("inf"), "procs": None}, {"procs": [3]},
+                  {"steps_per_s": {"a": 1}}):
+        assert coord.submit_result({"chunk_id": "g000000-c000", "generation": -1,
+                                    "worker": "junk", "member_idx": [],
+                                    "fitnesses": [], "stats": stats}) is False
+    assert coord.status()["workers"]["junk"]["steps_per_s"] is None
+    assert coord.status()["workers"]["junk"]["members_done"] == 2
+
+
+def test_a_nonstring_worker_name_does_not_kill_the_handler_thread():
+    coord = _coordinator()
+    assert coord.submit_result({"chunk_id": "g000000-c000", "generation": -1,
+                                "worker": {"name": "weird"}, "member_idx": [],
+                                "fitnesses": []}) is False
+    assert any("weird" in name for name in coord.status()["workers"])
+
+
+def test_per_generation_members_reset_while_totals_accumulate():
+    coord = _coordinator(pop_size=4, chunk_size=2)
+    for _ in range(2):
+        _submit(coord, coord.lease_work("m4"), "m4")
+    fits = coord.wait_for_generation()  # returns immediately: the queue is done
+    assert fits.shape == (4,)
+    coord.apply_update(fits)
+    coord.start_generation()
+    entry = coord.status()["workers"]["m4"]
+    assert entry["members_done"] == 0
+    assert entry["members_total"] == 4
+
+
+def test_duplicate_submission_neither_credits_the_loser_nor_changes_fitness():
+    coord = _coordinator(pop_size=4, chunk_size=2)
+    work = coord.lease_work("fast")
+    idx = [m[0] for m in work["members"]]
+    assert _submit(coord, work, "fast", fitnesses=[5.0, 6.0]) is True
+    assert _submit(coord, work, "slow", fitnesses=[-1.0, -2.0]) is False
+    workers = coord.status()["workers"]
+    assert workers["fast"]["members_done"] == 2
+    assert workers["slow"]["members_done"] == 0
+    # and wait_for_generation's setdefault keeps the winner's numbers
+    _submit(coord, coord.lease_work("fast"), "fast", fitnesses=[0.0, 0.0])
+    fits = coord.wait_for_generation()
+    assert fits[idx[0]] == pytest.approx(5.0)
+    assert fits[idx[1]] == pytest.approx(6.0)
+
+
+def test_fleet_report_and_wandb_metrics_split_the_work_per_machine():
+    from es import coordinator
+    coord = _coordinator(pop_size=8, chunk_size=2)
+    for worker, procs, steps in (("desktop", 20, 9000.0), ("m4", 6, 3700.0)):
+        for _ in range(2):
+            _submit(coord, coord.lease_work(worker), worker,
+                    stats={"procs": procs, "steps_per_s": steps})
+    coord.lease_work("idle-laptop")  # polls for work, finishes nothing
+
+    report = coord.fleet_report(seconds=10.0)
+    assert report["workers_active"] == 2  # a poller that finished nothing is not one
+    assert report["members"] == 8
+    assert report["members_per_s"] == pytest.approx(0.8)
+    assert report["total_steps_per_s"] == pytest.approx(12700.0)
+
+    metrics = coordinator.fleet_metrics(report)
+    assert metrics["fleet/total_steps_per_s"] == pytest.approx(12700.0)
+    assert metrics["fleet/workers_active"] == 2
+    assert metrics["worker/desktop/members"] == 4
+    assert metrics["worker/m4/steps_per_s"] == pytest.approx(3700.0)
+    assert "worker/idle-laptop/members" not in metrics
+
+    line = coordinator.fleet_summary_line(report, generation=7)
+    assert "gen 7" in line and "0.80 members/s" in line
+    assert "desktop:4" in line and "m4:4" in line
+
+
+def test_fleet_metrics_sanitise_names_and_omit_unknown_throughput():
+    from es import coordinator
+    report = {"total_steps_per_s": 0.0, "workers_active": 1, "members_per_s": 1.0,
+              "speculative_leases": 0, "seconds": 8.0,
+              "workers": {"wsl/laptop 2": {"members": 8, "steps_per_s": None,
+                                           "procs": 12}}}
+    metrics = coordinator.fleet_metrics(report)
+    # '/' would fabricate a nesting level in the W&B metric tree
+    assert metrics["worker/wsl_laptop_2/members"] == 8
+    # no reading at all is a gap in the chart, not a fabricated zero
+    assert not any(k.endswith("/steps_per_s") and k.startswith("worker/") for k in metrics)
+    # the journalctl line is for humans: it keeps the machine's real name
+    assert "wsl/laptop 2:8" in coordinator.fleet_summary_line(report, 0)
+
+
+def test_status_keeps_its_documented_top_level_shape():
+    coord = _coordinator()
+    assert set(coord.status()) == {
+        "generation", "pop_size", "members_done", "chunks_pending",
+        "best_fitness_gen", "best_fitness_ever", "theta_version",
+        "speculative_leases", "workers"}
+
+
+def test_coordinator_does_not_speculate_by_default():
+    coord = _coordinator(pop_size=4, chunk_size=2, lease_seconds=1000.0)
+    coord.lease_work("a")
+    coord.lease_work("b")
+    assert coord.lease_work("idle") is None
+    assert coord.status()["speculative_leases"] == 0
+
+
+def test_coordinator_wires_speculative_releasing_into_its_queue():
+    # lease_work() uses the real monotonic clock, so a threshold of ~0 (not a
+    # sleep) is what makes the tail race observable in a unit test
+    coord = _coordinator(pop_size=4, chunk_size=2, lease_seconds=1000.0,
+                         speculative_after=1e-9, speculative_when_remaining_below=2)
+    first = coord.lease_work("slow")["chunk_id"]
+    assert coord.lease_work("also-slow")["chunk_id"] != first
+    raced = coord.lease_work("idle")
+    assert raced is not None and raced["chunk_id"] == first
+    assert coord.status()["speculative_leases"] == 1

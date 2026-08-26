@@ -1,6 +1,7 @@
 # worker.py -- stateless ES evaluation worker. Run one per machine.
 #
-#   python src/es/worker.py --coordinator http://192.168.1.10:8823 --procs 8
+#   python src/es/worker.py --coordinator http://192.168.1.10:8823          # auto-sized
+#   python src/es/worker.py --coordinator http://madre:8080 --cpu-share 0.5 # donate half
 #
 # Loop forever: GET /work, reconstruct each member's perturbed policy from
 # (theta, pair_seed, sign) alone, evaluate it for the requested episodes on
@@ -14,7 +15,11 @@
 #
 # --procs N runs N persistent env processes: one stable-retro emulator per
 # OS process is a hard API limit (retro.make in the same process twice
-# errors), so parallelism is multiprocessing, never threads.
+# errors), so parallelism is multiprocessing, never threads. --procs auto
+# (the default) asks es/resources.py to size the machine instead; the same
+# module also drops the emulators to nice 10 so the box stays usable while
+# it contributes. Every chunk's POST carries a `stats` block so /status can
+# show what each machine is actually worth to the fleet.
 
 import argparse
 import json
@@ -32,16 +37,21 @@ if __package__ in (None, ""):  # `python src/es/worker.py`
 
 import numpy as np
 
-from es import protocol
+from es import protocol, resources
 from es.openes import fitness_from_episode, perturbation
 from es.policy import MLPPolicy, NUM_PARAMS
 
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
+RATE_WINDOW_S = 120.0      # rolling window behind the steps/s we report
 _STOP = False
 
 # one env per process, created lazily on the first evaluation in that process
 _ENV = None
 _ENV_KWARGS = None
+
+
+def _log(message):
+    print(f"[worker] {message}", flush=True)
 
 
 def _make_env():
@@ -55,10 +65,15 @@ def _make_env():
         return RetroSF2Env()
 
 
-def _pool_init(env_kwargs):
+def _pool_init(env_kwargs, nice_delta):
     global _ENV_KWARGS
     _ENV_KWARGS = env_kwargs
     signal.signal(signal.SIGINT, signal.SIG_IGN)  # parent coordinates shutdown
+    # Renice in the CHILD: this process is the one that will pin a core for
+    # hours. The parent only polls HTTP and stays at normal priority so it
+    # keeps answering the coordinator even when the machine is saturated.
+    if nice_delta:  # 0 means "leave priority alone", not "renice by 0"
+        resources.apply_nice(nice_delta, warn=_log)
 
 
 def _run_episode(env, policy):
@@ -69,18 +84,24 @@ def _run_episode(env, policy):
         steps += 1
         if terminated or truncated:
             break
-    return fitness_from_episode(info, steps)
+    return fitness_from_episode(info, steps), steps
 
 
 def evaluate_member(task):
-    """(theta, sigma, seed, sign, episodes) -> mean fitness. Pool-callable."""
+    """(theta, sigma, seed, sign, episodes) -> (mean fitness, agent steps).
+
+    Pool-callable. The step count rides along because it is free here and is
+    the only honest measure of how fast this machine emulates -- wall time per
+    chunk conflates throughput with how long the episodes happened to last.
+    """
     global _ENV
     theta, sigma, seed, sign, episodes = task
     if _ENV is None:
         _ENV = _make_env()
     eps = perturbation(theta.shape[0], seed)
     policy = MLPPolicy(theta + np.float32(sign) * np.float32(sigma) * eps)
-    return float(np.mean([_run_episode(_ENV, policy) for _ in range(episodes)]))
+    runs = [_run_episode(_ENV, policy) for _ in range(episodes)]
+    return float(np.mean([f for f, _s in runs])), int(sum(s for _f, s in runs))
 
 
 # ---------------------------------------------------------------------------
@@ -134,20 +155,81 @@ def fetch_theta(coordinator, version, cache):
     return theta if got_version == version else None
 
 
+# ---------------------------------------------------------------------------
+# Machine sizing + self-reported throughput
+# ---------------------------------------------------------------------------
+
+def parse_procs_flag(value):
+    """--procs 'auto' -> None (let resources size the machine). Anything else
+    goes to plan_procs untouched, which is the single place that decides what
+    a bad value means -- an autostarted worker must not die on a typo."""
+    if value is None:
+        return None
+    return None if str(value).strip().lower() in ("", "auto") else value
+
+
+def make_stats(procs, host, step_rate, ep_rate):
+    """The `stats` block of a /result POST.
+
+    The coordinator aggregates these per worker to show what each machine
+    contributes, so the key names are a wire contract: do not rename them.
+    """
+    return {"procs": int(procs),
+            "steps_per_s": round(step_rate.rate(), 1),
+            "episodes_per_s": round(ep_rate.rate(), 3),
+            "host": host}
+
+
+def _power_label(battery):
+    return {True: "battery", False: "ac"}.get(battery, "unknown")
+
+
+def _sizing_label(args, requested, topo):
+    """What actually decided `procs`, for the startup line. A --procs value
+    plan_procs could not parse decided nothing, so it gets no credit here."""
+    try:
+        int(requested)
+        return "--procs"
+    except (TypeError, ValueError):
+        pass
+    share = args.cpu_share
+    if share is not None and share == share:  # NaN parses as float but decides nothing
+        return f"--cpu-share {share}"
+    return f"auto: {topo.physical_cpus} cores - {args.reserve_cores} reserved"
+
+
 def main():
     ap = argparse.ArgumentParser(description="OpenAI-ES evaluation worker")
     ap.add_argument("--coordinator", required=True, help="http://host:port")
-    ap.add_argument("--procs", type=int, default=1, help="env processes on this machine")
+    ap.add_argument("--procs", default="auto",
+                    help="emulator processes: 'auto' (default) or an explicit count")
+    ap.add_argument("--reserve-cores", type=int, default=2,
+                    help="cores left free for the owner of the machine (auto sizing)")
+    ap.add_argument("--cpu-share", type=float, default=None,
+                    help="0.0-1.0: donate this fraction of the machine instead")
+    ap.add_argument("--max-procs", type=int, default=None,
+                    help="hard cap on processes, whatever the sizing says")
+    ap.add_argument("--nice", type=int, default=10 if hasattr(os, "nice") else 0,
+                    help="niceness added to each emulator process (POSIX; 0 disables)")
     ap.add_argument("--name", default=None, help="worker name shown in /status")
     ap.add_argument("--state", default="Champion.Level1.RyuVsGuile",
                     help="savestate handed to RetroSF2Env")
     args = ap.parse_args()
 
     global _ENV_KWARGS
-    name = args.name or f"{socket.gethostname()}-{os.getpid()}"
+    host = socket.gethostname()
+    name = args.name or f"{host}-{os.getpid()}"
     coordinator = args.coordinator.rstrip("/")
     env_kwargs = {"state": args.state}
     _ENV_KWARGS = env_kwargs
+
+    topo = resources.detect_topology()
+    requested = parse_procs_flag(args.procs)
+    procs = resources.plan_procs(topo, requested=requested,
+                                 reserve_cores=args.reserve_cores,
+                                 cpu_share=args.cpu_share, max_procs=args.max_procs,
+                                 warn=_log)
+    battery = resources.on_battery()
 
     def _sigterm(_sig, _frame):
         global _STOP
@@ -156,15 +238,29 @@ def main():
     signal.signal(signal.SIGINT, _sigterm)
 
     pool = None
-    if args.procs > 1:
+    if procs > 1:
         # spawn, not fork: an emulator's threads/fds do not survive fork on
         # macOS, and spawn keeps Windows/WSL2 behaviour identical
         ctx = mp.get_context("spawn")
-        pool = ctx.Pool(args.procs, initializer=_pool_init, initargs=(env_kwargs,))
+        pool = ctx.Pool(procs, initializer=_pool_init, initargs=(env_kwargs, args.nice))
+    else:
+        # single-process worker: THIS process is the emulator, so it is the one
+        # that needs the nice bump (there is no child to carry it)
+        resources.apply_nice(args.nice, warn=_log)
 
-    print(f"[worker] {name} -> {coordinator} ({args.procs} proc)", flush=True)
+    # one line, everything a student on a strange machine needs to see
+    _log(f"{name} -> {coordinator} | {topo.platform} {topo.logical_cpus}cpu/"
+         f"{topo.physical_cpus}core{'' if topo.physical_known else '?'} | "
+         f"procs={procs} ({_sizing_label(args, requested, topo)}) | "
+         f"nice={args.nice:+d} | power={_power_label(battery)}")
+    if battery:
+        _log("on battery: expect thermal/power throttling to roughly halve throughput "
+             "-- plug this machine in, chunks it drops are re-leased anyway")
+
     backoff = Backoff()
     theta_cache = {}
+    step_rate = resources.RollingRate(RATE_WINDOW_S)
+    ep_rate = resources.RollingRate(RATE_WINDOW_S)
     try:
         while not _STOP:
             msg = _http_json(f"{coordinator}/work?worker={name}")
@@ -183,31 +279,40 @@ def main():
                 continue
             backoff.reset()
 
-            tasks = [(theta, work["sigma"], seed, sign, work["episodes"])
+            episodes = int(work.get("episodes", 1) or 1)
+            tasks = [(theta, work["sigma"], seed, sign, episodes)
                      for _idx, seed, sign in work["members"]]
-            t0 = time.time()
+            t0 = time.monotonic()
             if pool is not None:
-                fitnesses = pool.map(evaluate_member, tasks)
+                outcomes = pool.map(evaluate_member, tasks)
             else:
-                fitnesses = [evaluate_member(t) for t in tasks]
+                outcomes = [evaluate_member(t) for t in tasks]
+            elapsed = time.monotonic() - t0
+
+            fitnesses = [f for f, _s in outcomes]
+            steps = sum(s for _f, s in outcomes)
+            step_rate.add(steps, elapsed)
+            ep_rate.add(len(tasks) * episodes, elapsed)
 
             result = {"chunk_id": work["chunk_id"], "generation": work["generation"],
                       "worker": name,
                       "member_idx": [idx for idx, _s, _g in work["members"]],
-                      "fitnesses": fitnesses}
+                      "fitnesses": fitnesses,
+                      "stats": make_stats(procs, host, step_rate, ep_rate)}
             # result POSTs retry harder than /work: the evaluation is paid for
             for _ in range(5):
                 resp = _http_json(f"{coordinator}/result", body=result)
                 if resp is not None:
                     break
                 backoff.sleep()
-            print(f"[worker] {work['chunk_id']}: {len(tasks)} members "
-                  f"in {time.time() - t0:.1f}s", flush=True)
+            _log(f"{work['chunk_id']}: {len(tasks)} members in {elapsed:.1f}s "
+                 f"({steps} steps, {step_rate.rate():.0f} steps/s, "
+                 f"{ep_rate.rate():.2f} ep/s)")
     finally:
         if pool is not None:
             pool.terminate()
             pool.join()
-        print(f"[worker] {name} stopped", flush=True)
+        _log(f"{name} stopped")
 
 
 if __name__ == "__main__":
