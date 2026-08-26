@@ -110,7 +110,8 @@ class Coordinator:
         self.speculative_when_remaining_below = speculative_when_remaining_below
         self.max_concurrent_leases = max_concurrent_leases
         self.queue = None
-        self.theta_payload = protocol.encode_theta(state.theta, state.generation)
+        self.theta_payload = protocol.encode_theta(state.theta, state.generation,
+                                                   policy=state.policy)
         self.workers = {}            # name -> _new_worker_record()
         self.gen_started_at = time.time()
         self.best_ever = None
@@ -136,7 +137,8 @@ class Coordinator:
                 speculative_after=self.speculative_after,
                 speculative_when_remaining_below=self.speculative_when_remaining_below,
                 max_concurrent_leases=self.max_concurrent_leases)
-            self.theta_payload = protocol.encode_theta(self.state.theta, g)
+            self.theta_payload = protocol.encode_theta(self.state.theta, g,
+                                                       policy=self.state.policy)
             self.best_gen = None
             self.gen_started_at = time.time()
             for record in self.workers.values():
@@ -567,18 +569,19 @@ def load_or_init_state(args, states=None):
         for name, cli_val in (("sigma", args.sigma), ("lr", args.lr),
                               ("weight_decay", args.weight_decay),
                               ("master_seed", args.master_seed),
-                              ("states", cli_states)):
+                              ("states", cli_states),
+                              ("policy", args.policy)):
             ckpt_val = getattr(state, name)
             if cli_val != ckpt_val:
                 print(f"[coord] WARNING: --{name.replace('_', '-')}={cli_val} ignored; "
                       f"checkpoint pins {name}={ckpt_val} (delete the checkpoint "
                       f"dir for a fresh run)", flush=True)
         return state
-    theta = policy.init_flat(args.master_seed)
-    print(f"[coord] fresh start: {theta.shape[0]} params, master_seed {args.master_seed}",
-          flush=True)
+    theta = policy.POLICIES[args.policy].init_flat(args.master_seed)
+    print(f"[coord] fresh start: policy {args.policy}, {theta.shape[0]} params, "
+          f"master_seed {args.master_seed}", flush=True)
     return openes.init_state(theta, args.sigma, args.lr, args.weight_decay,
-                             args.master_seed, states=cli_states)
+                             args.master_seed, states=cli_states, policy=args.policy)
 
 
 def main():
@@ -616,6 +619,12 @@ def main():
     ap.add_argument("--difficulty", default=None,
                     help="with --states manifest: keep only these difficulty "
                          "levels, e.g. '1,2'")
+    ap.add_argument("--policy", default=policy.DEFAULT_POLICY,
+                    choices=sorted(policy.POLICIES),
+                    help="policy architecture for a FRESH run (pinned by the "
+                         "checkpoint on resume, like --sigma). 'v4onehot' feeds "
+                         "the first layer one-hot character IDs so the MLP can "
+                         "branch per matchup")
     args = ap.parse_args()
 
     if args.difficulty is not None and args.states != "manifest":

@@ -38,7 +38,7 @@ import numpy as np
 
 from es import openes, protocol, resources
 from es.coordinator import resolve_states
-from es.policy import MLPPolicy
+from es.policy import DEFAULT_POLICY, POLICIES
 
 MAX_EPISODE_STEPS = 20000  # mismo failsafe que el worker
 
@@ -85,12 +85,12 @@ _ES_POLICY = None
 _MODEL = _NORM = _FRAMES = None
 
 
-def _init_es(theta_bytes, nice_delta):
+def _init_es(theta_bytes, policy_name, nice_delta):
     global _ENV, _ES_POLICY
     resources.apply_nice(nice_delta)
     from envs.retro_env import RetroSF2Env
     _ENV = RetroSF2Env()  # trainable=True default: identico al worker de flota
-    _ES_POLICY = MLPPolicy(np.frombuffer(theta_bytes, dtype=np.float32).copy())
+    _ES_POLICY = POLICIES[policy_name](np.frombuffer(theta_bytes, dtype=np.float32).copy())
 
 
 def _init_ppo(zip_path, pkl_path, nice_delta):
@@ -146,7 +146,7 @@ def fetch_theta(url):
     with urllib.request.urlopen(url, timeout=30) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     version, theta = protocol.decode_theta(payload)
-    return version, theta
+    return version, theta, str(payload.get("policy", DEFAULT_POLICY))
 
 
 def report(tag, states, rows, meta, out_path):
@@ -183,6 +183,8 @@ def main():
     ap.add_argument("--theta-url", default="http://madre:8080/theta")
     ap.add_argument("--theta-npz", default=None,
                     help="alternativa offline: .npz de checkpoint con clave theta")
+    ap.add_argument("--policy", default=DEFAULT_POLICY, choices=sorted(POLICIES),
+                    help="solo con --theta-npz (el /theta de la madre trae el suyo)")
     ap.add_argument("--zip", default=CHAMPION_ZIP)
     ap.add_argument("--pkl", default=CHAMPION_PKL)
     ap.add_argument("--procs", type=int, default=3)
@@ -208,15 +210,19 @@ def main():
         if args.theta_npz:
             theta = np.load(args.theta_npz)["theta"].astype(np.float32)
             version = f"npz:{os.path.basename(args.theta_npz)}"
+            policy_name = args.policy
         else:
-            version, theta = fetch_theta(args.theta_url)
-        print(f"[bench] theta version/gen {version}, {theta.shape[0]} params, "
-              f"||theta||={float(np.linalg.norm(theta)):.3f}")
+            version, theta, policy_name = fetch_theta(args.theta_url)
+        if theta.shape[0] != POLICIES[policy_name].num_params():
+            raise SystemExit(f"[bench] theta {theta.shape[0]} params no cuadra con "
+                             f"policy '{policy_name}' ({POLICIES[policy_name].num_params()})")
+        print(f"[bench] theta version/gen {version}, policy {policy_name}, "
+              f"{theta.shape[0]} params, ||theta||={float(np.linalg.norm(theta)):.3f}")
         pool = ctx.Pool(args.procs, initializer=_init_es,
-                        initargs=(theta.tobytes(), args.nice))
+                        initargs=(theta.tobytes(), policy_name, args.nice))
         rows = pool.map(_episode_es, tasks)
-        meta = {"model": "es_theta", "theta_version": str(version)}
-        tag = f"ES theta (gen {version}) argmax, sin ruido"
+        meta = {"model": "es_theta", "theta_version": str(version), "policy": policy_name}
+        tag = f"ES theta (gen {version}, {policy_name}) argmax, sin ruido"
         # verificacion de determinismo: mismo estado -> episodios identicos
         if eps >= 2:
             drift = [s for s in states
@@ -228,8 +234,8 @@ def main():
         pool = ctx.Pool(args.procs, initializer=_init_ppo,
                         initargs=(args.zip, args.pkl, args.nice))
         rows = pool.map(_episode_ppo, tasks)
-        meta = {"model": "ppo_champion", "zip": os.path.basename(args.zip)}
-        tag = "PPO campeon legacy (39.7M) predict estocastico"
+        meta = {"model": "ppo", "zip": os.path.basename(args.zip)}
+        tag = f"PPO {os.path.basename(args.zip)} predict estocastico"
 
     pool.close()
     pool.join()

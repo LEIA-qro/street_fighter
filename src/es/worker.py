@@ -46,7 +46,7 @@ import numpy as np
 
 from es import protocol, resources
 from es.openes import fitness_from_episode, perturbation, states_for_member
-from es.policy import MLPPolicy, NUM_PARAMS
+from es.policy import DEFAULT_POLICY, POLICIES
 
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
 RATE_WINDOW_S = 120.0      # rolling window behind the steps/s we report
@@ -112,11 +112,17 @@ def evaluate_member(task):
     the opponent draw. Fitness stays the plain per-member mean either way.
     """
     global _ENV
-    theta, sigma, seed, sign, episodes, states = task
+    # 7-tuples carry the wire's policy name; 6-tuples predate the registry
+    # (older callers and tests) and mean the v4 default.
+    if len(task) == 7:
+        theta, sigma, seed, sign, episodes, states, policy_name = task
+    else:
+        theta, sigma, seed, sign, episodes, states = task
+        policy_name = DEFAULT_POLICY
     if _ENV is None:
         _ENV = _make_env()
     eps = perturbation(theta.shape[0], seed)
-    policy = MLPPolicy(theta + np.float32(sign) * np.float32(sigma) * eps)
+    policy = POLICIES[policy_name](theta + np.float32(sign) * np.float32(sigma) * eps)
     if states:
         picks = states_for_member(seed, episodes, len(states))
         runs = [_run_episode(_ENV, policy, state=states[i]) for i in picks]
@@ -159,21 +165,33 @@ class Backoff:
 
 
 def fetch_theta(coordinator, version, cache):
-    """cache is {version: theta}; only the newest version is kept."""
+    """cache is {version: (theta, policy_name)}; only the newest version is kept.
+
+    Returns (theta, policy_name) or None. The payload's "policy" key names
+    the architecture theta parameterizes (absent = "v4", every pre-registry
+    coordinator); an unknown name or a shape mismatch is a stale-code exit,
+    never a silent wrong-architecture evaluation.
+    """
     if version in cache:
         return cache[version]
     payload = _http_json(f"{coordinator}/theta")
     if payload is None:
         return None
     got_version, theta = protocol.decode_theta(payload)
-    if theta.shape[0] != NUM_PARAMS:
-        raise SystemExit(f"[worker] theta has {theta.shape[0]} params, policy expects "
-                         f"{NUM_PARAMS} -- worker code is stale, update this machine")
+    policy_name = str(payload.get("policy", DEFAULT_POLICY))
+    policy_cls = POLICIES.get(policy_name)
+    if policy_cls is None:
+        raise SystemExit(f"[worker] coordinator serves policy '{policy_name}' which this "
+                         f"worker does not know -- worker code is stale, update this machine")
+    if theta.shape[0] != policy_cls.num_params():
+        raise SystemExit(f"[worker] theta has {theta.shape[0]} params, policy "
+                         f"'{policy_name}' expects {policy_cls.num_params()} -- worker "
+                         f"code is stale, update this machine")
     cache.clear()
-    cache[got_version] = theta
+    cache[got_version] = (theta, policy_name)
     # coordinator always serves current theta: if the /work lease named an
     # older version the lease is stale; returning None makes us re-poll
-    return theta if got_version == version else None
+    return (theta, policy_name) if got_version == version else None
 
 
 # ---------------------------------------------------------------------------
@@ -294,17 +312,18 @@ def main():
                 time.sleep(float(msg.get("retry_in", 2.0)))
                 continue
 
-            theta = fetch_theta(coordinator, work["theta_version"], theta_cache)
-            if theta is None:
+            fetched = fetch_theta(coordinator, work["theta_version"], theta_cache)
+            if fetched is None:
                 backoff.sleep()
                 continue
             backoff.reset()
+            theta, policy_name = fetched
 
             episodes = int(work.get("episodes", 1) or 1)
             # no "states" key (older coordinator, or a run without a rotation)
             # -> None -> every episode on this worker's default state
             states = work.get("states") or None
-            tasks = [(theta, work["sigma"], seed, sign, episodes, states)
+            tasks = [(theta, work["sigma"], seed, sign, episodes, states, policy_name)
                      for _idx, seed, sign in work["members"]]
             t0 = time.monotonic()
             if pool is not None:

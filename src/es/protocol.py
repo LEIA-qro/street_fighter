@@ -234,12 +234,23 @@ class ChunkQueue:
         return dict(self._results)
 
 
-def encode_theta(theta, version):
-    """theta -> the /theta response body. npz keeps float32 bit-exact."""
+def encode_theta(theta, version, policy=None):
+    """theta -> the /theta response body. npz keeps float32 bit-exact.
+
+    `policy` (2026-08-26) names the architecture theta parameterizes (a
+    policy.POLICIES key); workers construct their evaluation policy from it.
+    None omits the key -- an old coordinator's payload -- and readers default
+    to "v4". A stale worker ignores the key entirely and then trips on its
+    own NUM_PARAMS guard the moment theta's shape is not the v4 one, which
+    turns a silent wrong-architecture evaluation into a loud exit.
+    """
     buf = io.BytesIO()
     np.savez_compressed(buf, theta=np.asarray(theta, dtype=np.float32))
-    return {"version": int(version),
-            "npz_b64": base64.b64encode(buf.getvalue()).decode("ascii")}
+    payload = {"version": int(version),
+               "npz_b64": base64.b64encode(buf.getvalue()).decode("ascii")}
+    if policy is not None:
+        payload["policy"] = str(policy)
+    return payload
 
 
 def decode_theta(payload):
