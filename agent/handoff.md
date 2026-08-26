@@ -1,5 +1,16 @@
 # SF2 RL — Project Handoff & Optimization Charter
 
+> **Addendum 2026-08-25 (noche), rama `stage0-metrics-and-semantics`:** el P0 de
+> §5.1 está resuelto — `MetricsCallback` registra en TensorBoard reward_parts,
+> spacing por episodio, uso de macros y throughput; hay scripts de medición
+> (`benchmark_throughput.py`, `measure_spinlock.py`) y quedaron corregidos los
+> open items 1 (league reward), 3 (PBT) y 9 (docstring), el atexit de workers,
+> la γ=0.99 de `selective_norm`, el replay ratio de QR-DQN y la observación
+> rancia de `reset()` (ver la nota de fase del protocolo en `base_env.step()` —
+> el lag de un paso durante el episodio es deliberado y pipelinea emulación con
+> inferencia). Suite: 126 tests. Instrucciones de ejecución en la 13900K:
+> `agent/stage0-runbook.md`.
+
 **Last updated:** 2026-08-25
 **Branch:** `sf2-sota-rl-upgrade` (from `main` at `11552e8c`, 24 commits, **not merged**)
 **Verified state:** 110 pytest tests passing (re-run 2026-08-25, 81 s, fully offline).
