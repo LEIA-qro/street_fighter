@@ -1,0 +1,13 @@
+# requirements-es.txt -- the ES harness (src/es/) hard dependencies.
+#
+# Deliberately minimal: a worker machine needs numpy and an emulator, nothing
+# else -- no torch, no SB3, no web framework (coordinator is stdlib http.server).
+numpy>=1.24
+
+# Optional extras (all lazy-imported; the harness runs without them):
+#   stable-retro    -- REQUIRED on worker machines to actually evaluate episodes
+#                      (see requirements-retro.txt / the retro-backend track);
+#                      not needed on a coordinator-only box.
+#   wandb           -- coordinator --wandb-project logging (WANDB_API_KEY env,
+#                      or WANDB_MODE=offline for airgapped runs).
+#   boto3           -- coordinator --s3-bucket checkpoint mirroring.
