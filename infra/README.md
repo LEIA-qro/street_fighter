@@ -62,10 +62,17 @@ sudo apt update && sudo apt install terraform
 1. Entra a <https://login.tailscale.com/admin/settings/keys> (la tailnet del equipo).
 2. **Generate auth key** con:
    - **Reusable** ✅ — por si la instancia se recrea (p. ej. al cambiar user_data).
-   - **Ephemeral** ✅ — el nodo se borra solo de la tailnet cuando la instancia muere;
-     congruente con infra desechable: `destroy` tampoco deja basura en Tailscale.
-3. Copia el `tskey-auth-...` al tfvars (siguiente paso). Expira en 90 dias max; si la
-   madre vive mas que eso, genera otro.
+   - **Ephemeral** ❌ — NO lo marques: el plan gratis de Tailscale cobra los nodos
+     ephemeral por minutos (1,000 min/mes ≈ 16 h) y una madre 24/7 se los come en un
+     dia. Como nodo normal es un device regular, sin medidor. El costo: tras
+     `terraform destroy` el nodo "madre" queda listado en el admin console hasta que
+     alguien lo borre a mano (un clic en Machines → ... → Remove).
+   - OJO con el formulario del console: a veces resetea los toggles al corregir la
+     descripcion — verifica que Reusable quedo azul ANTES de darle Generate.
+3. Copia el `tskey-auth-...` al tfvars (siguiente paso). El key expira en 90 dias max
+   (solo afecta REGISTRAR nodos nuevos, no los ya conectados); al nodo madre ya
+   registrado deshabilitale la expiracion: Machines → madre → ... → Disable key
+   expiry (hecho en el despliegue actual).
 
 > **Nota de exposicion (aplica a los TRES secretos — tailscale key, W&B key y el token
 > de GitHub si usas esa via):** viajan dentro del user_data, que cualquier proceso local
