@@ -1,0 +1,241 @@
+# bench_12rivals.py -- evaluacion limpia sobre LA MISMA rotacion de 12 rivales
+# lvl1 que entrena la flota ES (resolve_states("manifest", "1"), identica a la
+# de la madre por construccion: mismo commit, misma funcion, mismo manifest).
+#
+# Dos brazos, cada modelo en su regimen nativo:
+#   --arm es   theta actual de la run (GET /theta de la madre, sin ruido),
+#              MLPPolicy argmax -- determinista, asi que bastan 2 eps/estado
+#              (el segundo solo verifica que el emulador repite bit a bit).
+#   --arm ppo  el campeon legacy PPO (models/latest, 39.7M steps) con el
+#              mismo cargador del banco historico (v4->v3 + FrozenNorm +
+#              predict(deterministic=False) seedeado) -- estocastico, asi que
+#              --eps-per-state (default 8) episodios por estado.
+#
+# La cifra comparable entre brazos y con la curva de W&B es el MEAN de
+# fitness_from_episode sobre la rotacion uniforme (la run muestrea estados
+# uniformemente, asi que su esperanza es el promedio por-estado).
+#
+#   .venv/bin/python tools/bench_12rivals.py --arm es
+#   .venv/bin/python tools/bench_12rivals.py --arm ppo
+#
+# Corre con nice 10 y pocos procesos para convivir con el worker de la flota.
+
+import argparse
+import json
+import multiprocessing as mp
+import os
+import sys
+import time
+import urllib.request
+from collections import deque
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "src"))
+os.chdir(REPO)  # resolve_states usa la ruta relativa del manifest
+
+import numpy as np
+
+from es import openes, protocol, resources
+from es.coordinator import resolve_states
+from es.policy import MLPPolicy
+
+MAX_EPISODE_STEPS = 20000  # mismo failsafe que el worker
+
+CHAMPION_ZIP = str(REPO / "models/latest/v3/ppo"
+                   "/ppo_v3_autocurrTest27_lvl4_plus6_WR83pct_ckpt_39681358steps.zip")
+CHAMPION_PKL = CHAMPION_ZIP.replace(".zip", "_vecnorm.pkl")
+
+# --- adaptador v4->v3 + norm congelada: copia exacta de es_finetune_lastlayer
+ACT_CATEGORIES, CHAR_CATEGORIES = 256, 16
+V3_FRAME = 10 + 2 * ACT_CATEGORIES + 2 * CHAR_CATEGORIES  # 554
+
+
+def v4_frame_to_v3(frame):
+    out = np.zeros(V3_FRAME, dtype=np.float32)
+    out[:10] = frame[:10]
+    out[10 + min(int(frame[15]), 255)] = 1.0
+    out[10 + 256 + min(int(frame[16]), 255)] = 1.0
+    out[522 + min(int(frame[21]), 15)] = 1.0
+    out[538 + min(int(frame[22]), 15)] = 1.0
+    return out
+
+
+class FrozenNorm:
+    def __init__(self, pkl_path):
+        import pickle
+        with open(pkl_path, "rb") as f:
+            stats = pickle.load(f)
+        assert stats["n_cont"] == 10 and stats["n_frames"] == 4, stats.keys()
+        self.mean = np.asarray(stats["running_mean"], dtype=np.float64)
+        self.std = np.sqrt(np.asarray(stats["running_var"], dtype=np.float64) + 1e-8)
+        self.clip = float(stats.get("clip", 10.0))
+
+    def __call__(self, stacked_2216):
+        obs = stacked_2216.reshape(4, V3_FRAME)
+        cont = (obs[:, :10] - self.mean) / self.std
+        obs = obs.copy()
+        obs[:, :10] = np.clip(cont, -self.clip, self.clip)
+        return obs.reshape(-1).astype(np.float32)
+
+
+# --- estado por proceso ------------------------------------------------------
+_ENV = None
+_ES_POLICY = None
+_MODEL = _NORM = _FRAMES = None
+
+
+def _init_es(theta_bytes, nice_delta):
+    global _ENV, _ES_POLICY
+    resources.apply_nice(nice_delta)
+    from envs.retro_env import RetroSF2Env
+    _ENV = RetroSF2Env()  # trainable=True default: identico al worker de flota
+    _ES_POLICY = MLPPolicy(np.frombuffer(theta_bytes, dtype=np.float32).copy())
+
+
+def _init_ppo(zip_path, pkl_path, nice_delta):
+    global _ENV, _MODEL, _NORM, _FRAMES
+    resources.apply_nice(nice_delta)
+    import torch
+    torch.set_num_threads(1)
+    from stable_baselines3 import PPO
+    from envs.retro_env import RetroSF2Env
+    _MODEL = PPO.load(zip_path, device="cpu")
+    _ENV = RetroSF2Env(trainable=True)
+    _NORM = FrozenNorm(pkl_path)
+    _FRAMES = deque(maxlen=4)
+
+
+def _episode_es(task):
+    state_name, ep = task
+    obs, _ = _ENV.reset(options={"state": state_name})
+    steps, info = 0, {}
+    while steps < MAX_EPISODE_STEPS:
+        obs, _r, term, trunc, info = _ENV.step(_ES_POLICY.act(obs))
+        steps += 1
+        if term or trunc:
+            break
+    return (state_name, ep, openes.fitness_from_episode(info, steps),
+            int(info.get("win", 0)), steps)
+
+
+def _episode_ppo(task):
+    state_name, state_idx, ep = task
+    import torch
+    # seed estable por (indice de estado, episodio): reproducible entre runs
+    # (hash() de str esta aleatorizado por proceso, jamas usarlo aqui)
+    torch.manual_seed(7_000_000 + state_idx * 1000 + ep)
+    obs92, _ = _ENV.reset(options={"state": state_name})
+    _FRAMES.clear()
+    for i in range(4):
+        _FRAMES.append(v4_frame_to_v3(obs92[i * 23:(i + 1) * 23]))
+    steps, info = 0, {}
+    while steps < MAX_EPISODE_STEPS:
+        stacked = _NORM(np.concatenate(_FRAMES))
+        action, _ = _MODEL.predict(stacked, deterministic=False)
+        obs92, _r, term, trunc, info = _ENV.step(action)
+        _FRAMES.append(v4_frame_to_v3(obs92[-23:]))
+        steps += 1
+        if term or trunc:
+            break
+    return (state_name, ep, openes.fitness_from_episode(info, steps),
+            int(info.get("win", 0)), steps)
+
+
+def fetch_theta(url):
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    version, theta = protocol.decode_theta(payload)
+    return version, theta
+
+
+def report(tag, states, rows, meta, out_path):
+    by_state = {s: [] for s in states}
+    for s, _ep, f, w, steps in rows:
+        by_state[s].append((f, w, steps))
+    print(f"\n=== {tag} ===")
+    all_f, all_w, n_eps = [], 0, 0
+    for s in states:
+        runs = by_state[s]
+        fs = [f for f, _w, _st in runs]
+        ws = sum(w for _f, w, _st in runs)
+        all_f += fs
+        all_w += ws
+        n_eps += len(runs)
+        print(f"  {s:<40} fit={np.mean(fs):+.3f}  wins={ws}/{len(runs)}")
+    mean_f = float(np.mean(all_f))
+    wr = all_w / n_eps
+    print(f"  {'TOTAL':<40} fit={mean_f:+.3f}  win_rate={all_w}/{n_eps}={wr:.3f}")
+    row = dict(meta, tag=tag, mean_fitness=mean_f, win_rate=wr,
+               episodes=n_eps, wins=all_w,
+               per_state={s: {"fitness": float(np.mean([f for f, _w, _st in by_state[s]])),
+                              "wins": sum(w for _f, w, _st in by_state[s]),
+                              "episodes": len(by_state[s])} for s in states},
+               states_fingerprint=protocol.states_fingerprint(states))
+    with open(out_path, "a") as f:
+        f.write(json.dumps(row) + "\n")
+    return mean_f, wr
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Banco limpio sobre los 12 rivales lvl1 de la run")
+    ap.add_argument("--arm", choices=["es", "ppo"], required=True)
+    ap.add_argument("--theta-url", default="http://madre:8080/theta")
+    ap.add_argument("--theta-npz", default=None,
+                    help="alternativa offline: .npz de checkpoint con clave theta")
+    ap.add_argument("--zip", default=CHAMPION_ZIP)
+    ap.add_argument("--pkl", default=CHAMPION_PKL)
+    ap.add_argument("--procs", type=int, default=3)
+    ap.add_argument("--eps-per-state", type=int, default=None,
+                    help="default: 2 para es (determinismo x2), 8 para ppo")
+    ap.add_argument("--nice", type=int, default=10)
+    ap.add_argument("--out", default=str(REPO / "benchmarks/bench_12rivals.jsonl"))
+    args = ap.parse_args()
+
+    states = resolve_states("manifest", "1")
+    print(f"[bench] rotacion: {len(states)} estados, fingerprint "
+          f"{protocol.states_fingerprint(states)}")
+
+    eps = args.eps_per_state or (2 if args.arm == "es" else 8)
+    if args.arm == "es":
+        tasks = [(s, e) for s in states for e in range(eps)]
+    else:
+        tasks = [(s, i, e) for i, s in enumerate(states) for e in range(eps)]
+    ctx = mp.get_context("spawn")
+    t0 = time.time()
+
+    if args.arm == "es":
+        if args.theta_npz:
+            theta = np.load(args.theta_npz)["theta"].astype(np.float32)
+            version = f"npz:{os.path.basename(args.theta_npz)}"
+        else:
+            version, theta = fetch_theta(args.theta_url)
+        print(f"[bench] theta version/gen {version}, {theta.shape[0]} params, "
+              f"||theta||={float(np.linalg.norm(theta)):.3f}")
+        pool = ctx.Pool(args.procs, initializer=_init_es,
+                        initargs=(theta.tobytes(), args.nice))
+        rows = pool.map(_episode_es, tasks)
+        meta = {"model": "es_theta", "theta_version": str(version)}
+        tag = f"ES theta (gen {version}) argmax, sin ruido"
+        # verificacion de determinismo: mismo estado -> episodios identicos
+        if eps >= 2:
+            drift = [s for s in states
+                     if len({(f, st) for s2, _e, f, _w, st in rows if s2 == s}) > 1]
+            print("[bench] determinismo: " +
+                  ("OK (todas las repeticiones identicas)" if not drift
+                   else f"OJO, {len(drift)} estados variaron: {drift}"))
+    else:
+        pool = ctx.Pool(args.procs, initializer=_init_ppo,
+                        initargs=(args.zip, args.pkl, args.nice))
+        rows = pool.map(_episode_ppo, tasks)
+        meta = {"model": "ppo_champion", "zip": os.path.basename(args.zip)}
+        tag = "PPO campeon legacy (39.7M) predict estocastico"
+
+    pool.close()
+    pool.join()
+    report(tag, states, rows, meta, args.out)
+    print(f"[bench] {len(tasks)} episodios en {time.time() - t0:.0f}s -> {args.out}")
+
+
+if __name__ == "__main__":
+    main()
