@@ -25,10 +25,13 @@ variable "instance_type" {
   default     = "t3.small"
 }
 
+# La cuenta de educacion NO tiene VPC default en us-west-2 (alguien la borro);
+# us-east-1 si la tiene, verificado 2026-08-25. Si cambias de region, confirma
+# primero: aws ec2 describe-vpcs --filters Name=isDefault,Values=true
 variable "region" {
   description = "Region AWS (cuenta de educacion)."
   type        = string
-  default     = "us-west-2"
+  default     = "us-east-1"
 }
 
 variable "arch" {
