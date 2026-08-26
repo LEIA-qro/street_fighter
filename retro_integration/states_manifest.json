@@ -1,0 +1,3625 @@
+{
+  "difficulty_ram": {
+    "encoding": "level_minus_1",
+    "evidence": {
+      "observations": [
+        "OPTION MODE default (4 stars) -> byte 3; one RIGHT tap -> 4",
+        "RIGHT taps clamp at 7 with all 8 stars lit; LEFT taps clamp at 0 with 1 star lit (screenshots d_max/d_min in the probe workdir)",
+        "byte stable across idle frames and unchanged into the fight scene",
+        "shipped Champion.Level1.RyuVsGuile.state carries byte 3 (default difficulty): its 'Level1' is ladder stage 1, NOT difficulty 1"
+      ],
+      "probe": "tools/menu_probe.py full-RAM diff, 2026-08-26"
+    },
+    "levels": {
+      "1": 0,
+      "2": 1,
+      "3": 2,
+      "4": 3,
+      "5": 4,
+      "6": 5,
+      "7": 6,
+      "8": 7
+    },
+    "m68k_address": "0xFFFE45",
+    "work_ram_offset": 65093
+  },
+  "schema": "sf2-retro-states/v1",
+  "states": {
+    "Champion.Level1.RyuVsGuile": {
+      "difficulty": null,
+      "notes": "gym-retro/stable-retro shipped state; difficulty setting undocumented",
+      "opponent": "GUILE",
+      "source": "shipped",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star1": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 1); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star2": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 2); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star3": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 3); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star4": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 4); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star5": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 5); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star6": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 6); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star7": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 7); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star7",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.left_star8": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (left side, star 8); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.left_star8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star1": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 1); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star2": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 2); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star3": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 3); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star4": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 4); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star5": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 5); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star6": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 6); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star7": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 7); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star7",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.Level1.RyuVsRyu.right_star8": {
+      "difficulty": null,
+      "notes": "FightLadder stars state (right side, star 8); their README calls star a 'difficulty level' but the state derives from a 2Player base (embedded gzip filename Champion.Level1.unknown.2Player.state), so star may be VS-mode handicap, not the options-menu difficulty -- left null, do not guess; FightLadder trained the RIGHT side here, our env drives P1 (left)",
+      "opponent": "RYU",
+      "original_name": "Champion.Level1.RyuVsRyu.right_star8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Champion.RyuVsRyu.2Player.align": {
+      "difficulty": null,
+      "notes": "2P VS state (both ports human) for future league play; load-verified only",
+      "opponent": "RYU",
+      "original_name": "Champion.RyuVsRyu.2Player.align",
+      "players": 2,
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": null,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level1.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.11": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 11; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.11",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.12": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 12; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.12",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.13": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 13; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.13",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.14": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 14; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.14",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.15": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 15; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.15",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.16": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 16; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.16",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.19": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 19; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.19",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.7": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 7; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.7",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.8": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 8; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level1.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 1 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "GUILE",
+      "original_name": "Level1.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 3
+      }
+    },
+    "FL_Level10.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 10 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BLANKA",
+      "original_name": "Level10.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 2
+      }
+    },
+    "FL_Level10.19": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 10 in eval episode 19; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BLANKA",
+      "original_name": "Level10.19",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 2
+      }
+    },
+    "FL_Level10.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 10 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BLANKA",
+      "original_name": "Level10.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 2
+      }
+    },
+    "FL_Level10.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 10 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BLANKA",
+      "original_name": "Level10.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 2
+      }
+    },
+    "FL_Level10.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 10 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BLANKA",
+      "original_name": "Level10.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 2
+      }
+    },
+    "FL_Level11.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 11 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BALROG",
+      "original_name": "Level11.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 10
+      }
+    },
+    "FL_Level11.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 11 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BALROG",
+      "original_name": "Level11.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 10
+      }
+    },
+    "FL_Level11.19": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 11 in eval episode 19; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BALROG",
+      "original_name": "Level11.19",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 10
+      }
+    },
+    "FL_Level11.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 11 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "BALROG",
+      "original_name": "Level11.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 10
+      }
+    },
+    "FL_Level13.140": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 140; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.140",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.155": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 155; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.155",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.206": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 206; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.206",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.229": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 229; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.229",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.276": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 276; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.276",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.368": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 368; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.368",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.380": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 380; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.380",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.392": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 392; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.392",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.395": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 395; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.395",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.407": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 407; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.407",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.43": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 43; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.43",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level13.53": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 13 in eval episode 53; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "VEGA",
+      "original_name": "Level13.53",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 11
+      }
+    },
+    "FL_Level14.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.12": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 12; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.12",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.22": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 22; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.22",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.26": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 26; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.26",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.364": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 364; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.364",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level14.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 14 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "SAGAT",
+      "original_name": "Level14.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 9
+      }
+    },
+    "FL_Level15.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.16": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 16; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.16",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level15.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 15 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "MBISON",
+      "original_name": "Level15.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 8
+      }
+    },
+    "FL_Level2.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.11": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 11; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.11",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.12": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 12; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.12",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.13": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 13; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.13",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.14": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 14; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.14",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.16": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 16; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.16",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.19": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 19; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.19",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.7": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 7; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.7",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.8": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 8; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level2.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 2 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "KEN",
+      "original_name": "Level2.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 4
+      }
+    },
+    "FL_Level3.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.11": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 11; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.11",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.16": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 16; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.16",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.8": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 8; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level3.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 3 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "CHUNLI",
+      "original_name": "Level3.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 5
+      }
+    },
+    "FL_Level5.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.11": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 11; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.11",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.8": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 8; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level5.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 5 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "ZANGIEF",
+      "original_name": "Level5.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 6
+      }
+    },
+    "FL_Level6.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.11": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 11; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.11",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          154,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          152,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          154,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.5": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 5; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.5",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          154,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.6": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 6; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.6",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.8": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 8; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.8",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level6.9": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 6 in eval episode 9; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "DHALSIM",
+      "original_name": "Level6.9",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          154,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 7
+      }
+    },
+    "FL_Level7.1": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 1; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.1",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.12": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 12; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.12",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.17": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 17; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.17",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level7.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 7 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "RYU",
+      "original_name": "Level7.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 0
+      }
+    },
+    "FL_Level9.10": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 10; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.10",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "FL_Level9.18": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 18; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.18",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "FL_Level9.2": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 2; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.2",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "FL_Level9.20": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 20; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.20",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "FL_Level9.3": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 3; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.3",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "FL_Level9.4": {
+      "difficulty": null,
+      "notes": "FightLadder arcade-ladder curriculum: saved on reaching ladder level 9 in eval episode 4; ladder order proved deterministic across all instances (opponent verified from RAM), difficulty inherited from the shipped Level1 state (undocumented)",
+      "opponent": "EHONDA",
+      "original_name": "Level9.4",
+      "source": "fightladder",
+      "verified": {
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "p2_char_id": 1
+      }
+    },
+    "RYU_BALROG_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "BALROG",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BALROG_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "BALROG",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BALROG_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "BALROG",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BALROG_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "BALROG",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "BLANKA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_CHUNLI_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl7": {
+      "difficulty": 7,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_CHUNLI_R1_lvl8": {
+      "difficulty": 8,
+      "opponent": "CHUNLI",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 5,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_DHALSIM_R1_lvl7": {
+      "difficulty": 7,
+      "opponent": "DHALSIM",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_EHONDA_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_EHONDA_R1_lvl7": {
+      "difficulty": 7,
+      "opponent": "EHONDA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 171
+      }
+    },
+    "RYU_GUILE_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "GUILE",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_GUILE_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "GUILE",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_GUILE_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "GUILE",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_GUILE_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "GUILE",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_GUILE_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "GUILE",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_KEN_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "KEN",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_KEN_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "KEN",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_KEN_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "KEN",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_KEN_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "KEN",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_KEN_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "KEN",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_MBISON_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "MBISON",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_MBISON_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "MBISON",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_MBISON_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "MBISON",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_MBISON_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "MBISON",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_RYU_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_RYU_R1_lvl7": {
+      "difficulty": 7,
+      "opponent": "RYU",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_SAGAT_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "SAGAT",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_SAGAT_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "SAGAT",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_SAGAT_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "SAGAT",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_SAGAT_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "SAGAT",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_VEGA_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "VEGA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_VEGA_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "VEGA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_VEGA_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "VEGA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_VEGA_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "VEGA",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl1": {
+      "difficulty": 1,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 0,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl2": {
+      "difficulty": 2,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 1,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl3": {
+      "difficulty": 3,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 2,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl4": {
+      "difficulty": 4,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 3,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl5": {
+      "difficulty": 5,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl6": {
+      "difficulty": 6,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl7": {
+      "difficulty": 7,
+      "opponent": "ZANGIEF",
+      "source": "farmed",
+      "verified": {
+        "date": "2026-08-26",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    }
+  }
+}
