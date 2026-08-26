@@ -158,3 +158,42 @@ checkpoints** (`force_destroy=true` — si algun checkpoint importa, bajalo ante
 nodo Tailscale es ephemeral, tambien desaparece solo de la tailnet. Despues del destroy
 la cuenta queda exactamente como antes; verificalo si quieres con el filtro
 `Project=leia-sf2-es` en la consola: cero resultados.
+
+---
+
+## Despliegue actual (2026-08-25)
+
+Primera madre levantada. Datos para referencia:
+
+| Dato | Valor |
+|---|---|
+| Cuenta | `800407728644` (Education, perfil `awsedu`) |
+| Región | **us-east-1** (la cuenta no tiene VPC default en us-west-2) |
+| Instancia | `i-03484b27772437719` (t3.small) |
+| Bucket de checkpoints | `leia-sf2-es-ckpt-d4a2b8dc99bbd0b480e7520f5e` |
+| Tailnet | `leia-qro.org.github` (propiedad de la ORG, no de una persona) |
+| Hostname en la malla | `madre` |
+
+Verificar que vive (desde cualquier máquina ya enlistada en la tailnet):
+
+```bash
+tailscale ssh madre
+sudo journalctl -u leia-coordinator -f
+curl http://madre:8080/status
+```
+
+Tirarla cuando no se esté entrenando (el costo se detiene, los checkpoints
+sobreviven solo si se subieron a S3 — y el bucket también se borra, así que
+bajen lo que importe antes):
+
+```bash
+AWS_PROFILE=awsedu terraform -chdir=infra destroy
+```
+
+**Pendientes de esta instalación:**
+- El auth key generado fue *single-use*: si la instancia se recrea, hay que
+  generar otro (marcando **Reusable**) y re-aplicar.
+- `wandb_api_key` quedó vacío: el coordinador corre con W&B en modo offline.
+  Cuando exista la cuenta, agrégalo al tfvars y re-aplica.
+- Invitar a 2+ compañeros como admins de la tailnet (Users → Invite) para que
+  no haya una sola persona con las llaves de la malla.
