@@ -18,7 +18,7 @@ git checkout stage0-metrics-and-semantics
 .venv\Scripts\python.exe -m pytest code_testing\pytest -q
 ```
 
-La suite debe dar **126 passed**. Si algo falla, deténganse y avisen.
+La suite debe dar **177 passed**. Si algo falla, deténganse y avisen.
 
 ## 1. Línea base de throughput (~30-40 min)
 
