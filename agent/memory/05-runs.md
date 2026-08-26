@@ -21,3 +21,16 @@ Ritual de análisis: la desktop exporta tfevents a ~/Downloads de la M4; script 
 - **Modelo sorpresa del equipo: "Glaber Xtreme V1"** — PPO v3 de **104.7M steps, llegó a lvl5**, WR rolling 76% (archivos en ~/Downloads de la M4). En el banco 12 rivales lvl1: **+1.044 / 85.4%** — PEOR que el campeón de 39.7M (+1.152/90.6%) en lvl1 (se especializó arriba; este banco solo mide el piso). ES gen 95 quedó a 0.07 de fitness del 100M.
 - **Run 2 lanzada: policy v4onehot** (char IDs one-hot, 21887 params, obs de wire igual 92). Fresh start verificado, S3 `es-run2-onehot/`, W&B run `pious-sea-6`. M4 al 80% (8 procs, ~3,700 steps/s). Hipótesis a validar: sin interferencia de matchup, debería acumular rivales en vez de rotarlos y pasar 10/12.
 - Pendientes de la verificación adversarial (menores): theta_cache del worker puede cruzar runs si colisionan números de gen en swap de coordinator (mitigado hoy: worker reiniciado a mano; fix real = nonce de run en el wire); load_checkpoint no valida dim vs policy (falla ruidoso en worker de todos modos).
+
+## [2026-08-26 tarde] Prueba de robustez — el 10/12 de run 1, bajo el microscopio
+
+bench_12rivals.py ahora tiene `--action-noise P` y `--desync-max K` (perturbaciones seedeadas por episodio, mismas para ambos brazos; con perturbación=0 reproduce lo limpio bit a bit). Resultados (θ final run 1 vs campeón 39.7M, 72 eps/condición):
+
+| Condición | ES run1 | PPO campeón |
+|---|---|---|
+| Limpio | +1.079 / 83.3% | +1.152 / 90.6% |
+| Ruido 5% | +0.894 / 76.4% | +1.254 / 95.8% |
+| Ruido 10% | +0.861 / 73.6% | +1.144 / 90.3% |
+| Desfase ≤30f | **+0.785 / 63.9%** | +1.188 / 93.1% |
+
+**El PPO es a prueba de balas** (entrenó estocástico; ninguna perturbación lo mueve). El ES pierde 19 pts de wr con solo desfasar el arranque ≤30 frames. Por rival bajo desfase: 7 victorias son ESTRATEGIA real (Balrog, Blanka, Guile, Ken, Ryu, Vega, Zangief: 6/6 todas), 3 eran coreografía total o parcial (**Sagat 0/6, Dhalsim 1/6, EHonda 3/6** — la "paliza" a EHonda era mitad guión). Implicación: NO tocar la run 2 (experimento de una variable: one-hot); si run 2 también sale frágil, la palanca de run 3 es **desync aleatorio en entrenamiento** (domain randomization barata). Protocolo de banco de ahora en adelante: reportar limpio + desync en cada checkpoint.

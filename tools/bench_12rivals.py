@@ -83,19 +83,37 @@ class FrozenNorm:
 _ENV = None
 _ES_POLICY = None
 _MODEL = _NORM = _FRAMES = None
+_NOISE = 0.0    # prob. de reemplazar la accion de la politica por una aleatoria
+_DESYNC = 0     # frames neutrales (0..K, sorteados) antes de soltar el control
+
+NEUTRAL_ACTION = np.array([0, 0], dtype=np.int64)  # sin direccion, sin boton
 
 
-def _init_es(theta_bytes, policy_name, nice_delta):
-    global _ENV, _ES_POLICY
+def _perturb_rng(state_idx, ep):
+    """RNG propio de (estado, episodio): reproducible y sin correlacion entre
+    episodios. Salt fijo para no colisionar con ningun otro stream del repo."""
+    ss = np.random.SeedSequence(entropy=780537,
+                                spawn_key=(int(state_idx), int(ep)))
+    return np.random.default_rng(ss)
+
+
+def _random_action(rng):
+    return np.array([rng.integers(0, 9), rng.integers(0, 7)], dtype=np.int64)
+
+
+def _init_es(theta_bytes, policy_name, nice_delta, noise, desync):
+    global _ENV, _ES_POLICY, _NOISE, _DESYNC
     resources.apply_nice(nice_delta)
+    _NOISE, _DESYNC = float(noise), int(desync)
     from envs.retro_env import RetroSF2Env
     _ENV = RetroSF2Env()  # trainable=True default: identico al worker de flota
     _ES_POLICY = POLICIES[policy_name](np.frombuffer(theta_bytes, dtype=np.float32).copy())
 
 
-def _init_ppo(zip_path, pkl_path, nice_delta):
-    global _ENV, _MODEL, _NORM, _FRAMES
+def _init_ppo(zip_path, pkl_path, nice_delta, noise, desync):
+    global _ENV, _MODEL, _NORM, _FRAMES, _NOISE, _DESYNC
     resources.apply_nice(nice_delta)
+    _NOISE, _DESYNC = float(noise), int(desync)
     import torch
     torch.set_num_threads(1)
     from stable_baselines3 import PPO
@@ -107,11 +125,23 @@ def _init_ppo(zip_path, pkl_path, nice_delta):
 
 
 def _episode_es(task):
-    state_name, ep = task
+    state_name, state_idx, ep = task
+    rng = _perturb_rng(state_idx, ep)
     obs, _ = _ENV.reset(options={"state": state_name})
     steps, info = 0, {}
+    # desfase de arranque: N frames neutrales le corren la "pelicula" al rival
+    # antes de que la politica vea su primer frame util
+    for _ in range(int(rng.integers(0, _DESYNC + 1)) if _DESYNC else 0):
+        obs, _r, term, trunc, info = _ENV.step(NEUTRAL_ACTION)
+        steps += 1
+        if term or trunc:
+            break
     while steps < MAX_EPISODE_STEPS:
-        obs, _r, term, trunc, info = _ENV.step(_ES_POLICY.act(obs))
+        if _NOISE and rng.random() < _NOISE:
+            action = _random_action(rng)
+        else:
+            action = _ES_POLICY.act(obs)
+        obs, _r, term, trunc, info = _ENV.step(action)
         steps += 1
         if term or trunc:
             break
@@ -125,14 +155,24 @@ def _episode_ppo(task):
     # seed estable por (indice de estado, episodio): reproducible entre runs
     # (hash() de str esta aleatorizado por proceso, jamas usarlo aqui)
     torch.manual_seed(7_000_000 + state_idx * 1000 + ep)
+    rng = _perturb_rng(state_idx, ep)
     obs92, _ = _ENV.reset(options={"state": state_name})
     _FRAMES.clear()
     for i in range(4):
         _FRAMES.append(v4_frame_to_v3(obs92[i * 23:(i + 1) * 23]))
     steps, info = 0, {}
+    for _ in range(int(rng.integers(0, _DESYNC + 1)) if _DESYNC else 0):
+        obs92, _r, term, trunc, info = _ENV.step(NEUTRAL_ACTION)
+        _FRAMES.append(v4_frame_to_v3(obs92[-23:]))
+        steps += 1
+        if term or trunc:
+            break
     while steps < MAX_EPISODE_STEPS:
-        stacked = _NORM(np.concatenate(_FRAMES))
-        action, _ = _MODEL.predict(stacked, deterministic=False)
+        if _NOISE and rng.random() < _NOISE:
+            action = _random_action(rng)
+        else:
+            stacked = _NORM(np.concatenate(_FRAMES))
+            action, _ = _MODEL.predict(stacked, deterministic=False)
         obs92, _r, term, trunc, info = _ENV.step(action)
         _FRAMES.append(v4_frame_to_v3(obs92[-23:]))
         steps += 1
@@ -191,18 +231,25 @@ def main():
     ap.add_argument("--eps-per-state", type=int, default=None,
                     help="default: 2 para es (determinismo x2), 8 para ppo")
     ap.add_argument("--nice", type=int, default=10)
+    ap.add_argument("--action-noise", type=float, default=0.0,
+                    help="prob. por paso de reemplazar la accion por una aleatoria "
+                         "(prueba de robustez: 0.05 = 5%% de los pasos)")
+    ap.add_argument("--desync-max", type=int, default=0,
+                    help="hasta N frames neutrales (sorteados por episodio) antes "
+                         "de soltar el control: rompe la coreografia del arranque")
     ap.add_argument("--out", default=str(REPO / "benchmarks/bench_12rivals.jsonl"))
     args = ap.parse_args()
 
     states = resolve_states("manifest", "1")
     print(f"[bench] rotacion: {len(states)} estados, fingerprint "
           f"{protocol.states_fingerprint(states)}")
+    perturbed = args.action_noise > 0 or args.desync_max > 0
+    if perturbed:
+        print(f"[bench] PERTURBADO: action_noise={args.action_noise} "
+              f"desync_max={args.desync_max}")
 
-    eps = args.eps_per_state or (2 if args.arm == "es" else 8)
-    if args.arm == "es":
-        tasks = [(s, e) for s in states for e in range(eps)]
-    else:
-        tasks = [(s, i, e) for i, s in enumerate(states) for e in range(eps)]
+    eps = args.eps_per_state or (2 if args.arm == "es" and not perturbed else 8)
+    tasks = [(s, i, e) for i, s in enumerate(states) for e in range(eps)]
     ctx = mp.get_context("spawn")
     t0 = time.time()
 
@@ -219,12 +266,14 @@ def main():
         print(f"[bench] theta version/gen {version}, policy {policy_name}, "
               f"{theta.shape[0]} params, ||theta||={float(np.linalg.norm(theta)):.3f}")
         pool = ctx.Pool(args.procs, initializer=_init_es,
-                        initargs=(theta.tobytes(), policy_name, args.nice))
+                        initargs=(theta.tobytes(), policy_name, args.nice,
+                                  args.action_noise, args.desync_max))
         rows = pool.map(_episode_es, tasks)
         meta = {"model": "es_theta", "theta_version": str(version), "policy": policy_name}
-        tag = f"ES theta (gen {version}, {policy_name}) argmax, sin ruido"
-        # verificacion de determinismo: mismo estado -> episodios identicos
-        if eps >= 2:
+        tag = f"ES theta (gen {version}, {policy_name}) argmax"
+        # verificacion de determinismo: mismo estado -> episodios identicos.
+        # Solo aplica SIN perturbaciones (con ellas, variar es el punto).
+        if eps >= 2 and not perturbed:
             drift = [s for s in states
                      if len({(f, st) for s2, _e, f, _w, st in rows if s2 == s}) > 1]
             print("[bench] determinismo: " +
@@ -232,10 +281,15 @@ def main():
                    else f"OJO, {len(drift)} estados variaron: {drift}"))
     else:
         pool = ctx.Pool(args.procs, initializer=_init_ppo,
-                        initargs=(args.zip, args.pkl, args.nice))
+                        initargs=(args.zip, args.pkl, args.nice,
+                                  args.action_noise, args.desync_max))
         rows = pool.map(_episode_ppo, tasks)
         meta = {"model": "ppo", "zip": os.path.basename(args.zip)}
         tag = f"PPO {os.path.basename(args.zip)} predict estocastico"
+    meta["action_noise"] = args.action_noise
+    meta["desync_max"] = args.desync_max
+    if perturbed:
+        tag += f" [noise={args.action_noise} desync<={args.desync_max}]"
 
     pool.close()
     pool.join()
