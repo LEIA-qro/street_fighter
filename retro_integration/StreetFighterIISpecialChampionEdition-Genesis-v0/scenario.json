@@ -1,0 +1,9 @@
+{
+  "done": {
+    "variables": {}
+  },
+  "reward": {
+    "variables": {}
+  },
+  "crop": [0, 16, 256, 200]
+}

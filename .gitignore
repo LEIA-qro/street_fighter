@@ -30,3 +30,7 @@ lua/test2.lua
 gha-creds-*.json
 /.agents
 /docs/superpowers
+
+# Los .State de BizHawk siguen ignorados; el savestate de la integracion
+# stable-retro es un asset versionado (la flota lo necesita en cada clon).
+!retro_integration/**/*.state

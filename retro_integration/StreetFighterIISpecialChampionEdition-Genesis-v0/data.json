@@ -1,0 +1,92 @@
+{
+  "info": {
+    "p1_hp": {
+      "address": 16744514,
+      "type": ">u2"
+    },
+    "p2_hp": {
+      "address": 16745154,
+      "type": ">u2"
+    },
+    "p1_x": {
+      "address": 16744454,
+      "type": ">u2"
+    },
+    "p2_x": {
+      "address": 16745094,
+      "type": ">u2"
+    },
+    "p1_y": {
+      "address": 16744458,
+      "type": ">u2"
+    },
+    "p2_y": {
+      "address": 16745098,
+      "type": ">u2"
+    },
+    "p1_state_word": {
+      "address": 16744526,
+      "type": ">u2"
+    },
+    "p2_state_word": {
+      "address": 16745166,
+      "type": ">u2"
+    },
+    "p1_proj_x": {
+      "address": 16745734,
+      "type": ">u2"
+    },
+    "p2_proj_x": {
+      "address": 16745862,
+      "type": ">u2"
+    },
+    "p1_char": {
+      "address": 16744923,
+      "type": "|u1"
+    },
+    "p2_char": {
+      "address": 16745563,
+      "type": "|u1"
+    },
+    "rel_dist": {
+      "address": 16745292,
+      "type": ">u2"
+    },
+    "p1_btn": {
+      "address": 16744930,
+      "type": "|u1"
+    },
+    "p2_btn": {
+      "address": 16745566,
+      "type": "|u1"
+    },
+    "p1_air_raw": {
+      "address": 16744640,
+      "type": ">u2"
+    },
+    "p2_air_raw": {
+      "address": 16746228,
+      "type": ">u2"
+    },
+    "rel_y_dist": {
+      "address": 16745294,
+      "type": ">u2"
+    },
+    "p1_chest": {
+      "address": 16744668,
+      "type": ">u2"
+    },
+    "p1_head": {
+      "address": 16744672,
+      "type": ">u2"
+    },
+    "p2_chest": {
+      "address": 16745308,
+      "type": ">u2"
+    },
+    "p2_head": {
+      "address": 16745312,
+      "type": ">u2"
+    }
+  }
+}

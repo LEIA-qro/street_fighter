@@ -1,0 +1,6 @@
+# Headless emulation backend for the distributed-ES fleet (see agent/handoff.md).
+# stable-retro publishes NO win_amd64 wheels: native Windows cannot pip-install
+# this -- the two Windows laptops and the 13900K desktop run it inside WSL2
+# (wsl --install -d Ubuntu, then pip install inside; tools/retro_bench.py
+# prints the exact steps). macOS and Linux install natively.
+stable-retro==1.0.1
