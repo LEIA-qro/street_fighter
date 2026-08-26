@@ -38,7 +38,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
     # debug_mode defaults to False: the every-10k-steps payload print is a
     # diagnostic, and building its f-string on every step of every worker is
     # measurable waste. Pass debug_mode=True to re-enable it.
-    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=False, player=1, verbose=True):
+    def __init__(self, rank=0, lua_path=config.TRAINING_ENV_CLIENT_LUA_PATH, trainable=True, debug_mode=False, player=1, verbose=True,
+                 ground_gate=False):
         assigned_port = config.PORT + rank
 
         super().__init__(
@@ -61,7 +62,10 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         self.prev_p2_x     = 0
         self.frames        = deque(maxlen=config.NUM_FRAMES)
 
-        self.reward_cfg = RewardConfig()
+        # ground_gate also reaches here via set_ground_gate(): sf2_v2's
+        # explicit __init__ signature does not forward unknown kwargs, so
+        # SFv2_make_env flips the flag post-construction instead.
+        self.reward_cfg = RewardConfig(ground_gate_shaping=ground_gate)
         self.reward_state = RewardState(
             prev_my_hp=176.0, prev_enemy_hp=176.0, prev_rel_dist=80.0,
             combo_counter=0, frames_since_last_hit=0,
@@ -84,6 +88,10 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         # into info on the terminal step so the metrics callback can log the
         # spacing distribution without any per-step info traffic.
         self._ep_rel_dists: list = []
+        # Non-sentinel steps spent airborne (p1_air truthy) this episode. The
+        # denominator is len(self._ep_rel_dists) -- both counters gate on the
+        # same sentinel check, so the fraction is over the same step set.
+        self._ep_air_steps = 0
 
         # The post-savestate-load payload of the most recent reset. League
         # play re-parses it from the P2 perspective.
@@ -100,6 +108,15 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
     def set_training_states(self, new_states):
         """Receives broadcast from the Main Process and updates local memory."""
         self.active_training_states = new_states
+
+    def set_ground_gate(self, enabled: bool) -> None:
+        """Flips the anti-jump shaping gate (see RewardConfig.ground_gate_shaping).
+
+        Exists because sf2_v2's explicit __init__ signature (owned by another
+        track) does not forward a ground_gate kwarg down to this base class;
+        SFv2_make_env calls this right after construction instead.
+        """
+        self.reward_cfg.ground_gate_shaping = bool(enabled)
 
     def _get_obs(self):
         return np.concatenate(self.frames)
@@ -207,8 +224,18 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
         else:
             self.footsie_steps = 0
 
+        # p1_air comes from the 24-field payload; a legacy 13-field client
+        # leaves extra_ram empty, so airborne reads permanently False and the
+        # gate (if enabled) degrades to the ungated shaping. On a corrupt
+        # payload extra_ram is stale from the last good frame -- but so are
+        # rel_dist and HP (same repeated frame), so the (d, air) pair the
+        # potential is evaluated on stays internally consistent.
+        airborne = bool(self.extra_ram.get("p1_air", 0))
+
         if not self.hp_sentinel:
             self._ep_rel_dists.append(rel_dist)
+            if airborne:
+                self._ep_air_steps += 1
 
         ko = bool(current_my_hp <= 0 or current_enemy_hp <= 0) and not self.hp_sentinel
 
@@ -223,6 +250,8 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             reward, self.reward_state, reward_parts = compute_reward(
                 self.reward_state, current_my_hp, current_enemy_hp,
                 rel_dist, ko, self.reward_cfg,
+                airborne=airborne,
+                prev_airborne=self.reward_state.prev_airborne,
             )
 
             # Mirror into the legacy attributes other modules still read.
@@ -268,6 +297,13 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
             info["ep_rel_dist_mean"] = float(arr.mean())
             info["ep_rel_dist_median"] = float(np.median(arr))
             info["ep_rel_dist_frac_far"] = float((arr >= FAR_DIST_THRESHOLD).mean())
+            # Fraction of non-sentinel steps spent airborne. THE metric for
+            # "approaches by jumping": uniform random over MultiDiscrete([9,7])
+            # picks one of the 3 jump directions a third of the time and sits
+            # at ~0.33 here; a policy that actually walks stays well under
+            # 0.15. (Reads 0.0 under a legacy 13-field Lua client, which has
+            # no p1_air field.)
+            info["ep_air_frac"] = self._ep_air_steps / len(self._ep_rel_dists)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -332,6 +368,11 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                     prev_rel_dist=self.prev_rel_dist,
                     combo_counter=0,
                     frames_since_last_hit=0,
+                    # _parse_payload above populated extra_ram from the
+                    # post-load frame; the shaping gate's Phi(s0) must match
+                    # whether that frame is actually airborne (False for a
+                    # legacy 13-field client, whose extra_ram is empty).
+                    prev_airborne=bool(self.extra_ram.get("p1_air", 0)),
                 )
                 self.sticky_counter = 0
                 self.sticky_direction = None
@@ -339,6 +380,7 @@ class StreetFighterBaseEnv(BizHawkBaseEnv):
                 self.p1_sentinel = False
                 self.p2_sentinel = False
                 self._ep_rel_dists = []
+                self._ep_air_steps = 0
 
                 self.frames.clear()
                 for _ in range(config.NUM_FRAMES): self.frames.append(observation)

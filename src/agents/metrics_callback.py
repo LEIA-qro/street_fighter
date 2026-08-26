@@ -6,9 +6,12 @@
 # consumed them, so none of the branch's success metrics were measurable.
 # This callback reads ONLY info dicts (no env methods, no extra IPC) and logs:
 #
-#   spacing/*     per-episode rel_dist mean / median / fraction >= 80.
-#                 THE metric: baseline is median 83 with 52.2% of steps far;
-#                 the movement fix is judged by this falling toward 70.
+#   spacing/*     per-episode rel_dist mean / median / fraction >= 80, plus
+#                 ep_air_frac (fraction of non-sentinel steps airborne).
+#                 THE metrics: baseline is median 83 with 52.2% of steps far;
+#                 the movement fix is judged by this falling toward 70. And
+#                 ep_air_frac ~0.33 is what uniform random looks like (3 of 9
+#                 directions are jumps) -- walking drives it well under 0.15.
 #   reward/*      per-step mean of every reward component (damage, taken,
 #                 combo, shaping, time, terminal). Confirms shaping is now the
 #                 same order as damage instead of 0.2% of it.
@@ -60,6 +63,7 @@ class MetricsCallback(BaseCallback):
         self._ep_means = []
         self._ep_medians = []
         self._ep_frac_far = []
+        self._ep_air_fracs = []
         self._ep_lengths = []
         self._ep_wins = []
         self._ep_double_kos = []
@@ -98,6 +102,8 @@ class MetricsCallback(BaseCallback):
                     self._ep_means.append(info["ep_rel_dist_mean"])
                     self._ep_medians.append(info["ep_rel_dist_median"])
                     self._ep_frac_far.append(info["ep_rel_dist_frac_far"])
+                if "ep_air_frac" in info:
+                    self._ep_air_fracs.append(info["ep_air_frac"])
 
     # ----------------------------------------------------------------- compute
 
@@ -111,6 +117,8 @@ class MetricsCallback(BaseCallback):
             records["spacing/ep_rel_dist_mean"] = float(np.mean(self._ep_means))
             records["spacing/ep_rel_dist_median"] = float(np.mean(self._ep_medians))
             records["spacing/frac_steps_far"] = float(np.mean(self._ep_frac_far))
+        if self._ep_air_fracs:
+            records["spacing/ep_air_frac"] = float(np.mean(self._ep_air_fracs))
         if self._actions_seen:
             n_macros = sum(self._macro_counts.values())
             records["macros/frac_macro_actions"] = n_macros / self._actions_seen

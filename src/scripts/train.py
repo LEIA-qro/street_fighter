@@ -28,6 +28,9 @@ def main():
     parser.add_argument("--auto_curriculum", action="store_true", help="Use progressive auto-curriculum pipeline")
     parser.add_argument("--macros", action="store_true",
                         help="Add Ryu special-move macros to the action space (env v3 only)")
+    parser.add_argument("--ground_gate", action="store_true",
+                        help="Zero the spacing potential on airborne frames so jump-approach "
+                             "stops collecting shaping (anti-jump gate, Run B)")
     parser.add_argument("--recurrent", action="store_true",
                         help="Use RecurrentPPO (PPO-LSTM) instead of feed-forward PPO")
 
@@ -66,7 +69,8 @@ def main():
     # Dynamic dispatch
     module  = importlib.import_module(f"agents.{args.algo}")
     agent   = module.build_agent()
-    env_fn  = lambda rank: SFv2_make_env(rank, version=args.env, macros=args.macros)
+    env_fn  = lambda rank: SFv2_make_env(rank, version=args.env, macros=args.macros,
+                                         ground_gate=args.ground_gate)
 
     save_dir = os.path.join(config.get_directory()["production"], args.env, args.algo)
     os.makedirs(save_dir, exist_ok=True)

@@ -37,7 +37,7 @@ def make_payload(p1_hp, p2_hp, p1_x=100, p2_x=200, p1_y=0, p2_y=0,
     return "0 " + ",".join(str(int(f)) for f in fields)
 
 
-def _bootstrap_common_fields(env, player, trainable):
+def _bootstrap_common_fields(env, player, trainable, ground_gate=False):
     """Sets every BizHawkBaseEnv / StreetFighterBaseEnv field the real
     __init__ chain would set, minus observation_space/action_space (those
     differ per obs layout and are set by each fake subclass).
@@ -85,7 +85,9 @@ def _bootstrap_common_fields(env, player, trainable):
     env.p1_sentinel = False
     env.p2_sentinel = False
     env.extra_ram = {}
-    env.reward_cfg = RewardConfig()
+    env._ep_rel_dists = []
+    env._ep_air_steps = 0
+    env.reward_cfg = RewardConfig(ground_gate_shaping=ground_gate)
     env.reward_state = RewardState(
         prev_my_hp=176.0, prev_enemy_hp=176.0, prev_rel_dist=80.0,
         combo_counter=0, frames_since_last_hit=0,
@@ -146,13 +148,13 @@ class FakeBizHawkEnv(_FakeSocketLayerMixin, StreetFighterEnvV3):
         # which would bind a socket and launch EmuHawk.exe.
         self._bootstrap_without_emulator(**kwargs)
 
-    def _bootstrap_without_emulator(self, player=1, trainable=True):
+    def _bootstrap_without_emulator(self, player=1, trainable=True, ground_gate=False):
         from gymnasium import spaces
         import numpy as np
         import core.config as config
         from envs.base_env import ONE_HOT_ACT_DIM, ONE_HOT_CHAR_DIM
 
-        _bootstrap_common_fields(self, player, trainable)
+        _bootstrap_common_fields(self, player, trainable, ground_gate)
 
         # --- Spaces (mirrors sf2_v2 / sf2_v3) ---
         cont_low = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.]
@@ -177,13 +179,13 @@ class FakeBizHawkEnvV4(_FakeSocketLayerMixin, StreetFighterEnvV4):
         # which would bind a socket and launch EmuHawk.exe.
         self._bootstrap_without_emulator(**kwargs)
 
-    def _bootstrap_without_emulator(self, player=1, trainable=True):
+    def _bootstrap_without_emulator(self, player=1, trainable=True, ground_gate=False):
         from gymnasium import spaces
         import numpy as np
         import core.config as config
         from envs.base_env import ACT_CATEGORIES, CHAR_CATEGORIES
 
-        _bootstrap_common_fields(self, player, trainable)
+        _bootstrap_common_fields(self, player, trainable, ground_gate)
 
         # --- Spaces (mirrors sf2_v4's compact 23-dim frame) ---
         cont_low = [0., 0., -500., -200., 0., -1., -1., -100., -100., 0.,

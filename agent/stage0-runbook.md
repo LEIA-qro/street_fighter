@@ -113,3 +113,41 @@ se re-diagnostica.
 action space cambiaron). El primer obs de cada episodio ahora es el frame real
 del estado cargado — estrictamente mejor, pero es un cambio de distribución en
 t=0 respecto a los checkpoints viejos.
+
+## 5. Runs A y B — desatorar el optimizador y anti-salto
+
+Diagnóstico de la corrida de 1M del 2026-08-24: **el optimizador estuvo
+congelado toda la corrida**. `lr=2.108e-05` (artefacto malo de Optuna) anneleado
+linealmente a cero ⇒ `train/entropy_loss` clavado en el máximo de
+MultiDiscrete([9,7]) (4.1431→4.1405) y `clip_fraction 0.000` de principio a
+fin. El "se acerca saltando" observado es simplemente lo que parece una
+política uniforme-random: 3 de las 9 direcciones son saltos.
+
+**Run A — lr sano (sin cambios de código, el flag ya existía):**
+
+```
+.venv\Scripts\python.exe src\scripts\train.py --algo ppo --env v3 --auto_curriculum --steps 1000000 --lr 3e-4
+```
+
+**Run B — A + gate anti-salto** (`--ground_gate`: Phi(d, air) = potencial de
+spacing solo en el suelo, 0 en el aire — sigue siendo PBRS puro sobre el
+estado extendido, así que es policy-invariant; saltar deja de cobrar shaping
+por acercarse):
+
+```
+.venv\Scripts\python.exe src\scripts\train.py --algo ppo --env v3 --auto_curriculum --steps 1000000 --lr 3e-4 --ground_gate
+```
+
+Qué mirar en TensorBoard, en este orden (si el paso 1 no ocurre, los demás no
+significan nada):
+
+| # | Métrica | Corrida congelada (baseline) | Señal de éxito |
+|---|---|---|---|
+| 1 | `train/entropy_loss` | **clavado en 4.143** toda la corrida — así se supo que el optimizador estaba congelado | **CAE** de 4.143 de forma sostenida |
+| 2 | `train/clip_fraction` | **0.000** todo el run | **> 0** desde los primeros updates |
+| 3 | `spacing/frac_steps_far` | ~0.46 | baja sostenida |
+| 4 | `spacing/ep_air_frac` | ~0.33 (uniforme-random: 3/9 direcciones son salto) | baja **muy por debajo de 0.15** = camina en vez de saltar |
+
+Si A destraba la entropía pero `ep_air_frac` no baja, el gate de B es el
+tratamiento; si ni A mueve la entropía, el problema es otro y se
+re-diagnostica antes de tocar rewards.

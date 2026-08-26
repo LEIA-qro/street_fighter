@@ -29,6 +29,13 @@ def SFv2_make_env(rank, **kwargs):
             from envs.sf2_v2 import StreetFighterEnvV2
             env = StreetFighterEnvV2(rank=rank, player=player, verbose=(rank == 0))
 
+        # Anti-jump shaping gate (Run B). Set post-construction because v2's
+        # explicit __init__ signature does not forward a ground_gate kwarg to
+        # the base class; the setter lives on StreetFighterBaseEnv, so v2/v3/v4
+        # all inherit it.
+        if kwargs.get("ground_gate", False):
+            env.set_ground_gate(True)
+
         if kwargs.get("macros", False):
             if version not in ("v3", "v4"):
                 raise ValueError(

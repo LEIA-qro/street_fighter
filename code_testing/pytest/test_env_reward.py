@@ -374,3 +374,153 @@ def test_v4_corrupt_payload_after_a_good_frame_does_not_crash():
     latest_frame = obs[-V4_FRAME_DIM:]
     assert latest_frame.shape == (V4_FRAME_DIM,)
     assert np.array_equal(latest_frame, good_frame)
+
+
+# --------------------------------------------------------------------------
+# Anti-jump gate (Run B): ground_gate_shaping redefines the potential over
+# the extended state (dist, airborne) -- Phi = spacing_potential(dist) while
+# grounded, 0 while airborne -- so jump-approach stops collecting shaping.
+# Still pure PBRS over the extended state, hence policy-invariant.
+# --------------------------------------------------------------------------
+
+def test_ground_gate_zeroes_phi_on_airborne_frames():
+    from envs.reward import RewardConfig, RewardState, compute_reward, spacing_potential
+
+    cfg = RewardConfig(gamma=1.0, ground_gate_shaping=True)
+    state = RewardState(176.0, 176.0, 100.0, 0, 0)
+
+    # Ground -> air while closing distance: the jump forfeits the whole
+    # accumulated potential instead of cashing in Phi(70) - Phi(100).
+    _, state, parts = compute_reward(state, 176.0, 176.0, 70.0, False, cfg,
+                                     airborne=True, prev_airborne=False)
+    assert parts["shaping"] == pytest.approx(-spacing_potential(100.0, cfg))
+    assert state.prev_airborne is True
+
+    # Air -> air: Phi is 0 on both ends, no shaping regardless of distance.
+    _, state, parts = compute_reward(state, 176.0, 176.0, 60.0, False, cfg,
+                                     airborne=True, prev_airborne=state.prev_airborne)
+    assert parts["shaping"] == pytest.approx(0.0)
+
+    # Air -> ground: landing re-earns the potential at the landing distance.
+    _, state, parts = compute_reward(state, 176.0, 176.0, 70.0, False, cfg,
+                                     airborne=False, prev_airborne=state.prev_airborne)
+    assert parts["shaping"] == pytest.approx(spacing_potential(70.0, cfg))
+    assert state.prev_airborne is False
+
+
+def test_ground_gate_shaping_telescopes_across_air_ground_transitions():
+    """PBRS over the EXTENDED state: a closed loop through mixed air/ground
+    states must still sum to (gamma^n - 1) * Phi = 0 at gamma = 1. This is
+    exactly the property that makes the gate safe to bolt on."""
+    from envs.reward import RewardConfig, RewardState, compute_reward
+
+    cfg = RewardConfig(gamma=1.0, ground_gate_shaping=True)
+    state = RewardState(176.0, 176.0, 80.0, 0, 0)  # start: (80, grounded)
+    total_shaping = 0.0
+    # Two jump arcs and a walk, returning to the exact starting (80, ground).
+    for dist, air in ((70.0, True), (60.0, True), (70.0, False),
+                      (90.0, True), (80.0, False)):
+        _, state, parts = compute_reward(state, 176.0, 176.0, dist, False, cfg,
+                                         airborne=air,
+                                         prev_airborne=state.prev_airborne)
+        total_shaping += parts["shaping"]
+    assert total_shaping == pytest.approx(0.0, abs=1e-9)
+
+
+def test_ground_gate_default_off_is_bit_identical_to_the_old_outputs():
+    """With ground_gate_shaping at its False default the airborne arguments
+    must be COMPLETELY inert: same float ops, bit-identical totals and parts,
+    for every existing caller that never heard of the gate."""
+    from envs.reward import RewardConfig, RewardState, compute_reward, spacing_potential
+
+    cfg = RewardConfig()  # gate off by default
+    transitions = [(80.0, 70.0), (70.0, 100.0), (187.0, 0.0), (60.0, 60.0)]
+    for prev_d, d in transitions:
+        old_style = compute_reward(
+            RewardState(176.0, 170.0, prev_d, 0, 0),
+            176.0, 150.0, d, False, cfg,
+        )
+        new_style = compute_reward(
+            RewardState(176.0, 170.0, prev_d, 0, 0),
+            176.0, 150.0, d, False, cfg,
+            airborne=True, prev_airborne=True,  # must be ignored when gated off
+        )
+        assert new_style[0] == old_style[0]          # bit-identical total
+        assert new_style[2] == old_style[2]          # bit-identical parts
+        # And both equal the pre-gate formula exactly.
+        assert old_style[2]["shaping"] == (
+            cfg.gamma * spacing_potential(d, cfg) - spacing_potential(prev_d, cfg)
+        )
+
+
+def test_ground_gate_env_wiring_gates_shaping_in_step():
+    """The constructor kwarg must reach compute_reward: an airborne approach
+    step pays -Phi(prev) under the gate instead of collecting the ungated
+    gamma*Phi(70) - Phi(100) > 0."""
+    from envs.reward import spacing_potential
+
+    gated = FakeBizHawkEnv([make_payload(176, 176, rel_dist=100, extended=True)],
+                           ground_gate=True)
+    gated.reset()
+    gated.queue([make_payload(176, 176, rel_dist=70, extended=True, p1_air=1)])
+    _, _, _, _, info = gated.step(np.array([0, 0]))
+    cfg = gated.reward_cfg
+    assert info["reward_parts"]["shaping"] == pytest.approx(
+        -spacing_potential(100.0, cfg))
+
+    plain = FakeBizHawkEnv([make_payload(176, 176, rel_dist=100, extended=True)])
+    plain.reset()
+    plain.queue([make_payload(176, 176, rel_dist=70, extended=True, p1_air=1)])
+    _, _, _, _, info = plain.step(np.array([0, 0]))
+    cfg = plain.reward_cfg
+    assert info["reward_parts"]["shaping"] == pytest.approx(
+        cfg.gamma * spacing_potential(70.0, cfg) - spacing_potential(100.0, cfg))
+
+
+def test_reset_initializes_prev_airborne_from_the_post_load_frame():
+    airborne_start = FakeBizHawkEnv([make_payload(176, 176, extended=True, p1_air=1)])
+    airborne_start.reset()
+    assert airborne_start.reward_state.prev_airborne is True
+
+    # Legacy 13-field client: extra_ram is empty, airborne must read False.
+    legacy = FakeBizHawkEnv([make_payload(176, 176)])
+    legacy.reset()
+    assert legacy.reward_state.prev_airborne is False
+
+
+def test_ep_air_frac_counts_airborne_non_sentinel_steps():
+    env = FakeBizHawkEnv([make_payload(176, 176, extended=True)])
+    env.reset()
+    env.queue([
+        make_payload(176, 176, extended=True, p1_air=1),   # air
+        make_payload(176, 176, extended=True, p1_air=0),   # ground
+        make_payload(255, 255, extended=True, p1_air=1),   # sentinel: excluded
+        make_payload(176, 0, extended=True, p1_air=0),     # terminal KO, ground
+    ])
+    for _ in range(3):
+        env.step(np.array([0, 0]))
+    _, _, terminated, _, info = env.step(np.array([0, 0]))
+    assert terminated is True
+    # 3 non-sentinel steps, 1 airborne; the sentinel frame is in NEITHER the
+    # numerator nor the denominator (same exclusion as the rel_dist samples).
+    assert info["ep_air_frac"] == pytest.approx(1.0 / 3.0)
+
+
+def test_ep_air_frac_resets_between_episodes():
+    env = FakeBizHawkEnv([make_payload(176, 176, extended=True)])
+    env.reset()
+    env.queue([make_payload(176, 176, extended=True, p1_air=1),
+               make_payload(176, 0, extended=True, p1_air=1)])
+    env.step(np.array([0, 0]))
+    _, _, terminated, _, info = env.step(np.array([0, 0]))
+    assert terminated is True
+    assert info["ep_air_frac"] == pytest.approx(1.0)
+
+    # Second reset consumes TWO payloads (stale in-flight + post-load).
+    env.queue([make_payload(176, 176, extended=True),
+               make_payload(176, 176, extended=True)])
+    env.reset()
+    env.queue([make_payload(176, 0, extended=True, p1_air=0)])
+    _, _, terminated, _, info = env.step(np.array([0, 0]))
+    assert terminated is True
+    assert info["ep_air_frac"] == pytest.approx(0.0)

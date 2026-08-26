@@ -116,3 +116,22 @@ def test_socket_death_counted():
     cb = make_cb()
     cb._ingest_infos([{"socket_death": True, "hp_sentinel": False, "reward_parts": {}}])
     assert cb._compute_records()["env/socket_deaths"] == 1
+
+
+def test_ep_air_frac_is_recorded_under_spacing():
+    """spacing/ep_air_frac is THE 'no camina nada' metric: uniform random
+    over MultiDiscrete([9,7]) sits ~0.33 (3 of 9 directions are jumps);
+    walking drives it well under 0.15. The callback must average the
+    per-episode fractions the env emits."""
+    cb = make_cb()
+    cb._ingest_infos([terminal_info(ep_air_frac=0.4)])
+    cb._ingest_infos([terminal_info(ep_air_frac=0.2)])
+    records = cb._compute_records()
+    assert records["spacing/ep_air_frac"] == pytest.approx(0.3)
+
+
+def test_no_ep_air_frac_key_when_the_env_never_emits_it():
+    # e.g. a legacy 13-field Lua client run before ep_air_frac existed.
+    cb = make_cb()
+    cb._ingest_infos([terminal_info()])
+    assert "spacing/ep_air_frac" not in cb._compute_records()

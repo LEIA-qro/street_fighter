@@ -39,6 +39,16 @@ class RewardConfig:
     # constant (or pass gamma= explicitly at both call sites) rather than
     # letting the two drift apart again.
     gamma: float = AGENT_GAMMA
+    # Anti-jump gate. When True, the spacing potential is defined over the
+    # extended state (dist, airborne): Phi = spacing_potential(dist) while
+    # grounded, 0 while airborne. Jump-approach then stops collecting shaping
+    # (leaving the ground forfeits the accumulated Phi; walking keeps it).
+    # This is still PURE potential-based shaping, just over the extended
+    # state space, so the policy-invariance guarantee (Ng, Harada & Russell,
+    # ICML 1999) holds unchanged -- gamma*Phi(s') - Phi(s) telescopes over
+    # (dist, air) exactly as it did over dist alone. Default False =>
+    # bit-identical rewards for every existing caller.
+    ground_gate_shaping: bool = False
 
 
 @dataclass
@@ -48,6 +58,11 @@ class RewardState:
     prev_rel_dist: float
     combo_counter: int
     frames_since_last_hit: int
+    # Carrier for the airborne half of the extended shaping state: written by
+    # compute_reward (next_state.prev_airborne = this step's airborne) so the
+    # env can hand it back as the prev_airborne argument on the next step.
+    # Defaulted so existing positional constructions keep working.
+    prev_airborne: bool = False
 
 
 def spacing_potential(dist: float, cfg: RewardConfig) -> float:
@@ -76,11 +91,17 @@ def spacing_potential(dist: float, cfg: RewardConfig) -> float:
 
 def compute_reward(state: RewardState, my_hp: float, enemy_hp: float,
                    rel_dist: float, terminated: bool,
-                   cfg: RewardConfig) -> tuple[float, RewardState, dict]:
+                   cfg: RewardConfig, airborne: bool = False,
+                   prev_airborne: bool = False) -> tuple[float, RewardState, dict]:
     """Returns (total_reward, next_state, component_breakdown).
 
     The component dict always sums exactly to total_reward, which makes both
     the unit tests and the TensorBoard breakdown trustworthy.
+
+    airborne / prev_airborne only matter under cfg.ground_gate_shaping; the
+    arguments are authoritative (state.prev_airborne is just the carrier the
+    env reads prev_airborne back out of between steps). Both default False, so
+    every pre-gate call site computes exactly what it always did.
     """
     damage_dealt = min(max(0.0, state.prev_enemy_hp - enemy_hp), cfg.damage_clamp)
     damage_taken = min(max(0.0, state.prev_my_hp - my_hp), cfg.damage_clamp)
@@ -105,8 +126,17 @@ def compute_reward(state: RewardState, my_hp: float, enemy_hp: float,
         combo = 0.0
         time = -cfg.time_penalty
 
-    shaping = (cfg.gamma * spacing_potential(rel_dist, cfg)
-               - spacing_potential(state.prev_rel_dist, cfg))
+    if cfg.ground_gate_shaping:
+        # Extended-state potential: Phi(d, air) = spacing_potential(d) if
+        # grounded else 0. Still F(s, s') = gamma*Phi(s') - Phi(s), i.e. pure
+        # potential-based shaping over (dist, airborne) -- policy-invariant by
+        # Ng/Harada/Russell exactly as the ungated form is over dist alone.
+        phi_next = 0.0 if airborne else spacing_potential(rel_dist, cfg)
+        phi_prev = 0.0 if prev_airborne else spacing_potential(state.prev_rel_dist, cfg)
+    else:
+        phi_next = spacing_potential(rel_dist, cfg)
+        phi_prev = spacing_potential(state.prev_rel_dist, cfg)
+    shaping = cfg.gamma * phi_next - phi_prev
 
     terminal = 0.0
     if terminated:
@@ -131,5 +161,6 @@ def compute_reward(state: RewardState, my_hp: float, enemy_hp: float,
         prev_rel_dist=rel_dist,
         combo_counter=combo_counter,
         frames_since_last_hit=frames_since_last_hit,
+        prev_airborne=airborne,
     )
     return sum(components.values()), next_state, components
