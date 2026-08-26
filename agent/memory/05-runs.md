@@ -59,3 +59,9 @@ bench_12rivals.py ahora tiene `--action-noise P` y `--desync-max K` (perturbacio
 - La "meseta" de g407 era transitoria: cerró subiendo (mean poblacional ~0.82; banco g751: desync 81.9%, Sagat cayó, EHonda regresó). Archivo: benchmarks/run2_final/ (theta gen 754 + checkpoint), S3 es-run2-onehot/ intacto, coordinator y workers detenidos limpio (madre viva para run 3).
 - **Matriz de randomness θ754**: limpio 75.0 / desync 75.0 (**brecha CERO — cero coreografía**, vs −19pts de run 1) / ruido 5% 65.3 / ruido 10% 66.7 (**sin dosis-respuesta**: el primer ruido rompe combos, más ya no empeora) / combinada 66.7. Número honesto de run 2: ~75-80% (varianza muestral ±5). El PPO campeón sigue siendo inmune al ruido (90.3% con 10%) por entrenar estocástico.
 - Palanca extra run 3 confirmada por esto: ruido de acciones EN los episodios de evaluación del ES (además del desync), para presionar la motricidad fina.
+
+## [2026-08-26 noche-3] RUN 3 LANZADA — "ni una partida igual"
+
+- **Config**: v4onehot + eval_desync_max 30 + eval_action_noise 0.05 + 4 eps/miembro + wd 0.01, S3 `es-run3-perturbed/`, W&B `sandy-pine-8`. Mac SOLA (8 procs, ~3.9k steps/s, ~166s/gen con los 4 eps) mientras la Legion corre Rainbow. La desktop se suma al terminar su 31M.
+- **Mecanismo nuevo (commit 5b3b1bda)**: perturbaciones sorteadas del seed del PAR con stream por episodio (gemelos antitéticos sufren idénticas; el ruido se cancela en la diferencia del par). Identidad de run anclada en checkpoint, viaja en el lease ("eval"), echo obligatorio (eval_fingerprint) — worker viejo = rechazo ruidoso. Validado en producción con el primer chunk aceptado.
+- **OJO al comparar curvas**: el fitness de run 3 es la función objetivo ROBUSTA (bajo ruido+desfase) — sus números serán más bajos que los de run 2 A IGUAL HABILIDAD (el 65-67% de run 2 bajo ruido es la vara inicial, no el 75 limpio). El banco sigue midiendo con las mismas 5 condiciones para comparar de verdad.

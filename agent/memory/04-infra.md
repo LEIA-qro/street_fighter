@@ -35,3 +35,8 @@
 - Archivo run 1 (policy escalar, 96 gens): S3 `es/` intacto + local `benchmarks/run1_final/` (gen_000096 + theta final).
 - Worker M4 ahora a `--cpu-share 0.8` (8 procs, ~3,700 steps/s). Log: scratchpad/worker-run2.log.
 - Tailnet: Diego tiene DOS nodos (perea-1=Windows host, **legion-wsl=el bueno** para worker; WSL y Windows son máquinas distintas para Tailscale, no es error).
+
+## [2026-08-26 noche] Unit actual de madre (run 3)
+
+`--states manifest --difficulty 1 --policy v4onehot --s3-prefix es-run3-perturbed --chunk-size 24 --episodes-per-eval 4 --weight-decay 0.01 --eval-desync-max 30 --eval-action-noise 0.05`
+Runs cerradas archivadas: S3 `es/` (run 1 escalar) y `es-run2-onehot/` (run 2), + benchmarks/run{1,2}_final/ en el repo.
