@@ -825,7 +825,8 @@ def _cli_args(tmp_path, **overrides):
     """A namespace matching _toy_state's hyperparameters (no spurious pins)."""
     import argparse
     kwargs = dict(checkpoint_dir=str(tmp_path), s3_bucket=None, sigma=0.1,
-                  lr=0.05, weight_decay=0.0, master_seed=1234, policy="v4")
+                  lr=0.05, weight_decay=0.0, master_seed=1234, policy="v4",
+                  eval_desync_max=0, eval_action_noise=0.0)
     kwargs.update(overrides)
     return argparse.Namespace(**kwargs)
 

@@ -53,6 +53,13 @@ class ESState:
     # Which policy architecture theta parameterizes (key into policy.POLICIES).
     # Run identity like everything above: theta's very SHAPE depends on it.
     policy: str = "v4"
+    # Perturbaciones de evaluacion (2026-08-26, run 3): cada episodio arranca
+    # desfasado 0..eval_desync_max frames neutrales y cada paso tiene prob.
+    # eval_action_noise de ejecutar una accion aleatoria. Identidad del run:
+    # el fitness bajo perturbacion es OTRA funcion objetivo (la robusta), y
+    # mezclar fitness limpios en el mismo run compara peras con manzanas.
+    eval_desync_max: int = 0
+    eval_action_noise: float = 0.0
 
 
 def normalize_states(states):
@@ -67,13 +74,16 @@ def normalize_states(states):
     return tuple(str(s) for s in states)
 
 
-def init_state(theta, sigma, lr, weight_decay, master_seed, states=None, policy="v4"):
+def init_state(theta, sigma, lr, weight_decay, master_seed, states=None, policy="v4",
+               eval_desync_max=0, eval_action_noise=0.0):
     theta = np.asarray(theta, dtype=np.float32)
     zeros = np.zeros_like(theta)
     return ESState(theta=theta, sigma=float(sigma), lr=float(lr),
                    weight_decay=float(weight_decay), master_seed=int(master_seed),
                    generation=0, adam_m=zeros.copy(), adam_v=zeros.copy(), adam_t=0,
-                   states=normalize_states(states), policy=str(policy))
+                   states=normalize_states(states), policy=str(policy),
+                   eval_desync_max=int(eval_desync_max),
+                   eval_action_noise=float(eval_action_noise))
 
 
 def pair_seeds_for_generation(master_seed, generation, n_pairs):
@@ -107,6 +117,24 @@ def members_for_generation(state, pop_size):
 # the perturbation's leading components -- exactly the confound this function
 # exists to remove.
 _STATE_STREAM_KEY = 0x57A7E
+_EVAL_PERTURB_KEY = 0xE7A1
+
+
+def eval_rng_for_episode(pair_seed, episode_idx):
+    """RNG de perturbaciones de evaluacion para UN episodio de un miembro.
+
+    Derivado del seed del PAR (jamas del signo), con stream propio por indice
+    de episodio: los gemelos antiteticos +eps y -eps sortean EXACTAMENTE el
+    mismo desfase de arranque y la misma secuencia de ruido, asi que la
+    perturbacion del ambiente se cancela en la diferencia del par (common
+    random numbers, el mismo argumento de states_for_member). El stream es
+    por-episodio y no compartido porque el numero de draws depende del LARGO
+    del episodio, que difiere entre gemelos: un stream unico se
+    desincronizaria del episodio 2 en adelante.
+    """
+    ss = np.random.SeedSequence(entropy=int(pair_seed),
+                                spawn_key=(_EVAL_PERTURB_KEY, int(episode_idx)))
+    return np.random.default_rng(ss)
 
 
 def states_for_member(pair_seed, episodes, n_states):
@@ -211,7 +239,9 @@ def save_checkpoint(state, path_base):
             # run identity like sigma/lr: which savestates the fitnesses were
             # measured against (null = workers' default state)
             "states": None if state.states is None else list(state.states),
-            "policy": state.policy}
+            "policy": state.policy,
+            "eval_desync_max": state.eval_desync_max,
+            "eval_action_noise": state.eval_action_noise}
     tmp = path_base + ".json.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -233,7 +263,10 @@ def load_checkpoint(path_base):
                     # have no key at all and resume as single-state runs
                     states=normalize_states(meta.get("states")),
                     # same aging rule: pre-registry checkpoints are all v4
-                    policy=str(meta.get("policy", "v4")))
+                    policy=str(meta.get("policy", "v4")),
+                    # y los pre-perturbacion son runs limpios
+                    eval_desync_max=int(meta.get("eval_desync_max", 0)),
+                    eval_action_noise=float(meta.get("eval_action_noise", 0.0)))
     if state.theta.shape[0] != int(meta["dim"]):
         raise ValueError(f"checkpoint dim mismatch: json says {meta['dim']}, "
                          f"npz has {state.theta.shape[0]}")

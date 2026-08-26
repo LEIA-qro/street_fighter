@@ -71,6 +71,26 @@ import time
 import numpy as np
 
 
+def eval_fingerprint(desync_max, action_noise):
+    """Echo corto de los parametros de perturbacion de evaluacion; None si
+    ambos son cero (run limpio).
+
+    Mismo contrato que states_fingerprint: mientras un run entrena con
+    perturbaciones, el coordinador solo acepta resultados que ECHAN este
+    string calculado de los parametros del lease que el worker realmente
+    aplico. Un worker viejo ignora la clave "eval" del lease, evalua limpio,
+    no puede producir el echo, y es rechazado ruidosamente por chunk en vez
+    de mezclar fitness limpios (otra funcion objetivo) en el run robusto.
+    El formato usa el roundtrip exacto de JSON (repr de float), asi ambos
+    lados producen bytes identicos del mismo numero.
+    """
+    desync_max = int(desync_max or 0)
+    action_noise = float(action_noise or 0.0)
+    if desync_max == 0 and action_noise == 0.0:
+        return None
+    return f"d{desync_max}:n{action_noise!r}"
+
+
 def states_fingerprint(states):
     """Order-sensitive digest of a savestate rotation; None without one.
 

@@ -45,8 +45,11 @@ if __package__ in (None, ""):  # `python src/es/worker.py`
 import numpy as np
 
 from es import protocol, resources
-from es.openes import fitness_from_episode, perturbation, states_for_member
+from es.openes import (eval_rng_for_episode, fitness_from_episode, perturbation,
+                       states_for_member)
 from es.policy import DEFAULT_POLICY, POLICIES
+
+NEUTRAL_ACTION = np.array([0, 0], dtype=np.int64)  # sin direccion, sin boton
 
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
 RATE_WINDOW_S = 120.0      # rolling window behind the steps/s we report
@@ -83,14 +86,32 @@ def _pool_init(env_kwargs, nice_delta):
         resources.apply_nice(nice_delta, warn=_log)
 
 
-def _run_episode(env, policy, state=None):
+def _run_episode(env, policy, state=None, perturb_rng=None, desync_max=0,
+                 action_noise=0.0):
     # options={"state": name} pins THIS episode's savestate (RetroSF2Env's
     # per-reset override); None keeps the env's own default, which is the
     # entire pre-rotation behaviour.
+    #
+    # perturb_rng (run 3): el RNG PAREADO del episodio (eval_rng_for_episode
+    # con el seed del par) -- sortea el desfase de arranque y el ruido de
+    # acciones identicos para ambos gemelos antiteticos. None = episodio
+    # limpio, byte a byte el comportamiento previo.
     obs, _ = env.reset(options={"state": state} if state else None)
     steps, info = 0, {}
+    if perturb_rng is not None and desync_max:
+        for _ in range(int(perturb_rng.integers(0, int(desync_max) + 1))):
+            obs, _reward, terminated, truncated, info = env.step(NEUTRAL_ACTION)
+            steps += 1
+            if terminated or truncated:
+                return fitness_from_episode(info, steps), steps
     while steps < MAX_EPISODE_STEPS:
-        obs, _reward, terminated, truncated, info = env.step(policy.act(obs))
+        if (perturb_rng is not None and action_noise
+                and perturb_rng.random() < action_noise):
+            action = np.array([perturb_rng.integers(0, 9),
+                               perturb_rng.integers(0, 7)], dtype=np.int64)
+        else:
+            action = policy.act(obs)
+        obs, _reward, terminated, truncated, info = env.step(action)
         steps += 1
         if terminated or truncated:
             break
@@ -112,9 +133,12 @@ def evaluate_member(task):
     the opponent draw. Fitness stays the plain per-member mean either way.
     """
     global _ENV
-    # 7-tuples carry the wire's policy name; 6-tuples predate the registry
-    # (older callers and tests) and mean the v4 default.
-    if len(task) == 7:
+    # Longitud del task = version del wire: 6 (pre-registro, v4 limpio),
+    # 7 (+ nombre de policy), 8 (+ dict de perturbaciones de evaluacion).
+    eval_params = None
+    if len(task) == 8:
+        theta, sigma, seed, sign, episodes, states, policy_name, eval_params = task
+    elif len(task) == 7:
         theta, sigma, seed, sign, episodes, states, policy_name = task
     else:
         theta, sigma, seed, sign, episodes, states = task
@@ -123,11 +147,22 @@ def evaluate_member(task):
         _ENV = _make_env()
     eps = perturbation(theta.shape[0], seed)
     policy = POLICIES[policy_name](theta + np.float32(sign) * np.float32(sigma) * eps)
+    desync = int(eval_params.get("desync_max", 0)) if eval_params else 0
+    noise = float(eval_params.get("action_noise", 0.0)) if eval_params else 0.0
+
+    def _episode(ep_idx, state_name):
+        # RNG del seed del PAR + indice de episodio: el gemelo antitetico de
+        # este miembro deriva EXACTAMENTE las mismas perturbaciones
+        rng = (eval_rng_for_episode(seed, ep_idx)
+               if (desync or noise) else None)
+        return _run_episode(_ENV, policy, state=state_name, perturb_rng=rng,
+                            desync_max=desync, action_noise=noise)
+
     if states:
         picks = states_for_member(seed, episodes, len(states))
-        runs = [_run_episode(_ENV, policy, state=states[i]) for i in picks]
+        runs = [_episode(e, states[i]) for e, i in enumerate(picks)]
     else:
-        runs = [_run_episode(_ENV, policy) for _ in range(episodes)]
+        runs = [_episode(e, None) for e in range(episodes)]
     return float(np.mean([f for f, _s in runs])), int(sum(s for _f, s in runs))
 
 
@@ -323,7 +358,10 @@ def main():
             # no "states" key (older coordinator, or a run without a rotation)
             # -> None -> every episode on this worker's default state
             states = work.get("states") or None
-            tasks = [(theta, work["sigma"], seed, sign, episodes, states, policy_name)
+            # "eval" (run 3): perturbaciones de evaluacion; ausente = limpio
+            eval_params = work.get("eval") or None
+            tasks = [(theta, work["sigma"], seed, sign, episodes, states,
+                      policy_name, eval_params)
                      for _idx, seed, sign in work["members"]]
             t0 = time.monotonic()
             if pool is not None:
@@ -348,6 +386,12 @@ def main():
                 # blindly acknowledged. The coordinator refuses rotation
                 # results without a matching echo (see protocol.py).
                 result["states_fingerprint"] = protocol.states_fingerprint(states)
+            if eval_params:
+                # misma prueba para las perturbaciones: el echo se calcula de
+                # los parametros REALMENTE aplicados en este loop
+                result["eval_fingerprint"] = protocol.eval_fingerprint(
+                    eval_params.get("desync_max", 0),
+                    eval_params.get("action_noise", 0.0))
             # result POSTs retry harder than /work: the evaluation is paid for
             for _ in range(5):
                 resp = _http_json(f"{coordinator}/result", body=result)

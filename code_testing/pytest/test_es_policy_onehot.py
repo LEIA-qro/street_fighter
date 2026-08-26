@@ -152,7 +152,8 @@ class TestCheckpointIdentity:
         openes.save_checkpoint(state, str(tmp_path / "gen_000003"))
         args = argparse.Namespace(checkpoint_dir=str(tmp_path), s3_bucket=None,
                                   sigma=0.02, lr=0.01, weight_decay=0.0,
-                                  master_seed=9, policy="v4onehot")
+                                  master_seed=9, policy="v4onehot",
+                                  eval_desync_max=0, eval_action_noise=0.0)
         resumed = load_or_init_state(args, states=("A", "B"))
         assert resumed.policy == "v4"
         assert resumed.generation == state.generation

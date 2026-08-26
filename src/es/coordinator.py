@@ -106,6 +106,12 @@ class Coordinator:
         # what a current worker must echo in every /result while the rotation
         # is on (None = no rotation, and the echo then decides nothing)
         self.states_fingerprint = protocol.states_fingerprint(self.states)
+        # perturbaciones de evaluacion del run (identidad, del checkpoint):
+        # viajan en cada lease y exigen echo, mismo contrato que la rotacion
+        self.eval_desync_max = int(getattr(state, "eval_desync_max", 0) or 0)
+        self.eval_action_noise = float(getattr(state, "eval_action_noise", 0.0) or 0.0)
+        self.eval_fingerprint = protocol.eval_fingerprint(self.eval_desync_max,
+                                                          self.eval_action_noise)
         self.speculative_after = speculative_after
         self.speculative_when_remaining_below = speculative_when_remaining_below
         self.max_concurrent_leases = max_concurrent_leases
@@ -166,6 +172,9 @@ class Coordinator:
                 # because the handler serialises the lease outside the lock:
                 # nothing downstream may hold (or mutate) the rotation itself.
                 work["states"] = list(self.states)
+            if self.eval_fingerprint is not None:
+                work["eval"] = {"desync_max": self.eval_desync_max,
+                                "action_noise": self.eval_action_noise}
             return work
 
     @staticmethod
@@ -211,6 +220,19 @@ class Coordinator:
                           f"{str(body.get('worker', '?'))}: rotation active "
                           f"but the result {why} -- update that machine's "
                           f"worker before it can contribute", flush=True)
+                    return False
+            if self.eval_fingerprint is not None:
+                # mismo contrato que la rotacion: sin echo de perturbaciones
+                # no hay prueba de que el fitness sea el ROBUSTO y no el
+                # limpio -- otra funcion objetivo, rechazo ruidoso
+                echo = body.get("eval_fingerprint")
+                if echo != self.eval_fingerprint:
+                    why = ("echoes different eval params" if echo
+                           else "has no eval echo (pre-perturbation worker?)")
+                    print(f"[coord] refused {body.get('chunk_id')} from "
+                          f"{str(body.get('worker', '?'))}: eval perturbations "
+                          f"active but the result {why} -- update that "
+                          f"machine's worker before it can contribute", flush=True)
                     return False
             fits = dict(zip(body["member_idx"], body["fitnesses"]))
             accepted = self.queue.complete(body["chunk_id"], fits)
@@ -587,7 +609,9 @@ def load_or_init_state(args, states=None):
                               ("weight_decay", args.weight_decay),
                               ("master_seed", args.master_seed),
                               ("states", cli_states),
-                              ("policy", args.policy)):
+                              ("policy", args.policy),
+                              ("eval_desync_max", args.eval_desync_max),
+                              ("eval_action_noise", args.eval_action_noise)):
             ckpt_val = getattr(state, name)
             if cli_val != ckpt_val:
                 print(f"[coord] WARNING: --{name.replace('_', '-')}={cli_val} ignored; "
@@ -598,7 +622,9 @@ def load_or_init_state(args, states=None):
     print(f"[coord] fresh start: policy {args.policy}, {theta.shape[0]} params, "
           f"master_seed {args.master_seed}", flush=True)
     return openes.init_state(theta, args.sigma, args.lr, args.weight_decay,
-                             args.master_seed, states=cli_states, policy=args.policy)
+                             args.master_seed, states=cli_states, policy=args.policy,
+                             eval_desync_max=args.eval_desync_max,
+                             eval_action_noise=args.eval_action_noise)
 
 
 def main():
@@ -646,6 +672,14 @@ def main():
                          "checkpoint on resume, like --sigma). 'v4onehot' feeds "
                          "the first layer one-hot character IDs so the MLP can "
                          "branch per matchup")
+    ap.add_argument("--eval-desync-max", type=int, default=0,
+                    help="cada episodio de evaluacion arranca desfasado 0..N "
+                         "frames neutrales (sorteo del seed del PAR: ambos "
+                         "gemelos antiteticos sufren el mismo). Identidad del "
+                         "run, anclada en el checkpoint")
+    ap.add_argument("--eval-action-noise", type=float, default=0.0,
+                    help="prob. por paso de accion aleatoria durante la "
+                         "evaluacion (mismo sorteo pareado). Identidad del run")
     args = ap.parse_args()
 
     if args.difficulty is not None and args.states != "manifest":
