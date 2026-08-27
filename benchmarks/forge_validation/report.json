@@ -1,0 +1,220 @@
+{
+  "date": "2026-08-27 00:34",
+  "ckpt": "apex_curriculum_best.pt",
+  "eps_per_arm": 40,
+  "desync_max": 30,
+  "opponents": {
+    "CHUNLI": {
+      "levels": {
+        "lo": 1,
+        "hi": 8
+      },
+      "arms": {
+        "A_lo": {
+          "episodes": 40,
+          "win_rate": 0.975,
+          "fitness": 1.3748880681818183,
+          "fitness_std": 0.3028532166775679,
+          "mean_steps": 112.625
+        },
+        "A_hi": {
+          "episodes": 40,
+          "win_rate": 0.175,
+          "fitness": -0.05645272727272728,
+          "fitness_std": 0.5145371629258845,
+          "mean_steps": 198.05
+        },
+        "F_hi": {
+          "episodes": 40,
+          "win_rate": 0.125,
+          "fitness": -0.08984670454545454,
+          "fitness_std": 0.46770240381804445,
+          "mean_steps": 204.575
+        },
+        "F_lo": {
+          "episodes": 40,
+          "win_rate": 1.0,
+          "fitness": 1.3809737499999999,
+          "fitness_std": 0.09392421736667085,
+          "mean_steps": 119.95
+        }
+      },
+      "comparisons": {
+        "control": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": 0.8,
+          "d_fitness": 1.4313407954545456
+        },
+        "equiv_hi": {
+          "p_fitness": 0.7643117844107795,
+          "p_wins": 0.751812409379531,
+          "d_win_rate": -0.04999999999999999,
+          "d_fitness": -0.03339397727272726
+        },
+        "discrim_hi": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": -0.85,
+          "d_fitness": -1.4647347727272728
+        },
+        "equiv_lo": {
+          "p_fitness": 0.9814509274536273,
+          "p_wins": 1.0,
+          "d_win_rate": 0.025000000000000022,
+          "d_fitness": 0.0060856818181815875
+        },
+        "discrim_lo": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": 0.825,
+          "d_fitness": 1.4374264772727272
+        }
+      },
+      "verdict": "PASS",
+      "why": "forjado ~ etiqueta y forjado != donante, en ambas direcciones"
+    },
+    "ZANGIEF": {
+      "levels": {
+        "lo": 1,
+        "hi": 7
+      },
+      "arms": {
+        "A_lo": {
+          "episodes": 40,
+          "win_rate": 1.0,
+          "fitness": 1.389299659090909,
+          "fitness_std": 0.08971390548967437,
+          "mean_steps": 111.975
+        },
+        "A_hi": {
+          "episodes": 40,
+          "win_rate": 0.45,
+          "fitness": 0.4111228409090909,
+          "fitness_std": 0.6722357870993743,
+          "mean_steps": 165.05
+        },
+        "F_hi": {
+          "episodes": 40,
+          "win_rate": 0.475,
+          "fitness": 0.4325455681818182,
+          "fitness_std": 0.6335090034367474,
+          "mean_steps": 161.05
+        },
+        "F_lo": {
+          "episodes": 40,
+          "win_rate": 1.0,
+          "fitness": 1.4013761363636363,
+          "fitness_std": 0.056381656281373926,
+          "mean_steps": 115.5
+        }
+      },
+      "comparisons": {
+        "control": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": 0.55,
+          "d_fitness": 0.9781768181818181
+        },
+        "equiv_hi": {
+          "p_fitness": 0.8911554422278886,
+          "p_wins": 1.0,
+          "d_win_rate": 0.024999999999999967,
+          "d_fitness": 0.021422727272727315
+        },
+        "discrim_hi": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": -0.525,
+          "d_fitness": -0.9567540909090908
+        },
+        "equiv_lo": {
+          "p_fitness": 0.4785760711964402,
+          "p_wins": 1.0,
+          "d_win_rate": 0.0,
+          "d_fitness": 0.012076477272727315
+        },
+        "discrim_lo": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 4.999750012499375e-05,
+          "d_win_rate": 0.55,
+          "d_fitness": 0.9902532954545454
+        }
+      },
+      "verdict": "PASS",
+      "why": "forjado ~ etiqueta y forjado != donante, en ambas direcciones"
+    },
+    "DHALSIM": {
+      "levels": {
+        "lo": 1,
+        "hi": 7
+      },
+      "arms": {
+        "A_lo": {
+          "episodes": 40,
+          "win_rate": 1.0,
+          "fitness": 1.4183198863636364,
+          "fitness_std": 0.06217349149864204,
+          "mean_steps": 110.125
+        },
+        "A_hi": {
+          "episodes": 40,
+          "win_rate": 0.8,
+          "fitness": 0.9126954545454545,
+          "fitness_std": 0.5652767877021628,
+          "mean_steps": 199.75
+        },
+        "F_hi": {
+          "episodes": 40,
+          "win_rate": 0.9,
+          "fitness": 1.0811804545454546,
+          "fitness_std": 0.4237046749720633,
+          "mean_steps": 186.775
+        },
+        "F_lo": {
+          "episodes": 40,
+          "win_rate": 1.0,
+          "fitness": 1.4133639772727273,
+          "fitness_std": 0.055616262275817695,
+          "mean_steps": 115.65
+        }
+      },
+      "comparisons": {
+        "control": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 0.005149742512874356,
+          "d_win_rate": 0.19999999999999996,
+          "d_fitness": 0.5056244318181818
+        },
+        "equiv_hi": {
+          "p_fitness": 0.1383930803459827,
+          "p_wins": 0.3474326283685816,
+          "d_win_rate": 0.09999999999999998,
+          "d_fitness": 0.1684850000000001
+        },
+        "discrim_hi": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 0.11944402779861008,
+          "d_win_rate": -0.09999999999999998,
+          "d_fitness": -0.33713943181818173
+        },
+        "equiv_lo": {
+          "p_fitness": 0.7101144942752863,
+          "p_wins": 1.0,
+          "d_win_rate": 0.0,
+          "d_fitness": -0.004955909090909039
+        },
+        "discrim_lo": {
+          "p_fitness": 4.999750012499375e-05,
+          "p_wins": 0.005949702514874256,
+          "d_win_rate": 0.19999999999999996,
+          "d_fitness": 0.5006685227272728
+        }
+      },
+      "verdict": "PASS",
+      "why": "forjado ~ etiqueta y forjado != donante, en ambas direcciones"
+    }
+  },
+  "verdicts": {},
+  "verdict": "PASS"
+}

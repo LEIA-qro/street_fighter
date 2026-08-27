@@ -79,3 +79,32 @@ tailscale status
 
 El nombre de tu nodo WSL (algo como `sss-1`) es la dirección que los helpers
 usan en su `--learner http://<ese-nodo>:8090`.
+
+## ⚠️ 5. INCIDENTE 2026-08-27 madrugada: learner congelado — reinicio
+
+El learner se CONGELÓ en `grads 33103` (~00:40): el HTTP siguió vivo (los
+actores alimentando, `/status` respondiendo) pero cero gradientes. El
+sospechoso principal es un `wandb.log` bloqueado (ya está parcheado en el
+repo: wandb corre en su propio hilo y jamás vuelve a frenar el
+entrenamiento). Para levantarlo:
+
+1. En la terminal del learner: **`Ctrl+C` UNA vez y COPIA el traceback al
+   grupo** — dice exactamente dónde estaba congelado (¿wandb? ¿CUDA?). Es el
+   diagnóstico, no lo pierdas.
+2. `cd ~/street_fighter && git pull` (trae el parche de wandb **y los
+   savestates lvl5-8 nuevos**).
+3. Relanzar desde el último checkpoint (se pierden ≤10k grads, el buffer se
+   rellena solo en ~3 min):
+
+```bash
+cd ~/street_fighter && source .venv/bin/activate && LATEST=$(ls -t models/rainbow_apex/apex_grads_*.pt | head -1) && python tools/apex_learner.py --port 8090 --macros --buffer 1000000 --beta-anneal-grads 1000000 --weights-every 500 --resume-ckpt "$LATEST" --wandb-project leia-sf2-es --wandb-id rainbow-apex-curriculum
+```
+
+(`--weights-every 500` es el ajuste ya planeado: pesos cada ~10 s en vez de
+~2 s.) Los actores se reconectan y recargan solos; si alguno grita "config
+cambió", es su guard: pull + relanzar ese actor.
+
+**Curriculum 5-8**: ya existen los 96 estados (12 rivales × lvl1-8,
+validados conductualmente). Extender la run = decisión de equipo con
+Felipe; el cambio es solo relanzar ACTORES con `--difficulty 1,2,3,4,5,6,7,8`
+(el learner no se toca).

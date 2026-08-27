@@ -14,6 +14,7 @@
 import argparse
 import json
 import os
+import queue
 import random
 import sys
 import threading
@@ -170,6 +171,27 @@ def main():
         except Exception as e:
             print(f"[learner] wandb off ({e})", flush=True)
 
+    # wandb JAMAS en el hilo de entrenamiento: un .log() puede bloquear
+    # indefinidamente si el sidecar se atora (2026-08-27: el loop se congelo
+    # en grads 33103 con el HTTP vivo -- ingesta corriendo, cero gradientes,
+    # toda la flota alimentando a un learner paralizado). Un hilo daemon
+    # drena una cola con tope; si wandb se muere, se TIRAN filas con aviso y
+    # el entrenamiento ni se entera.
+    wandb_q = None
+    if wandb_run:
+        wandb_q = queue.Queue(maxsize=200)
+
+        def _wandb_pump():
+            while True:
+                row, step = wandb_q.get()
+                try:
+                    wandb_run.log(row, step=step)
+                except Exception as e:  # noqa: BLE001 -- telemetria, no el run
+                    print(f"[learner] wandb log fallo ({e}); sigo", flush=True)
+
+        threading.Thread(target=_wandb_pump, daemon=True,
+                         name="wandb-pump").start()
+
     os.makedirs(args.out, exist_ok=True)
     rng = random.Random(args.seed)
     losses = []
@@ -224,17 +246,21 @@ def main():
                       f"wr acum {s['win_rate_cum']} reciente200 {s['win_rate_recent200']} ({s['episodes']} eps) | "
                       f"loss {np.mean(losses):.4f} | {actor_line}",
                       flush=True)
-                if wandb_run:
-                    wandb_run.log({"loss": float(np.mean(losses)),
-                                   "buffer": s["buffer"], "beta": beta,
-                                   "grads_per_s": grads_s,
-                                   "transitions_per_s": trans_s,
-                                   "win_rate_cum": s["win_rate_cum"],
-                                   "win_rate_recent200": s["win_rate_recent200"],
-                                   **{f"win_rate_recent/lvl{lv}": v
-                                      for lv, v in s["win_rate_recent_by_lvl"].items()},
-                                   "episodes": s["episodes"]},
-                                  step=learner.grad_steps)
+                if wandb_q:
+                    row = {"loss": float(np.mean(losses)),
+                           "buffer": s["buffer"], "beta": beta,
+                           "grads_per_s": grads_s,
+                           "transitions_per_s": trans_s,
+                           "win_rate_cum": s["win_rate_cum"],
+                           "win_rate_recent200": s["win_rate_recent200"],
+                           **{f"win_rate_recent/lvl{lv}": v
+                              for lv, v in s["win_rate_recent_by_lvl"].items()},
+                           "episodes": s["episodes"]}
+                    try:
+                        wandb_q.put_nowait((row, learner.grad_steps))
+                    except queue.Full:
+                        print("[learner] cola wandb llena (sidecar atorado?); "
+                              "fila tirada, el entrenamiento sigue", flush=True)
                 last_log_t = time.time()
                 last_log_grads = learner.grad_steps
                 last_log_trans = s["transitions_in"]

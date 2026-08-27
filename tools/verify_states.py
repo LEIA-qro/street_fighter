@@ -64,27 +64,39 @@ def read_manifest(path=MANIFEST_PATH):
 
 
 def write_manifest_merged(results, path=MANIFEST_PATH):
-    """Read-merge-write: only replace 'verified' (and null 'opponent') on
-    entries we measured; keep everything else -- including entries another
-    track added since we read the file -- untouched."""
-    manifest = read_manifest(path)
-    states = manifest.setdefault("states", {})
-    for name, res in results.items():
-        entry = states.get(name)
-        if entry is None:
-            continue  # entry vanished under us; not ours to resurrect
-        entry["verified"] = res["verified"]
-        if entry.get("opponent") is None and res["opponent"] is not None:
-            entry["opponent"] = res["opponent"]
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(manifest, f, indent=2)
-            f.write("\n")
-        os.replace(tmp, path)
-    except BaseException:
-        os.unlink(tmp)
-        raise
+    """Read-merge-write under the manifest lock: only refresh the measured
+    keys of 'verified' (and null 'opponent') on entries we measured; keep
+    everything else -- other tracks' entries, and provenance keys inside
+    'verified' (forged_from, forge_method, difficulty_byte...) that this
+    linter does not measure -- untouched. The flock is the same one
+    farm_states/forge_states writes take, so concurrent merges serialize
+    instead of dropping each other's rows."""
+    import fcntl
+    with open(path + ".lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            manifest = read_manifest(path)
+            states = manifest.setdefault("states", {})
+            for name, res in results.items():
+                entry = states.get(name)
+                if entry is None:
+                    continue  # entry vanished under us; not ours to resurrect
+                merged = dict(entry.get("verified") or {})
+                merged.update(res["verified"])
+                entry["verified"] = merged
+                if entry.get("opponent") is None and res["opponent"] is not None:
+                    entry["opponent"] = res["opponent"]
+            fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(manifest, f, indent=2)
+                    f.write("\n")
+                os.replace(tmp, path)
+            except BaseException:
+                os.unlink(tmp)
+                raise
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def ram(env):

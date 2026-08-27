@@ -23,6 +23,53 @@
     "m68k_address": "0xFFFE45",
     "work_ram_offset": 65093
   },
+  "difficulty_ram_in_fight": {
+    "behavioral_validation": "benchmarks/forge_validation/report.json (PASS: 3 opponents x 4 arms x 40 eps, both poke directions, permutation tests)",
+    "bytes": {
+      "0x96B8": {
+        "by_level": {
+          "1": 0,
+          "2": 0,
+          "3": 0,
+          "4": 32,
+          "5": 48,
+          "6": 96,
+          "7": 128,
+          "8": 255
+        },
+        "role": "derived AI parameter (nonlinear)"
+      },
+      "0x97B2": {
+        "encoding": "level_minus_1",
+        "role": "in-fight difficulty copy"
+      },
+      "0xBA35": {
+        "by_level": {
+          "1": 239,
+          "2": 255,
+          "3": 15,
+          "4": 31,
+          "5": 47,
+          "6": 63,
+          "7": 79,
+          "8": 95
+        },
+        "role": "derived (16*(lvl-2)-1 mod 256), tripled"
+      },
+      "0xBA38": {
+        "role": "same as 0xBA35"
+      },
+      "0xBA58": {
+        "role": "same as 0xBA35"
+      },
+      "0xFE45": {
+        "encoding": "level_minus_1",
+        "role": "OPTION MODE setting; cosmetic in-fight"
+      }
+    },
+    "discovery": "full-blob diff across the 68 authentic farmed states (12 opponents, levels 1-8), 2026-08-27, after the 0xFE45-only poke FAILED behavioral validation (fight scene copies difficulty at load)",
+    "tool": "tools/forge_states.py DIFFICULTY_DEPENDENT_RAM"
+  },
   "schema": "sf2-retro-states/v1",
   "states": {
     "Champion.Level1.RyuVsGuile": {
@@ -2405,6 +2452,94 @@
         "timer_ticked_after_frames": 170
       }
     },
+    "RYU_BALROG_R1_lvl5": {
+      "difficulty": 5,
+      "donor": "RYU_BALROG_R1_lvl4",
+      "opponent": "BALROG",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl5 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BALROG_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_BALROG_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_BALROG_R1_lvl4",
+      "opponent": "BALROG",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BALROG_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_BALROG_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_BALROG_R1_lvl4",
+      "opponent": "BALROG",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BALROG_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_BALROG_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_BALROG_R1_lvl4",
+      "opponent": "BALROG",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BALROG_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 10,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
     "RYU_BLANKA_R1_lvl1": {
       "difficulty": 1,
       "opponent": "BLANKA",
@@ -2517,6 +2652,50 @@
         "p2_char_id": 2,
         "round_timer_bcd": 153,
         "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_BLANKA_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_BLANKA_R1_lvl6",
+      "opponent": "BLANKA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BLANKA_R1_lvl6",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_BLANKA_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_BLANKA_R1_lvl6",
+      "opponent": "BLANKA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_BLANKA_R1_lvl6",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 2,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
       }
     },
     "RYU_CHUNLI_R1_lvl1": {
@@ -2804,6 +2983,28 @@
         "timer_ticked_after_frames": 169
       }
     },
+    "RYU_DHALSIM_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_DHALSIM_R1_lvl7",
+      "opponent": "DHALSIM",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_DHALSIM_R1_lvl7",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 7,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 168
+      }
+    },
     "RYU_EHONDA_R1_lvl1": {
       "difficulty": 1,
       "opponent": "EHONDA",
@@ -2937,6 +3138,28 @@
         "timer_ticked_after_frames": 171
       }
     },
+    "RYU_EHONDA_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_EHONDA_R1_lvl7",
+      "opponent": "EHONDA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_EHONDA_R1_lvl7",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 1,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 170
+      }
+    },
     "RYU_GUILE_R1_lvl1": {
       "difficulty": 1,
       "opponent": "GUILE",
@@ -3030,6 +3253,72 @@
         "p2_char_id": 3,
         "round_timer_bcd": 153,
         "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_GUILE_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_GUILE_R1_lvl5",
+      "opponent": "GUILE",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_GUILE_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 168
+      }
+    },
+    "RYU_GUILE_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_GUILE_R1_lvl5",
+      "opponent": "GUILE",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_GUILE_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 168
+      }
+    },
+    "RYU_GUILE_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_GUILE_R1_lvl5",
+      "opponent": "GUILE",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_GUILE_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 3,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 168
       }
     },
     "RYU_KEN_R1_lvl1": {
@@ -3127,6 +3416,72 @@
         "timer_ticked_after_frames": 170
       }
     },
+    "RYU_KEN_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_KEN_R1_lvl5",
+      "opponent": "KEN",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_KEN_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_KEN_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_KEN_R1_lvl5",
+      "opponent": "KEN",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_KEN_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_KEN_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_KEN_R1_lvl5",
+      "opponent": "KEN",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_KEN_R1_lvl5",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 4,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
     "RYU_MBISON_R1_lvl1": {
       "difficulty": 1,
       "opponent": "MBISON",
@@ -3201,6 +3556,94 @@
         "p2_char_id": 8,
         "round_timer_bcd": 153,
         "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_MBISON_R1_lvl5": {
+      "difficulty": 5,
+      "donor": "RYU_MBISON_R1_lvl4",
+      "opponent": "MBISON",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl5 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_MBISON_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_MBISON_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_MBISON_R1_lvl4",
+      "opponent": "MBISON",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_MBISON_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_MBISON_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_MBISON_R1_lvl4",
+      "opponent": "MBISON",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_MBISON_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_MBISON_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_MBISON_R1_lvl4",
+      "opponent": "MBISON",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_MBISON_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 8,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
       }
     },
     "RYU_RYU_R1_lvl1": {
@@ -3336,6 +3779,28 @@
         "timer_ticked_after_frames": 169
       }
     },
+    "RYU_RYU_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_RYU_R1_lvl7",
+      "opponent": "RYU",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_RYU_R1_lvl7",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 0,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 168
+      }
+    },
     "RYU_SAGAT_R1_lvl1": {
       "difficulty": 1,
       "opponent": "SAGAT",
@@ -3412,6 +3877,94 @@
         "timer_ticked_after_frames": 170
       }
     },
+    "RYU_SAGAT_R1_lvl5": {
+      "difficulty": 5,
+      "donor": "RYU_SAGAT_R1_lvl4",
+      "opponent": "SAGAT",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl5 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_SAGAT_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_SAGAT_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_SAGAT_R1_lvl4",
+      "opponent": "SAGAT",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_SAGAT_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_SAGAT_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_SAGAT_R1_lvl4",
+      "opponent": "SAGAT",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_SAGAT_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_SAGAT_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_SAGAT_R1_lvl4",
+      "opponent": "SAGAT",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_SAGAT_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 9,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
     "RYU_VEGA_R1_lvl1": {
       "difficulty": 1,
       "opponent": "VEGA",
@@ -3486,6 +4039,94 @@
         "p2_char_id": 11,
         "round_timer_bcd": 153,
         "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_VEGA_R1_lvl5": {
+      "difficulty": 5,
+      "donor": "RYU_VEGA_R1_lvl4",
+      "opponent": "VEGA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 4,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl5 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_VEGA_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_VEGA_R1_lvl6": {
+      "difficulty": 6,
+      "donor": "RYU_VEGA_R1_lvl4",
+      "opponent": "VEGA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 5,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl6 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_VEGA_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_VEGA_R1_lvl7": {
+      "difficulty": 7,
+      "donor": "RYU_VEGA_R1_lvl4",
+      "opponent": "VEGA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 6,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl7 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_VEGA_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
+      }
+    },
+    "RYU_VEGA_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_VEGA_R1_lvl4",
+      "opponent": "VEGA",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_VEGA_R1_lvl4",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 11,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
       }
     },
     "RYU_ZANGIEF_R1_lvl1": {
@@ -3619,6 +4260,28 @@
         "p2_char_id": 6,
         "round_timer_bcd": 153,
         "timer_ticked_after_frames": 170
+      }
+    },
+    "RYU_ZANGIEF_R1_lvl8": {
+      "difficulty": 8,
+      "donor": "RYU_ZANGIEF_R1_lvl7",
+      "opponent": "ZANGIEF",
+      "source": "forged",
+      "verified": {
+        "date": "2026-08-27",
+        "difficulty_byte": 7,
+        "fight_alive": true,
+        "forge_method": "difficulty-dependent RAM set (0x96B8, 0x97B2, 0xBA35/38/58, 0xFE45) rewritten to lvl8 values in the donor snapshot; behavioral validation in benchmarks/forge_validation/report.json",
+        "forged_from": "RYU_ZANGIEF_R1_lvl7",
+        "hp_start": [
+          176,
+          176
+        ],
+        "loads": true,
+        "method": "stable-retro load via Integrations.CUSTOM + 900-frame no-input probe",
+        "p2_char_id": 6,
+        "round_timer_bcd": 153,
+        "timer_ticked_after_frames": 169
       }
     }
   }

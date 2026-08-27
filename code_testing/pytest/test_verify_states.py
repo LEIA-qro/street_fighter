@@ -31,7 +31,10 @@ INTEGRATION_DIR = os.path.join(
     PROJECT_ROOT, "retro_integration",
     "StreetFighterIISpecialChampionEdition-Genesis-v0")
 
-VALID_SOURCES = {"shipped", "fightladder", "farmed"}
+# "forged": minted by tools/forge_states.py from an authentic donor by
+# rewriting the difficulty-dependent RAM set (behavioral validation in
+# benchmarks/forge_validation/report.json gates every fill).
+VALID_SOURCES = {"shipped", "fightladder", "farmed", "forged"}
 REQUIRED_KEYS = {"opponent", "difficulty", "source", "verified"}
 VERIFIED_KEYS = {"loads", "p2_char_id", "hp_start", "fight_alive"}
 
@@ -65,10 +68,13 @@ def test_manifest_schema():
 
 def test_manifest_matches_state_files_on_disk():
     # Every cataloged state has a .state file, and every non-metadata .state
-    # in the integration dir is cataloged -- the linter's premise.
+    # in the integration dir is cataloged -- the linter's premise. FORGEVAL_*
+    # files are exempt: they are forge_states.py's deliberately-uncataloged
+    # validation probes, present only during a validation campaign and
+    # removed by --clean-validation.
     states = load_manifest()["states"]
     on_disk = {f[:-len(".state")] for f in os.listdir(INTEGRATION_DIR)
-               if f.endswith(".state")}
+               if f.endswith(".state") and not f.startswith("FORGEVAL_")}
     assert set(states) == on_disk
 
 

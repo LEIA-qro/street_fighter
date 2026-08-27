@@ -12,19 +12,41 @@ La cola VIVA post-noche-histórica. Sustituye a 06-pendientes para lo operativo
    al 50-66% CPU (mi Mac) / desktop al 30% total. Mitigación aplicada anoche:
    sobre-suscribir procs (Mac 12, desktop 44, Legion 30). Ambas componen.
    Verificar adversarial antes de desplegar (toca el acting de una run viva).
-2. **Inferencia de savestates lvl5-8 (el atajo)** — poke del byte de dificultad
-   `0xFE45` (= nivel−1, PROBADO por RAM-diff en la investigación de la granja)
-   sobre los estados existentes de cada rival → 12 rivales × lvl5-8 en minutos
-   sin que nadie juegue. **VALIDAR primero**: pokear lvl1→lvl3 y comparar
-   estadísticamente el CPU contra los estados lvl3 AUTÉNTICOS (wr de una
-   política fija, daño, duración). Si difiere → plan B: granja pilotada por el
-   campeón nuevo (farm_states.py, sin humanos). stable-retro escribe RAM via
-   data.set_value (declarar la var en data.json si falta).
+2. ~~**Inferencia de savestates lvl5-8 (el atajo)**~~ — **HECHO (madrugada
+   2026-08-27)**, con giro científico: el poke de solo `0xFE45` resultó
+   COSMÉTICO (la escena copia la dificultad al cargar; validación conductual
+   FAIL — el forjado jugaba idéntico a su donante). Un diff masivo de blobs
+   sobre los 68 estados auténticos encontró el conjunto real: **`0x97B2`
+   (copia en-pelea, = nivel−1), `0x96B8` (parámetro derivado no lineal) y
+   `0xBA35/38/58` (derivado lineal triplicado)**. Pokeando los 6 bytes:
+   validación PASS en 3 rivales × 2 direcciones (480 eps, tests de
+   permutación) → **las 28 celdas faltantes forjadas; la malla 12×8 = 96
+   COMPLETA**, verify_states 240/240, manifest documentado
+   (`difficulty_ram_in_fight`). Herramientas: `tools/forge_states.py` +
+   `tools/validate_forged_states.py` (+19 tests). **Extender la run a
+   `--difficulty 1..8` = decisión de equipo; solo se relanzan actores.**
 3. **Fleet-agent** ("dar de alta y olvidarse"): `fleet.json` en el repo como
    plano de control (qué corre cada máquina) + supervisor por máquina (loop:
    git pull rama `fleet-stable` → comparar manifiesto/HEAD → relanzar hijo →
    heartbeat; backoff anti-crash-loop). Deploy = mover el tag. Conversación de
    confianza con el equipo antes de encenderlo.
+
+## ⚠️ INCIDENTE madrugada 2026-08-27: learner CONGELADO (grads 33103)
+
+- ~00:40, tras llenarse el buffer (1M): `/status` vivo, ingesta corriendo,
+  pero **cero gradientes** — el main thread quedó bloqueado a media
+  iteración FUERA del lock (el `finally` nunca corrió: no fue crash).
+  Sospechoso principal: `wandb.log` colgado (el mal conocido); alternativa:
+  kernel CUDA atorado. **El traceback del Ctrl+C de Santiago es el
+  diagnóstico definitivo — pedirle que lo copie.**
+- **Fix ya commiteado**: wandb en hilo daemon con cola drop-on-full
+  (`apex_learner.py`) — un sidecar muerto ya no puede frenar el
+  entrenamiento. Reinicio documentado en `RUN_LARGA_SANTIAGO.md` §5
+  (git pull + resume del último ckpt + `--weights-every 500`).
+- La escalera ANTES del congelamiento (33k grads): lvl1 .96-.97 / lvl2
+  .90-.93 / lvl3 .84-.90 / lvl4 .50-.56 — subiendo parejo, sin mínimo
+  cobarde. La flota siguió generando toda la noche (experiencia a un
+  learner paralizado: inofensivo, solo cómputo tirado).
 
 ## Vigilancia de la run del curriculum (corriendo AHORA)
 
