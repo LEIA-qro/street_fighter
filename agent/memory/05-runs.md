@@ -96,3 +96,10 @@ ES run 3 CERRADA en gen 113 (acta en benchmarks/run3_final/: theta+ckpt+metrics.
 | ES2 g754 | 75.0/+0.924 | 75.0/+0.909 | 65.3/+0.691 | 71.8 |
 
 **DQN líder en promedio (95.8) con ~50× menos cómputo que el campeón; campeón conserva solo la corona del desfase (+1.4pts).** Glaber pierde con desfase (79.2 — tiene algo de coreografía). ES3: robusto al desfase (−4pts) pero débil al ruido (113 gens no alcanzaron a entrenarlo). Reporte para el equipo (artifact): https://claude.ai/code/artifact/cec6dc95-28b1-4cb6-9c62-0a40fbad8531 — siguiente: Ape-X a dificultades altas + estrenar macros.
+
+## [2026-08-27 ~05:00] Mac de actor DQN + selección automática + lección de churn
+
+- **La Mac entró de actor Ape-X** (8 procs, ~3.5k steps/s) — flota de actuación ~7k steps/s hacia el learner de la Legion. Regla de un-entrenamiento-por-máquina intacta (mismo entrenamiento, más cuerpos).
+- **Lección DQN medida**: entre 90k y 192k grads el limpio cayó 100→83.3 pero el desfase se mantuvo 91.7 (fit subió) — la política CHUREA con el entrenamiento continuo; el checkpoint bueno se SELECCIONA. El pico sigue siendo 90k (archivado).
+- **Selector automático corriendo en la Mac**: cada 30 min jala /weights del learner, banco desfase (72 eps), bitácora en scratchpad/apex_selector.jsonl y guarda el mejor en benchmarks/apex_milestones/apex_best_desync.pt(.json). El campeón DQN se elige solo.
+- `win_rate_recent200` agregado al learner (visible al relanzarlo). air_frac del DQN: 0.432 medio pero MODULADO por matchup (0.23 vs Balrog — primer modelo que decide cuándo no brincar).
