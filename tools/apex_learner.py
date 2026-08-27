@@ -145,19 +145,28 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"[learner] listening on {args.host}:{args.port}", flush=True)
 
+    resume_grads = 0
     if args.resume_ckpt:
         ckpt = torch.load(args.resume_ckpt, map_location="cpu",
                           weights_only=False)
         learner.online.load_state_dict(ckpt["state_dict"])  # estricto
         learner.sync_target()
+        # El contador CONTINUA donde iba el checkpoint: wandb loguea con
+        # step=grad_steps y una run resumida rechaza pasos que retroceden
+        # (visto 2026-08-27: "less than the current step 32754" y el dash
+        # ciego); ademas beta/target_sync/nombres de ckpt siguen su linea.
+        # El tope de replay-ratio se mide RELATIVO al arranque (resume_grads):
+        # el buffer empieza vacio y los grads viejos no re-masticaron NADA
+        # de la ingesta de este proceso.
+        resume_grads = int(ckpt.get("meta", {}).get("grad_steps", 0) or 0)
         with learner.lock:
+            learner.grad_steps = resume_grads
             learner.weights_version += 1
             from agents.apex import encode_weights
             learner._weights_payload = encode_weights(
                 learner.online, learner.weights_version, learner.config)
         print(f"[learner] red resumida de {args.resume_ckpt} "
-              f"(grads previos: {ckpt.get('meta', {}).get('grad_steps', '?')})",
-              flush=True)
+              f"(contador continua en {resume_grads} grads)", flush=True)
 
     wandb_run = None
     if args.wandb_project:
@@ -203,7 +212,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     rng = random.Random(args.seed)
     losses = []
-    last_log_t, last_log_grads, last_log_trans = time.time(), 0, 0
+    last_log_t, last_log_grads, last_log_trans = (time.time(),
+                                                  learner.grad_steps, 0)
 
     def save_ckpt(tag):
         path = os.path.join(args.out, f"apex_{tag}.pt")
@@ -227,7 +237,8 @@ def main():
                 continue
             # tope de replay ratio: no re-masticar el buffer si los actores
             # van lentos (sobreajuste al replay = el mal clasico de DQN)
-            if learner.grad_steps * args.batch > args.replay_ratio * max(ingested, 1):
+            if ((learner.grad_steps - resume_grads) * args.batch
+                    > args.replay_ratio * max(ingested, 1)):
                 time.sleep(0.05)
                 continue
             beta = min(1.0, args.per_beta0 + (1.0 - args.per_beta0)
