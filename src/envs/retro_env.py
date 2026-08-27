@@ -275,7 +275,8 @@ class RetroSF2Env(gymnasium.Env):
     HP_SENTINEL_THRESHOLD = HP_SENTINEL_THRESHOLD
 
     def __init__(self, state: str = DEFAULT_STATE, trainable: bool = True,
-                 verbose: bool = False, ground_gate: bool = False):
+                 verbose: bool = False, ground_gate: bool = False,
+                 render_mode=None):
         # Lazy import: everything above this class must stay importable on
         # machines without stable-retro (the unit tests run there).
         import stable_retro as retro
@@ -288,9 +289,13 @@ class RetroSF2Env(gymnasium.Env):
         self._integrations = Integrations
         # obs_type=RAM skips the per-step screen blit; we never use retro's
         # observation, only the data.json variables in its info dict.
+        # render_mode: None para TODO lo de entrenamiento/banco (una ventana
+        # pyglet ata la emulacion al vsync del monitor: 3,700 fps -> 60);
+        # "human" SOLO para el visor (tools/watch_es.py), donde 60 fps es
+        # exactamente lo que se quiere.
         self._env = retro.make(
             game=GAME, state=state, inttype=Integrations.CUSTOM,
-            obs_type=retro.Observations.RAM, render_mode=None,
+            obs_type=retro.Observations.RAM, render_mode=render_mode,
         )
         self._loaded_state = state
         self._buttons = list(self._env.buttons)
