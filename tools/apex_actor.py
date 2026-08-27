@@ -187,6 +187,12 @@ def main():
     ap.add_argument("--nice", type=int, default=10 if hasattr(os, "nice") else 0)
     ap.add_argument("--name", default=None)
     ap.add_argument("--seed", type=int, default=20260827)
+    ap.add_argument("--flush", type=int, default=FLUSH_TRANSITIONS,
+                    help="transiciones por POST (default 800 ~ 400KB). Bajalo "
+                         "(p.ej. 100) en redes que matan subidas grandes: el "
+                         "POST /transitions se queda en 'timed out' con los "
+                         "GET pasando bien (visto 2026-08-27, Legion en red "
+                         "ajena) -- lotes chicos, mas frecuentes, mismo caudal")
     args = ap.parse_args()
 
     learner_url = args.learner.rstrip("/")
@@ -198,6 +204,7 @@ def main():
     # el buffer con duplicados M-plicados. El nombre entra al seed.
     import zlib
     seed = args.seed ^ zlib.crc32(name.encode("utf-8"))
+    flush = max(1, args.flush)
 
     def _sigterm(_s, _f):
         global _STOP
@@ -252,12 +259,12 @@ def main():
                 acc = ep_levels.setdefault(lv, [0, 0])
                 acc[0] += item["wins"]
                 acc[1] += item["count"]
-            if len(batch) >= FLUSH_TRANSITIONS:
+            if len(batch) >= flush:
                 # POSTs SIEMPRE de tamano fijo: durante una caida del learner
                 # la cola local sigue creciendo, y un lote gigante seria
                 # rechazado por MAX_BATCH_B64_BYTES al volver -- perdida
                 # permanente en loop. Se manda una rebanada y el resto espera.
-                chunk = batch[:FLUSH_TRANSITIONS]
+                chunk = batch[:flush]
                 dt = max(time.time() - last_rate_t, 1e-6)
                 rate = (sent_total - last_rate_n + len(chunk)) / dt
                 body = {"actor": name, "b64": encode_transitions(chunk),
@@ -268,11 +275,11 @@ def main():
                                      "levels": ep_levels}}
                 resp = _http_json(f"{learner_url}/transitions", body=body)
                 if resp is not None:
-                    del batch[:FLUSH_TRANSITIONS]
+                    del batch[:flush]
                     sent_total += len(chunk)
                     ep_wins, ep_count = 0, 0
                     ep_levels = {}
-                    if sent_total % (FLUSH_TRANSITIONS * 10) == 0:
+                    if sent_total % (flush * 10) == 0:
                         _log(f"{sent_total} transiciones | {rate:.0f} trans/s | "
                              f"buffer learner {resp.get('buffer')}")
                     last_rate_t, last_rate_n = time.time(), sent_total
@@ -280,7 +287,7 @@ def main():
                     time.sleep(5)  # learner caido: reintento con la MISMA rebanada
                     # cola local acotada: replay es prescindible, la RAM no.
                     # Se descarta lo MAS VIEJO (lo mas lejos de la politica actual)
-                    cap = FLUSH_TRANSITIONS * 20
+                    cap = flush * 20
                     if len(batch) > cap:
                         dropped = len(batch) - cap
                         del batch[:dropped]
