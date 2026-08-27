@@ -521,6 +521,7 @@ def make_wandb_logger(project, run_id=None):
         import wandb  # lazy; WANDB_MODE=offline works without a key
         default_mode = "online" if os.environ.get("WANDB_API_KEY") else "offline"
         run = wandb.init(project=project, id=run_id, name=run_id, resume="allow",
+                         group="es", tags=["es"],
                          mode=os.environ.get("WANDB_MODE", default_mode),
                          settings=wandb.Settings(x_disable_stats=True))
         return lambda metrics, step: run.log(metrics, step=step)

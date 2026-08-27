@@ -123,7 +123,10 @@ def main():
         try:
             import wandb
             wandb_run = wandb.init(project=args.wandb_project,
-                                   name=f"rainbow-qr-{args.seed}", resume="allow")
+                                   id=f"rainbow-qr-{args.seed}",
+                                   name=f"rainbow-qr-{args.seed}", resume="allow",
+                                   group="dqn", tags=["dqn"],
+                                   settings=wandb.Settings(x_disable_stats=True))
         except Exception as e:
             print(f"[rainbow] wandb off ({e})", flush=True)
 
