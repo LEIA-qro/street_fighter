@@ -127,3 +127,7 @@ Herramientas nuevas: `tools/forge_states.py` (forja gateada por el veredicto del
 ## [2026-08-27 ~08:45] La escalera del v511 — la estrategia VIAJA
 
 Banco canónico (3 condiciones) × niveles 1-6 con el v511 (wr promedio por nivel): **lvl1 100.0 / lvl2 99.7 / lvl3 92.7 / lvl4 74.3 / lvl5 66.3 / lvl6 61.8** — monótona, sin acantilados. En lvl5-6 (JAMÁS entrenados) desfase ≈ ruido ≈ limpio: generalización real, no coreografía. vs el campeón lvl1-only de ayer (50% lvl5, 31% lvl6): el curriculum enseñó a pelear, no a memorizar. Actas: benchmarks/bench_v511_escalera.jsonl (+ canónico en bench_v511_canonico.jsonl). Artifact del equipo actualizado (misma URL). Felipe pidió esta prueba ANTES de soltar los tiers altos → luz verde técnica para extender actores a 1-8.
+
+## [2026-08-27 ~11:30] EL CAMPEÓN CAMINA — la ballena blanca cayó sola
+
+El v781 (primer campeón de la era-escalera, media 83.1% sobre los 8 tiers: 100/97.9/97.9/91.7/87.5/75/64.6/50) juega con **air_frac 0.20 en lvl1** — contra el 0.43-0.48 de TODOS los modelos históricos (PPO/ES/v511). La tesis del backlog se cumplió literal: los anti-aéreos de lvl5-8 en el curriculum le quitaron el vicio de saltar, y el estilo de piso bajó con él a todos los niveles (visto en vivo: perfect 176-0 a Balrog lvl1 CAMINANDO, en 64 pasos). El ítem "caminar" de la cola queda RESUELTO por efecto secundario del curriculum — sin incentivos artificiales, como se prefería. Extensión a 8 niveles: lvl7 25→66 y lvl8 10→50 en horas; entrenar arriba MEJORÓ lvl4 (91.7 vs 83-85 del v511). Congelado: apex_v781_escalera831.pt.
