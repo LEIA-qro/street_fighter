@@ -1,0 +1,10 @@
+# requirements-dqn.txt -- el track Rainbow/Ape-X (train_rainbow, apex_*).
+#
+# En WSL2 el `pip install torch` default trae wheels CUDA cu12x; si
+# torch.cuda.is_available() da False con una RTX 50xx (Blackwell):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+torch>=2.4
+gymnasium>=1.0
+numpy>=1.26
+wandb>=0.19
+# el emulador viene de requirements-retro.txt (stable-retro; Linux/WSL2 only)
