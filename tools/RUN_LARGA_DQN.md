@@ -63,8 +63,9 @@ python tools/apex_actor.py --learner http://<DESKTOP-WSL>:8090 --difficulty 1,2,
 |---|---|
 | Desktop (actor local; usar `--learner http://127.0.0.1:8090`) | 28 |
 | Legion (Diego) | 20 |
-| Omen (Santiago) | 12 |
 | Mac (Felipe) — la lanza Claude | 8 |
+
+(La Omen de Santiago se suma cuando esté: mismo comando de actor, `--procs 12`.)
 
 Todas con `--difficulty 1,2,3,4`: **el curriculum es uniforme en todos los
 actores** (decisión de diseño: por-máquina sesgaría el buffer hacia el tier de
