@@ -77,3 +77,7 @@ Rainbow-QR **distribuido** listo: `tools/apex_learner.py` (máquina GPU: replay 
 ## [2026-08-27 ~02:30] APE-X DESPEGÓ — nuevo subcampeón honesto (87.5%)
 
 A ~79k gradientes (~2h en la Legion sola, learner+actor local): **limpio +1.199/91.7% (11/12, fitness ARRIBA del campeón) · desfase 87.5%** — 2º lugar honesto del proyecto, aplastando al ES (~75-82) con el MISMO env. Chun-Li (+1.444) y Balrog cayeron; solo Sagat resiste. wr de comportamiento 64.6% (con epsilon; el greedy es lo de arriba). SIN macros aún. Truco operativo: los pesos vivos se jalan de GET /weights del learner por la tailnet y se arman en ckpt benchable sin tocar la máquina de Diego (script en historial; meta desde la config del payload). La tesis "es el env" pierde fuerza: mismo env, algoritmo distinto, +12pts honestos — el replay/off-policy exprime la experiencia como ES/PPO-onpolicy no pudieron.
+
+## [2026-08-27 ~03:00] 🏆 PLENO PERFECTO — Ape-X 12/12 a 90k gradientes
+
+**Primer modelo en la historia del proyecto que barre los 12 rivales limpios: 24/24, fitness +1.313 (récord absoluto del banco). Desfase honesto: 91.7% (+1.181) — a 1.4pts del campeón (93.1%).** ~2.5h de entrenamiento en la Legion sola, SIN macros. Sagat (+1.034) fue el último en caer. Checkpoint archivado: benchmarks/apex_milestones/apex_grads90k_PLENO12de12.pt (ojo: los .pt de torch son zips — las descargas a veces les añaden .zip; se renombra y listo). Taildrop entre usuarios NO funciona ("peer owned by different user") — los checkpoints se comparten por http.server en la tailnet o el /weights vivo del learner.
