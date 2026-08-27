@@ -113,6 +113,23 @@ class TestApexLearner:
         assert s["actors"]["legion-1"]["procs"] == 8
         assert s["win_rate_cum"] == pytest.approx(0.6)
 
+    def test_ingest_tracks_recent_and_per_level(self):
+        learner = self._learner()
+        rng = np.random.default_rng(9)
+        learner.ingest({"actor": "a",
+                        "b64": encode_transitions(_fake_transitions(5, rng)),
+                        "episodes": {"wins": 3, "count": 4,
+                                     "levels": {"1": [3, 3], "3": [0, 1]}}},
+                       now=1.0)
+        s = learner.status(now=2.0)
+        assert s["win_rate_recent200"] == pytest.approx(0.75)
+        assert s["win_rate_recent_by_lvl"] == {"1": 1.0, "3": 0.0}
+        # campo levels ausente (actor viejo): no truena, solo no segmenta
+        learner.ingest({"actor": "b",
+                        "b64": encode_transitions(_fake_transitions(3, rng)),
+                        "episodes": {"wins": 1, "count": 1}}, now=3.0)
+        assert learner.status(now=4.0)["episodes"] == 5
+
     def test_train_tick_none_until_batch_available(self):
         learner = self._learner()
         assert learner.train_tick(64, beta=0.4, rng=random.Random(0)) is None

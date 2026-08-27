@@ -35,6 +35,8 @@ sys.path.insert(0, str(REPO / "src"))
 os.chdir(REPO)
 
 import numpy as np
+import re as _re_mod
+_LVL_RE = _re_mod.compile(r"lvl(\d+)")
 
 from agents.apex import apex_epsilon, encode_transitions
 from es.coordinator import resolve_states
@@ -142,10 +144,15 @@ def _child(rank, procs, states, desync_max, weights_path, version_value,
         for t in cooked:
             out_queue.put(("t", t))
         if term or trunc:
-            wins += int(info.get("win", 0) or 0)
+            w = int(info.get("win", 0) or 0)
+            wins += w
             count += 1
-            out_queue.put(("ep", {"wins": int(info.get("win", 0) or 0),
-                                  "count": 1}))
+            # el lvl viene del nombre del savestate que sorteo la rotacion
+            # (RYU_X_R1_lvl3 -> 3); StateRotation es el wrapper de afuera
+            state_name = str(getattr(env, "current_state", "") or "")
+            m = _LVL_RE.search(state_name)
+            out_queue.put(("ep", {"wins": w, "count": 1,
+                                  "lvl": m.group(1) if m else "?"}))
             obs, _ = env.reset()
         else:
             obs = next_obs
@@ -227,6 +234,7 @@ def main():
         c.start()
 
     batch, ep_wins, ep_count = [], 0, 0
+    ep_levels = {}
     sent_total, t0, last_weights = 0, time.time(), time.time()
     last_rate_t, last_rate_n = time.time(), 0
     try:
@@ -240,6 +248,10 @@ def main():
             elif kind == "ep":
                 ep_wins += item["wins"]
                 ep_count += item["count"]
+                lv = item.get("lvl", "?")
+                acc = ep_levels.setdefault(lv, [0, 0])
+                acc[0] += item["wins"]
+                acc[1] += item["count"]
             if len(batch) >= FLUSH_TRANSITIONS:
                 # POSTs SIEMPRE de tamano fijo: durante una caida del learner
                 # la cola local sigue creciendo, y un lote gigante seria
@@ -252,12 +264,14 @@ def main():
                         "stats": {"procs": args.procs,
                                   "steps_per_s": round(rate, 1),
                                   "host": socket.gethostname()},
-                        "episodes": {"wins": ep_wins, "count": ep_count}}
+                        "episodes": {"wins": ep_wins, "count": ep_count,
+                                     "levels": ep_levels}}
                 resp = _http_json(f"{learner_url}/transitions", body=body)
                 if resp is not None:
                     del batch[:FLUSH_TRANSITIONS]
                     sent_total += len(chunk)
                     ep_wins, ep_count = 0, 0
+                    ep_levels = {}
                     if sent_total % (FLUSH_TRANSITIONS * 10) == 0:
                         _log(f"{sent_total} transiciones | {rate:.0f} trans/s | "
                              f"buffer learner {resp.get('buffer')}")

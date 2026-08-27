@@ -231,6 +231,8 @@ def main():
                                    "transitions_per_s": trans_s,
                                    "win_rate_cum": s["win_rate_cum"],
                                    "win_rate_recent200": s["win_rate_recent200"],
+                                   **{f"win_rate_recent/lvl{lv}": v
+                                      for lv, v in s["win_rate_recent_by_lvl"].items()},
                                    "episodes": s["episodes"]},
                                   step=learner.grad_steps)
                 last_log_t = time.time()

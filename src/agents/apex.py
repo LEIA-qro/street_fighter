@@ -165,6 +165,10 @@ class ApexLearner:
         # arranque aleatorio ni resets (deque de los ultimos 200 episodios)
         from collections import deque
         self.recent_eps = deque(maxlen=200)
+        # ventanas por dificultad (lvl del savestate del episodio):
+        # el termometro segmentado que el curriculum uniforme necesita
+        self._deque = deque
+        self.recent_by_lvl = {}
 
     # -- ingesta (hilo HTTP) ------------------------------------------------
     def ingest(self, body, now):
@@ -192,6 +196,16 @@ class ApexLearner:
                 # wins unos y (count-wins) ceros -- el orden intra-lote
                 # no importa para una media movil
                 self.recent_eps.extend([1] * wins + [0] * (count - wins))
+                levels = eps.get("levels")
+                if isinstance(levels, dict):
+                    for lv, wc in levels.items():
+                        try:
+                            w, c = int(wc[0]), int(wc[1])
+                        except (TypeError, ValueError, IndexError):
+                            continue
+                        dq = self.recent_by_lvl.setdefault(
+                            str(lv), self._deque(maxlen=200))
+                        dq.extend([1] * w + [0] * (c - w))
         return {"accepted": True, "buffer": self.buffer.size,
                 "weights_version": self.weights_version}
 
@@ -237,6 +251,9 @@ class ApexLearner:
                     "win_rate_cum": round(self.ep_wins / max(self.ep_count, 1), 3),
                     "win_rate_recent200": round(
                         sum(self.recent_eps) / max(len(self.recent_eps), 1), 3),
+                    "win_rate_recent_by_lvl": {
+                        lv: round(sum(dq) / max(len(dq), 1), 3)
+                        for lv, dq in sorted(self.recent_by_lvl.items())},
                     "episodes": self.ep_count,
                     "actors": {n: dict(r, age=round(now - r.get("last_seen", 0), 1))
                                for n, r in self.actors.items()}}
