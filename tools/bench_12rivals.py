@@ -38,7 +38,7 @@ import numpy as np
 
 from es import openes, protocol, resources
 from es.coordinator import resolve_states
-from es.policy import DEFAULT_POLICY, POLICIES
+from es.policy import DEFAULT_POLICY, POLICIES, wrap_env_for_policy
 
 MAX_EPISODE_STEPS = 20000  # mismo failsafe que el worker
 
@@ -85,6 +85,7 @@ _ES_POLICY = None
 _MODEL = _NORM = _FRAMES = None
 _RAINBOW = None
 _RAINBOW_ONEHOT = True
+_RAINBOW_N_ACTIONS = 63
 _NOISE = 0.0    # prob. de reemplazar la accion de la politica por una aleatoria
 _DESYNC = 0     # frames neutrales (0..K, sorteados) antes de soltar el control
 
@@ -108,8 +109,10 @@ def _init_es(theta_bytes, policy_name, nice_delta, noise, desync):
     resources.apply_nice(nice_delta)
     _NOISE, _DESYNC = float(noise), int(desync)
     from envs.retro_env import RetroSF2Env
-    _ENV = RetroSF2Env()  # trainable=True default: identico al worker de flota
-    _ES_POLICY = POLICIES[policy_name](np.frombuffer(theta_bytes, dtype=np.float32).copy())
+    cls = POLICIES[policy_name]
+    # misma envoltura que el worker de flota: macro -> MacroActionWrapper
+    _ENV = wrap_env_for_policy(RetroSF2Env(), cls)
+    _ES_POLICY = cls(np.frombuffer(theta_bytes, dtype=np.float32).copy())
 
 
 def _init_ppo(zip_path, pkl_path, nice_delta, noise, desync):
@@ -134,13 +137,13 @@ def _episode_es(task):
     # desfase de arranque: N frames neutrales le corren la "pelicula" al rival
     # antes de que la politica vea su primer frame util
     for _ in range(int(rng.integers(0, _DESYNC + 1)) if _DESYNC else 0):
-        obs, _r, term, trunc, info = _ENV.step(NEUTRAL_ACTION)
+        obs, _r, term, trunc, info = _ENV.step(_ES_POLICY.neutral_action())
         steps += 1
         if term or trunc:
             break
     while steps < MAX_EPISODE_STEPS:
         if _NOISE and rng.random() < _NOISE:
-            action = _random_action(rng)
+            action = _ES_POLICY.random_action(rng)
         else:
             action = _ES_POLICY.act(obs)
         obs, _r, term, trunc, info = _ENV.step(action)
@@ -152,7 +155,7 @@ def _episode_es(task):
 
 
 def _init_rainbow(ckpt_path, nice_delta, noise, desync):
-    global _ENV, _RAINBOW, _RAINBOW_ONEHOT, _NOISE, _DESYNC
+    global _ENV, _RAINBOW, _RAINBOW_ONEHOT, _RAINBOW_N_ACTIONS, _NOISE, _DESYNC
     resources.apply_nice(nice_delta)
     _NOISE, _DESYNC = float(noise), int(desync)
     import torch
@@ -161,36 +164,52 @@ def _init_rainbow(ckpt_path, nice_delta, noise, desync):
     from envs.retro_env import RetroSF2Env
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     meta = ckpt["meta"]
-    _RAINBOW = QRDuelingNet(meta["in_dim"], n_quantiles=meta["quantiles"],
+    _RAINBOW_N_ACTIONS = int(meta.get("n_actions", 63))
+    _RAINBOW = QRDuelingNet(meta["in_dim"], n_actions=_RAINBOW_N_ACTIONS,
+                            n_quantiles=meta["quantiles"],
                             hidden=meta["hidden"])
     _RAINBOW.load_state_dict(ckpt["state_dict"])
     _RAINBOW.eval()
     _RAINBOW_ONEHOT = bool(meta.get("onehot", True))
     _ENV = RetroSF2Env()
+    if meta.get("macros", False):
+        # checkpoint entrenado con macros: mismo wrapper que en entrenamiento
+        from envs.macro_wrapper import MacroActionWrapper
+        from es.policy import OBS_FRAME_DIM
+        _ENV = MacroActionWrapper(_ENV, obs_rel_x_index=2,
+                                  frame_size=OBS_FRAME_DIM)
 
 
 def _episode_rainbow(task):
     state_name, state_idx, ep = task
     import torch
     from es.policy import expand_char_onehot
+    # env envuelto (macros) habla acciones PLANAS int; el pelon, MultiDiscrete
+    flat = _RAINBOW_N_ACTIONS != 63 or hasattr(_ENV, "obs_rel_x_index")
     rng = _perturb_rng(state_idx, ep)
     obs, _ = _ENV.reset(options={"state": state_name})
     steps, info = 0, {}
+    neutral = 0 if flat else NEUTRAL_ACTION
     for _ in range(int(rng.integers(0, _DESYNC + 1)) if _DESYNC else 0):
-        obs, _r, term, trunc, info = _ENV.step(NEUTRAL_ACTION)
+        obs, _r, term, trunc, info = _ENV.step(neutral)
         steps += 1
         if term or trunc:
             break
     while steps < MAX_EPISODE_STEPS:
         if _NOISE and rng.random() < _NOISE:
-            action = _random_action(rng)
+            action = (int(rng.integers(0, _RAINBOW_N_ACTIONS)) if flat
+                      else _random_action(rng))
         else:
             feats = expand_char_onehot(obs) if _RAINBOW_ONEHOT else obs
             with torch.no_grad():
                 q = _RAINBOW.q_values(torch.as_tensor(
                     feats, dtype=torch.float32).unsqueeze(0))
-            move, attack = divmod(int(q.argmax(dim=1).item()), 7)
-            action = np.array([move, attack], dtype=np.int64)
+            a = int(q.argmax(dim=1).item())
+            if flat:
+                action = a
+            else:
+                move, attack = divmod(a, 7)
+                action = np.array([move, attack], dtype=np.int64)
         obs, _r, term, trunc, info = _ENV.step(action)
         steps += 1
         if term or trunc:

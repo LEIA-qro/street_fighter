@@ -39,28 +39,47 @@ _FRAME_ABS_HIGH = np.array([
 ], dtype=np.float32)
 OBS_SCALE = np.tile(1.0 / _FRAME_ABS_HIGH, NUM_FRAMES).astype(np.float32)
 
-def _shapes_for(in_dim):
-    """Flat-pack layout: W1(64,in) b1(64) W2(64,64) b2(64) W3(63,64) b3(63)."""
+def _shapes_for(in_dim, out_dim=N_LOGITS):
+    """Flat-pack layout: W1(64,in) b1(64) W2(64,64) b2(64) W3(out,64) b3(out)."""
     return [
         (HIDDEN_DIM, in_dim), (HIDDEN_DIM,),
         (HIDDEN_DIM, HIDDEN_DIM), (HIDDEN_DIM,),
-        (N_LOGITS, HIDDEN_DIM), (N_LOGITS,),
+        (out_dim, HIDDEN_DIM), (out_dim,),
     ]
 
 
 class MLPPolicy:
     """Deterministic MLP over the 92-float stacked v4 observation.
 
-    Subclasses change only the FEATURE map (what the first layer sees), never
-    the wire observation: act() always takes the raw (92,) env obs, and
-    IN_DIM is the post-feature width the flat parameter vector is sized for.
+    Subclasses change only the FEATURE map (what the first layer sees) o el
+    VOCABULARIO de salida (OUT_DIM/ACTION_KIND), never the wire observation:
+    act() always takes the raw (92,) env obs, and IN_DIM is the post-feature
+    width the flat parameter vector is sized for.
+
+    ACTION_KIND es el contrato con quien EJECUTA la accion (worker, banco,
+    visor): "multidiscrete" -> act() regresa np.array([move, attack]) y el env
+    es RetroSF2Env pelon; "macro" -> act() regresa un int plano y el env DEBE
+    ir envuelto en MacroActionWrapper. neutral_action()/random_action() son
+    los companeros polimorficos (desync y ruido de evaluacion) para que ningun
+    consumidor tenga que hacer if-chains por tipo de politica.
     """
 
     IN_DIM = OBS_DIM  # width after _features(); the first layer's fan-in
+    OUT_DIM = N_LOGITS
+    ACTION_KIND = "multidiscrete"
 
     @classmethod
     def shapes(cls):
-        return _shapes_for(cls.IN_DIM)
+        return _shapes_for(cls.IN_DIM, cls.OUT_DIM)
+
+    @classmethod
+    def neutral_action(cls):
+        return np.array([0, 0], dtype=np.int64)
+
+    @classmethod
+    def random_action(cls, rng):
+        return np.array([rng.integers(0, N_MOVE), rng.integers(0, N_ATTACK)],
+                        dtype=np.int64)
 
     @classmethod
     def num_params(cls):
@@ -108,16 +127,18 @@ class MLPPolicy:
         """Raw (92,) env obs -> what the first layer sees. Base: scaled as-is."""
         return obs * OBS_SCALE
 
-    def act(self, obs):
-        """obs (92,) float-like -> np.array([move 0-8, attack 0-6], int64)."""
+    def _logits(self, obs):
         obs = np.asarray(obs, dtype=np.float32)
         if obs.shape != (OBS_DIM,):
             raise ValueError(f"expected obs of shape ({OBS_DIM},), got {obs.shape}")
         w1, b1, w2, b2, w3, b3 = self._params
         h = np.tanh(w1 @ self._features(obs) + b1)
         h = np.tanh(w2 @ h + b2)
-        logits = w3 @ h + b3
-        move, attack = divmod(int(np.argmax(logits)), N_ATTACK)
+        return w3 @ h + b3
+
+    def act(self, obs):
+        """obs (92,) float-like -> np.array([move 0-8, attack 0-6], int64)."""
+        move, attack = divmod(int(np.argmax(self._logits(obs))), N_ATTACK)
         return np.array([move, attack], dtype=np.int64)
 
 
@@ -163,11 +184,53 @@ class CharOneHotPolicy(MLPPolicy):
         return expand_char_onehot(obs)
 
 
+# --- variante con macros: el vocabulario de accion de action_macros ---------
+# Los 9 macros del equipo (hadouken/shoryuken/tatsumaki + movimiento) como
+# acciones atomicas: la salida crece a 72 logits y el ejecutor (worker/banco)
+# envuelve el env en MacroActionWrapper. action_macros es python puro, asi
+# que este modulo sigue importable con numpy solo.
+from envs.action_macros import N_ACTIONS as MACRO_N_ACTIONS  # noqa: E402
+
+
+class CharOneHotMacroPolicy(CharOneHotPolicy):
+    """One-hot de personajes + vocabulario de 72 acciones (63 + 9 macros)."""
+
+    OUT_DIM = MACRO_N_ACTIONS
+    ACTION_KIND = "macro"
+
+    @classmethod
+    def neutral_action(cls):
+        return 0  # accion plana 0 = divmod(0,7) = sin direccion, sin boton
+
+    @classmethod
+    def random_action(cls, rng):
+        return int(rng.integers(0, MACRO_N_ACTIONS))
+
+    def act(self, obs):
+        """obs (92,) -> accion plana int en [0, 72). El env envuelto la decodifica."""
+        return int(np.argmax(self._logits(obs)))
+
+
 # Wire registry: the name a coordinator pins in its checkpoint and serves in
 # /theta ("policy" key); workers construct by name. Absent key = "v4", which
 # is every run that predates the registry.
-POLICIES = {"v4": MLPPolicy, "v4onehot": CharOneHotPolicy}
+POLICIES = {"v4": MLPPolicy, "v4onehot": CharOneHotPolicy,
+            "v4onehot_macro": CharOneHotMacroPolicy}
 DEFAULT_POLICY = "v4"
+
+
+def wrap_env_for_policy(env, policy_cls):
+    """El env que una politica espera pisar. Compartido por worker/banco/visor.
+
+    "multidiscrete" -> el env tal cual. "macro" -> MacroActionWrapper con el
+    layout v4 (rel_x en el indice 2 del frame de 23) -- la MISMA envoltura
+    que uso el equipo para BizHawk, apuntada al frame chico.
+    """
+    if policy_cls.ACTION_KIND == "macro":
+        from envs.macro_wrapper import MacroActionWrapper
+        return MacroActionWrapper(env, obs_rel_x_index=2,
+                                  frame_size=OBS_FRAME_DIM)
+    return env
 
 # Backward-compatible module-level API (pre-registry callers and tests).
 _SHAPES = MLPPolicy.shapes()

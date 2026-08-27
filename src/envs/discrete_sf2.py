@@ -99,16 +99,29 @@ class CharOneHotObs(gym.ObservationWrapper):
         return expand_char_onehot(obs)
 
 
-def make_discrete_sf2(states, seed=0, desync_max=0, onehot=True, env_kwargs=None):
+def make_discrete_sf2(states, seed=0, desync_max=0, onehot=True, env_kwargs=None,
+                      macros=False):
     """Fabrica completa, importable desde el env_fn de un AsyncVectorEnv.
 
     Import tardio de RetroSF2Env: la fabrica corre DENTRO del proceso hijo
     (stable-retro solo tolera un emulador por proceso), y este modulo debe
     poder importarse en el padre sin emulador.
+
+    macros=True: Discrete(72) via MacroActionWrapper (los 9 macros del equipo
+    como opciones atomicas) en vez del Discrete(63) plano. La accion neutral
+    sigue siendo 0 en ambos casos (divmod(0,7) = nada), asi que StateRotation
+    no cambia. El wrapper de macros lee rel_x del frame CRUDO (indice 2 del
+    frame de 23), por eso va pegado al env, debajo de todo lo demas.
     """
     from envs.retro_env import RetroSF2Env
     env = RetroSF2Env(**(env_kwargs or {}))
-    env = FlatDiscreteActions(env)
+    if macros:
+        from envs.macro_wrapper import MacroActionWrapper
+        from es.policy import OBS_FRAME_DIM
+        env = MacroActionWrapper(env, obs_rel_x_index=2,
+                                 frame_size=OBS_FRAME_DIM)
+    else:
+        env = FlatDiscreteActions(env)
     env = StateRotation(env, states, seed=seed, desync_max=desync_max)
     if onehot:
         env = CharOneHotObs(env)

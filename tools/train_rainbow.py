@@ -59,6 +59,10 @@ def main():
                     help="0 = condiciones identicas a ES/PPO; >0 = robustez horneada")
     ap.add_argument("--no-onehot", action="store_true",
                     help="features crudas 92 en vez de char one-hot 212")
+    ap.add_argument("--macros", action="store_true",
+                    help="accion Discrete(72): los 9 macros del equipo "
+                         "(hadouken/shoryuken/tatsumaki/movimiento) como "
+                         "opciones atomicas")
     ap.add_argument("--buffer", type=int, default=200_000)
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--lr", type=float, default=1e-4)
@@ -86,12 +90,16 @@ def main():
     states = resolve_states(args.states, args.difficulty)
     device = pick_device(args.device)
     in_dim = OBS_DIM if args.no_onehot else ONEHOT_OBS_DIM
+    if args.macros:
+        from envs.action_macros import N_ACTIONS as n_actions
+    else:
+        n_actions = 63
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
     print(f"[rainbow] {len(states)} estados | envs={args.envs} device={device} "
-          f"in_dim={in_dim} desync<={args.desync_max} quantiles={args.quantiles}",
-          flush=True)
+          f"in_dim={in_dim} acciones={n_actions} desync<={args.desync_max} "
+          f"quantiles={args.quantiles}", flush=True)
 
     import gymnasium as gym
 
@@ -100,15 +108,16 @@ def main():
             from envs.discrete_sf2 import make_discrete_sf2
             return make_discrete_sf2(states, seed=args.seed * 1000 + rank,
                                      desync_max=args.desync_max,
-                                     onehot=not args.no_onehot)
+                                     onehot=not args.no_onehot,
+                                     macros=args.macros)
         return _make
 
     venv = gym.vector.AsyncVectorEnv([env_fn(r) for r in range(args.envs)],
                                      context="spawn")
 
-    online = QRDuelingNet(in_dim, n_quantiles=args.quantiles,
+    online = QRDuelingNet(in_dim, n_actions=n_actions, n_quantiles=args.quantiles,
                           hidden=args.hidden).to(device)
-    target = QRDuelingNet(in_dim, n_quantiles=args.quantiles,
+    target = QRDuelingNet(in_dim, n_actions=n_actions, n_quantiles=args.quantiles,
                           hidden=args.hidden).to(device)
     target.load_state_dict(online.state_dict())
     target.eval()
@@ -153,7 +162,7 @@ def main():
                                                 device=device))
             greedy = q.argmax(dim=1).cpu().numpy()
         explore = rng.random(args.envs) < eps
-        actions = np.where(explore, rng.integers(0, 63, size=args.envs), greedy)
+        actions = np.where(explore, rng.integers(0, n_actions, size=args.envs), greedy)
 
         next_obs, rewards, terms, truncs, infos = venv.step(actions)
         win_arr = infos.get("win")
@@ -222,12 +231,14 @@ def main():
             torch.save({"state_dict": online.state_dict(),
                         "meta": {"in_dim": in_dim, "quantiles": args.quantiles,
                                  "hidden": args.hidden, "onehot": not args.no_onehot,
+                                 "n_actions": n_actions, "macros": args.macros,
                                  "step": global_step, "args": vars(args)}}, path)
 
     path = os.path.join(args.out, f"rainbow_final_{global_step:08d}.pt")
     torch.save({"state_dict": online.state_dict(),
                 "meta": {"in_dim": in_dim, "quantiles": args.quantiles,
                          "hidden": args.hidden, "onehot": not args.no_onehot,
+                         "n_actions": n_actions, "macros": args.macros,
                          "step": global_step, "args": vars(args)}}, path)
     print(f"[rainbow] listo: {path} ({time.time() - t0:.0f}s)", flush=True)
     venv.close()

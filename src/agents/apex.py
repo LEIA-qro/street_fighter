@@ -128,13 +128,17 @@ class ApexLearner:
 
     def __init__(self, hidden=256, quantiles=51, onehot=True, gamma=0.99,
                  n_step=3, buffer_capacity=500_000, lr=1e-4, per_alpha=0.5,
-                 device="cpu", weights_every_grads=100):
+                 device="cpu", weights_every_grads=100, n_actions=63,
+                 macros=False):
         self.onehot = bool(onehot)
         self.in_dim = ONEHOT_OBS_DIM if self.onehot else OBS_DIM
+        self.n_actions = int(n_actions)
         self.device = torch.device(device)
-        self.online = QRDuelingNet(self.in_dim, n_quantiles=quantiles,
+        self.online = QRDuelingNet(self.in_dim, n_actions=self.n_actions,
+                                   n_quantiles=quantiles,
                                    hidden=hidden).to(self.device)
-        self.target = QRDuelingNet(self.in_dim, n_quantiles=quantiles,
+        self.target = QRDuelingNet(self.in_dim, n_actions=self.n_actions,
+                                   n_quantiles=quantiles,
                                    hidden=hidden).to(self.device)
         self.target.load_state_dict(self.online.state_dict())
         self.target.eval()
@@ -145,7 +149,10 @@ class ApexLearner:
         self.lock = threading.Lock()
         self.config = {"hidden": int(hidden), "quantiles": int(quantiles),
                        "onehot": self.onehot, "in_dim": self.in_dim,
-                       "gamma": float(gamma), "n_step": int(n_step)}
+                       "gamma": float(gamma), "n_step": int(n_step),
+                       # los actores construyen su env y su exploracion de
+                       # ESTO: el vocabulario es config del run, no flag local
+                       "n_actions": self.n_actions, "macros": bool(macros)}
         self.weights_version = 0
         self.weights_every_grads = int(weights_every_grads)
         self._weights_payload = encode_weights(self.online, 0, self.config)

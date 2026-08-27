@@ -124,6 +124,12 @@ class Coordinator:
             self.required_caps.add("states")
         if self.eval_fingerprint is not None:
             self.required_caps.add("eval")
+        # una politica de macros exige un worker que sepa ENVOLVER el env
+        # (MacroActionWrapper); uno viejo tronaria tarde (nombre de politica
+        # desconocido) tras secuestrar un lease -- mejor bancarlo de entrada
+        if policy.POLICIES.get(state.policy,
+                               policy.MLPPolicy).ACTION_KIND == "macro":
+            self.required_caps.add("macro")
         self.speculative_after = speculative_after
         self.speculative_when_remaining_below = speculative_when_remaining_below
         self.max_concurrent_leases = max_concurrent_leases
@@ -149,7 +155,8 @@ class Coordinator:
     def start_generation(self):
         with self.lock:
             g = self.state.generation
-            members = openes.members_for_generation(self.state, self.pop_size)
+            strategy = openes.STRATEGIES[self.state.strategy]
+            members = strategy.members_for_generation(self.state, self.pop_size)
             self.queue = protocol.ChunkQueue(
                 protocol.make_chunks(members, self.chunk_size, g), self.lease_seconds,
                 speculative_after=self.speculative_after,
@@ -350,7 +357,8 @@ class Coordinator:
 
     def apply_update(self, fitnesses):
         with self.lock:
-            self.state = openes.es_update(self.state, fitnesses)
+            strategy = openes.STRATEGIES[self.state.strategy]
+            self.state = strategy.update(self.state, fitnesses)
 
 
 def fleet_metrics(report):
@@ -666,7 +674,10 @@ def load_or_init_state(args, states=None):
                               ("states", cli_states),
                               ("policy", args.policy),
                               ("eval_desync_max", args.eval_desync_max),
-                              ("eval_action_noise", args.eval_action_noise)):
+                              ("eval_action_noise", args.eval_action_noise),
+                              ("sigma_final", args.sigma_final),
+                              ("sigma_decay_gens", args.sigma_decay_gens),
+                              ("strategy", args.strategy)):
             ckpt_val = getattr(state, name)
             if cli_val != ckpt_val:
                 print(f"[coord] WARNING: --{name.replace('_', '-')}={cli_val} ignored; "
@@ -679,7 +690,10 @@ def load_or_init_state(args, states=None):
     return openes.init_state(theta, args.sigma, args.lr, args.weight_decay,
                              args.master_seed, states=cli_states, policy=args.policy,
                              eval_desync_max=args.eval_desync_max,
-                             eval_action_noise=args.eval_action_noise)
+                             eval_action_noise=args.eval_action_noise,
+                             sigma_final=args.sigma_final,
+                             sigma_decay_gens=args.sigma_decay_gens,
+                             strategy=args.strategy)
 
 
 def main():
@@ -735,6 +749,15 @@ def main():
     ap.add_argument("--eval-action-noise", type=float, default=0.0,
                     help="prob. por paso de accion aleatoria durante la "
                          "evaluacion (mismo sorteo pareado). Identidad del run")
+    ap.add_argument("--sigma-final", type=float, default=0.0,
+                    help="con --sigma-decay-gens: sigma decae exponencialmente "
+                         "de --sigma a este valor. 0 = constante")
+    ap.add_argument("--sigma-decay-gens", type=int, default=0,
+                    help="generaciones para llegar a --sigma-final (0 = sin decay)")
+    ap.add_argument("--strategy", default=openes.DEFAULT_STRATEGY,
+                    choices=sorted(openes.STRATEGIES),
+                    help="estrategia de optimizacion de la flota (identidad del "
+                         "run). El contrato para agregar nuevas esta en openes.py")
     args = ap.parse_args()
 
     if args.difficulty is not None and args.states != "manifest":

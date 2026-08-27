@@ -26,9 +26,7 @@ import numpy as np
 
 from es import protocol
 from es.coordinator import resolve_states
-from es.policy import DEFAULT_POLICY, POLICIES
-
-NEUTRAL = np.array([0, 0], dtype=np.int64)
+from es.policy import DEFAULT_POLICY, POLICIES, wrap_env_for_policy
 
 
 def fetch_theta(url):
@@ -65,7 +63,8 @@ def main():
     print("[visor] Ctrl+C para salir\n")
 
     from envs.retro_env import RetroSF2Env
-    env = RetroSF2Env(render_mode="human")
+    env = wrap_env_for_policy(RetroSF2Env(render_mode="human"),
+                              POLICIES[policy_name])
     rng = np.random.default_rng(0)
     step_dt = (4 / 60.0) / max(args.speed, 0.01)  # frameskip 4 sobre 60 fps
     wins, count = 0, 0
@@ -76,7 +75,7 @@ def main():
             obs, _ = env.reset(options={"state": state})
             for _ in range(int(rng.integers(0, args.desync_max + 1))
                            if args.desync_max else 0):
-                obs, _r, term, trunc, info = env.step(NEUTRAL)
+                obs, _r, term, trunc, info = env.step(policy.neutral_action())
                 time.sleep(step_dt)
             steps, info = 0, {}
             t0 = time.time()

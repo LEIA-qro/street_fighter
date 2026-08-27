@@ -85,6 +85,10 @@ def main():
     ap.add_argument("--hidden", type=int, default=256)
     ap.add_argument("--quantiles", type=int, default=51)
     ap.add_argument("--no-onehot", action="store_true")
+    ap.add_argument("--macros", action="store_true",
+                    help="accion Discrete(72): los 9 macros del equipo como "
+                         "opciones atomicas (config del run: los actores la "
+                         "adoptan solos)")
     ap.add_argument("--gamma", type=float, default=0.99)
     ap.add_argument("--n-step", type=int, default=3)
     ap.add_argument("--buffer", type=int, default=500_000)
@@ -111,13 +115,19 @@ def main():
     args = ap.parse_args()
 
     device = pick_device(args.device)
+    if args.macros:
+        from envs.action_macros import N_ACTIONS as n_actions
+    else:
+        n_actions = 63
     torch.manual_seed(args.seed)
     learner = ApexLearner(hidden=args.hidden, quantiles=args.quantiles,
                           onehot=not args.no_onehot, gamma=args.gamma,
                           n_step=args.n_step, buffer_capacity=args.buffer,
                           lr=args.lr, per_alpha=args.per_alpha, device=device,
-                          weights_every_grads=args.weights_every)
+                          weights_every_grads=args.weights_every,
+                          n_actions=n_actions, macros=args.macros)
     print(f"[learner] device={device} in_dim={learner.in_dim} "
+          f"acciones={learner.n_actions} "
           f"buffer={args.buffer} batch={args.batch} replay_ratio<="
           f"{args.replay_ratio}", flush=True)
 
@@ -148,6 +158,8 @@ def main():
                     "meta": {"in_dim": learner.in_dim,
                              "quantiles": args.quantiles, "hidden": args.hidden,
                              "onehot": not args.no_onehot,
+                             "n_actions": learner.n_actions,
+                             "macros": args.macros,
                              "grad_steps": learner.grad_steps,
                              "args": vars(args)}}, path)
         return path

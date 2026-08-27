@@ -47,22 +47,25 @@ import numpy as np
 from es import protocol, resources
 from es.openes import (eval_rng_for_episode, fitness_from_episode, perturbation,
                        states_for_member)
-from es.policy import DEFAULT_POLICY, POLICIES
-
-NEUTRAL_ACTION = np.array([0, 0], dtype=np.int64)  # sin direccion, sin boton
+from es.policy import DEFAULT_POLICY, POLICIES, wrap_env_for_policy
 
 # Capacidades que ESTE codigo sabe honrar, anunciadas en cada /work. La
 # madre banca a los workers que no anuncien lo que su run requiere (codigo
 # viejo = sin query param = banca): mejor un "espera y actualizate" que
 # quemar CPU evaluando mal para ser rechazado por los fingerprints.
-WORKER_CAPS = "states,eval"
+WORKER_CAPS = "states,eval,macro"
 
 MAX_EPISODE_STEPS = 20000  # hard failsafe; the env's own truncation should fire first
 RATE_WINDOW_S = 120.0      # rolling window behind the steps/s we report
 _STOP = False
 
-# one env per process, created lazily on the first evaluation in that process
+# one env per process, created lazily on the first evaluation in that process.
+# _ENV_KIND: el ACTION_KIND de la politica para la que se construyo -- una
+# politica "macro" necesita el env envuelto (MacroActionWrapper) y una
+# "multidiscrete" lo necesita pelon; un run nunca mezcla politicas, pero el
+# guard reconstruye en vez de pisar un env del tipo equivocado.
 _ENV = None
+_ENV_KIND = None
 _ENV_KWARGS = None
 
 
@@ -70,15 +73,16 @@ def _log(message):
     print(f"[worker] {message}", flush=True)
 
 
-def _make_env():
+def _make_env(policy_cls):
     """Import guarded so this module (and the test suite) imports without
     stable-retro/the retro_env track being present; only an evaluation
     actually needs the env."""
     from envs.retro_env import RetroSF2Env  # built by the retro-backend track
     try:
-        return RetroSF2Env(**_ENV_KWARGS)
+        env = RetroSF2Env(**_ENV_KWARGS)
     except TypeError:  # interface drift tolerance: fall back to defaults
-        return RetroSF2Env()
+        env = RetroSF2Env()
+    return wrap_env_for_policy(env, policy_cls)
 
 
 def _pool_init(env_kwargs, nice_delta):
@@ -106,15 +110,15 @@ def _run_episode(env, policy, state=None, perturb_rng=None, desync_max=0,
     steps, info = 0, {}
     if perturb_rng is not None and desync_max:
         for _ in range(int(perturb_rng.integers(0, int(desync_max) + 1))):
-            obs, _reward, terminated, truncated, info = env.step(NEUTRAL_ACTION)
+            obs, _reward, terminated, truncated, info = env.step(
+                policy.neutral_action())
             steps += 1
             if terminated or truncated:
                 return fitness_from_episode(info, steps), steps
     while steps < MAX_EPISODE_STEPS:
         if (perturb_rng is not None and action_noise
                 and perturb_rng.random() < action_noise):
-            action = np.array([perturb_rng.integers(0, 9),
-                               perturb_rng.integers(0, 7)], dtype=np.int64)
+            action = policy.random_action(perturb_rng)
         else:
             action = policy.act(obs)
         obs, _reward, terminated, truncated, info = env.step(action)
@@ -138,7 +142,7 @@ def evaluate_member(task):
     the pair's fitness difference measures the perturbation, not the luck of
     the opponent draw. Fitness stays the plain per-member mean either way.
     """
-    global _ENV
+    global _ENV, _ENV_KIND
     # Longitud del task = version del wire: 6 (pre-registro, v4 limpio),
     # 7 (+ nombre de policy), 8 (+ dict de perturbaciones de evaluacion).
     eval_params = None
@@ -149,10 +153,12 @@ def evaluate_member(task):
     else:
         theta, sigma, seed, sign, episodes, states = task
         policy_name = DEFAULT_POLICY
-    if _ENV is None:
-        _ENV = _make_env()
+    policy_cls = POLICIES[policy_name]
+    if _ENV is None or _ENV_KIND != policy_cls.ACTION_KIND:
+        _ENV = _make_env(policy_cls)
+        _ENV_KIND = policy_cls.ACTION_KIND
     eps = perturbation(theta.shape[0], seed)
-    policy = POLICIES[policy_name](theta + np.float32(sign) * np.float32(sigma) * eps)
+    policy = policy_cls(theta + np.float32(sign) * np.float32(sigma) * eps)
     desync = int(eval_params.get("desync_max", 0)) if eval_params else 0
     noise = float(eval_params.get("action_noise", 0.0)) if eval_params else 0.0
 

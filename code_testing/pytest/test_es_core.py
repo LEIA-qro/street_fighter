@@ -777,6 +777,7 @@ def test_worker_pair_members_face_identical_state_sequences():
         for sign in (1, -1):
             fake = _FakeEnv()
             worker._ENV = fake  # module-global env slot; no emulator offline
+            worker._ENV_KIND = "multidiscrete"  # y su tipo, o el guard reconstruye
             fitness, steps = worker.evaluate_member(
                 (theta, 0.02, pair_seed, sign, 5, states))
             assert fitness == pytest.approx(fitness_from_episode(
@@ -827,7 +828,8 @@ def _cli_args(tmp_path, **overrides):
     import argparse
     kwargs = dict(checkpoint_dir=str(tmp_path), s3_bucket=None, sigma=0.1,
                   lr=0.05, weight_decay=0.0, master_seed=1234, policy="v4",
-                  eval_desync_max=0, eval_action_noise=0.0)
+                  eval_desync_max=0, eval_action_noise=0.0,
+                  sigma_final=0.0, sigma_decay_gens=0, strategy="openes")
     kwargs.update(overrides)
     return argparse.Namespace(**kwargs)
 

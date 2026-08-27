@@ -60,6 +60,19 @@ class ESState:
     # mezclar fitness limpios en el mismo run compara peras con manzanas.
     eval_desync_max: int = 0
     eval_action_noise: float = 0.0
+    # Decaimiento de sigma (2026-08-27, run 4): exploracion ancha al inicio,
+    # fina al final. sigma en la generacion g es
+    #   sigma0 * (sigma_final/sigma0) ** min(g/sigma_decay_gens, 1)
+    # (exponencial, determinista en g -> el resume reproduce el schedule
+    # exacto). sigma_decay_gens=0 = constante, el comportamiento de siempre.
+    # Identidad del run como todo lo demas.
+    sigma0: float = 0.0        # 0.0 = "usa sigma tal cual" (runs pre-schedule)
+    sigma_final: float = 0.0
+    sigma_decay_gens: int = 0
+    # Que ESTRATEGIA de optimizacion corre la flota (key en STRATEGIES, al
+    # final de este modulo). Identidad del run: los seeds/miembros/updates de
+    # una estrategia no son continuables por otra.
+    strategy: str = "openes"
 
 
 def normalize_states(states):
@@ -75,7 +88,8 @@ def normalize_states(states):
 
 
 def init_state(theta, sigma, lr, weight_decay, master_seed, states=None, policy="v4",
-               eval_desync_max=0, eval_action_noise=0.0):
+               eval_desync_max=0, eval_action_noise=0.0,
+               sigma_final=0.0, sigma_decay_gens=0, strategy="openes"):
     theta = np.asarray(theta, dtype=np.float32)
     zeros = np.zeros_like(theta)
     return ESState(theta=theta, sigma=float(sigma), lr=float(lr),
@@ -83,7 +97,22 @@ def init_state(theta, sigma, lr, weight_decay, master_seed, states=None, policy=
                    generation=0, adam_m=zeros.copy(), adam_v=zeros.copy(), adam_t=0,
                    states=normalize_states(states), policy=str(policy),
                    eval_desync_max=int(eval_desync_max),
-                   eval_action_noise=float(eval_action_noise))
+                   eval_action_noise=float(eval_action_noise),
+                   sigma0=float(sigma), sigma_final=float(sigma_final),
+                   sigma_decay_gens=int(sigma_decay_gens), strategy=str(strategy))
+
+
+def sigma_for_generation(state, generation):
+    """El sigma que la generacion `generation` debe usar bajo el schedule.
+
+    Pura y determinista en g: workers y update usan el MISMO valor via
+    state.sigma (el coordinador lo refresca al abrir cada generacion), y un
+    resume recalcula el punto exacto del schedule sin estado extra.
+    """
+    if state.sigma_decay_gens <= 0 or state.sigma0 <= 0 or state.sigma_final <= 0:
+        return state.sigma
+    frac = min(float(generation) / float(state.sigma_decay_gens), 1.0)
+    return float(state.sigma0 * (state.sigma_final / state.sigma0) ** frac)
 
 
 def pair_seeds_for_generation(master_seed, generation, n_pairs):
@@ -205,8 +234,13 @@ def es_update(state, fitnesses):
     v_hat = v / (1 - ADAM_BETA2 ** t)
     theta = state.theta + np.float32(state.lr) * m_hat / (np.sqrt(v_hat) + ADAM_EPS)
 
-    return replace(state, theta=theta.astype(np.float32), generation=state.generation + 1,
-                   adam_m=m.astype(np.float32), adam_v=v.astype(np.float32), adam_t=t)
+    new_gen = state.generation + 1
+    return replace(state, theta=theta.astype(np.float32), generation=new_gen,
+                   adam_m=m.astype(np.float32), adam_v=v.astype(np.float32), adam_t=t,
+                   # el sigma de la SIGUIENTE generacion segun el schedule
+                   # (constante si no hay schedule); members_for_generation y
+                   # los leases leen state.sigma, asi que todos ven el mismo
+                   sigma=sigma_for_generation(state, new_gen))
 
 
 def fitness_from_episode(info, steps):
@@ -241,7 +275,10 @@ def save_checkpoint(state, path_base):
             "states": None if state.states is None else list(state.states),
             "policy": state.policy,
             "eval_desync_max": state.eval_desync_max,
-            "eval_action_noise": state.eval_action_noise}
+            "eval_action_noise": state.eval_action_noise,
+            "sigma0": state.sigma0, "sigma_final": state.sigma_final,
+            "sigma_decay_gens": state.sigma_decay_gens,
+            "strategy": state.strategy}
     tmp = path_base + ".json.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -266,7 +303,12 @@ def load_checkpoint(path_base):
                     policy=str(meta.get("policy", "v4")),
                     # y los pre-perturbacion son runs limpios
                     eval_desync_max=int(meta.get("eval_desync_max", 0)),
-                    eval_action_noise=float(meta.get("eval_action_noise", 0.0)))
+                    eval_action_noise=float(meta.get("eval_action_noise", 0.0)),
+                    # pre-schedule: sigma constante
+                    sigma0=float(meta.get("sigma0", 0.0)),
+                    sigma_final=float(meta.get("sigma_final", 0.0)),
+                    sigma_decay_gens=int(meta.get("sigma_decay_gens", 0)),
+                    strategy=str(meta.get("strategy", "openes")))
     if state.theta.shape[0] != int(meta["dim"]):
         raise ValueError(f"checkpoint dim mismatch: json says {meta['dim']}, "
                          f"npz has {state.theta.shape[0]}")
@@ -281,3 +323,33 @@ def latest_checkpoint(checkpoint_dir):
         if os.path.exists(base + ".npz"):
             candidates.append(base)
     return max(candidates) if candidates else None  # gen_%06d sorts lexically
+
+
+# ---------------------------------------------------------------------------
+# Registro de ESTRATEGIAS de la flota (2026-08-27). El contrato minimo que la
+# infra (coordinador+workers+wire) le pide a cualquier optimizador black-box:
+#
+#   members_for_generation(state, pop_size) -> [(idx, seed, sign), ...]
+#       la poblacion de una generacion como (semilla, signo) -- el wire consta
+#       de SEMILLAS, no de parametros: cualquier estrategia nueva debe poder
+#       reconstruir a un miembro desde (theta, sigma, seed, sign) en el worker
+#       (hoy: member_theta). Si una estrategia futura necesita otra
+#       reconstruccion, se versiona junto con una capacidad nueva del worker.
+#   update(state, fitnesses) -> ESState nuevo
+#       fitnesses alineados al orden de members_for_generation.
+#
+# Todo lo demas (leases, rotacion de estados, perturbaciones de evaluacion,
+# checkpoints, S3, W&B, banca de workers) es agnostico a la estrategia y se
+# hereda gratis. El nombre es identidad del run (checkpoint ancla, CLI avisa).
+# ---------------------------------------------------------------------------
+
+class OpenESStrategy:
+    """OpenAI-ES (Salimans 2017): antitetico + centered ranks + Adam."""
+
+    name = "openes"
+    members_for_generation = staticmethod(members_for_generation)
+    update = staticmethod(es_update)
+
+
+STRATEGIES = {"openes": OpenESStrategy}
+DEFAULT_STRATEGY = "openes"

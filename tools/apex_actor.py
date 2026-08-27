@@ -82,7 +82,9 @@ def _child(rank, procs, states, desync_max, weights_path, version_value,
         time.sleep(0.2)
     ckpt = torch.load(weights_path, map_location="cpu", weights_only=False)
     config = ckpt["config"]
-    net = QRDuelingNet(config["in_dim"], n_quantiles=config["quantiles"],
+    net = QRDuelingNet(config["in_dim"],
+                       n_actions=int(config.get("n_actions", 63)),
+                       n_quantiles=config["quantiles"],
                        hidden=config["hidden"])
     net.load_state_dict(ckpt["state"])  # estricto: actor stale truena aqui
     net.eval()
@@ -93,8 +95,10 @@ def _child(rank, procs, states, desync_max, weights_path, version_value,
         entropy=int(seed), spawn_key=(int(rank),)))
     # obs crudas (92) en el wire: onehot=False en la fabrica; la expansion
     # one-hot es solo para el forward local
+    n_actions = int(config.get("n_actions", 63))
     env = make_discrete_sf2(states, seed=seed * 100 + rank,
-                            desync_max=desync_max, onehot=False)
+                            desync_max=desync_max, onehot=False,
+                            macros=bool(config.get("macros", False)))
     my_version = version_value.value
     reload_failures = 0
 
@@ -124,7 +128,7 @@ def _child(rank, procs, states, desync_max, weights_path, version_value,
                 if reload_failures >= 5:
                     raise
         if rng.random() < eps:
-            action = int(rng.integers(0, 63))
+            action = int(rng.integers(0, n_actions))
         else:
             feats = expand_char_onehot(obs) if onehot else obs
             with torch.no_grad():

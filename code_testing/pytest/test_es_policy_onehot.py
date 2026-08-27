@@ -153,7 +153,9 @@ class TestCheckpointIdentity:
         args = argparse.Namespace(checkpoint_dir=str(tmp_path), s3_bucket=None,
                                   sigma=0.02, lr=0.01, weight_decay=0.0,
                                   master_seed=9, policy="v4onehot",
-                                  eval_desync_max=0, eval_action_noise=0.0)
+                                  eval_desync_max=0, eval_action_noise=0.0,
+                                  sigma_final=0.0, sigma_decay_gens=0,
+                                  strategy="openes")
         resumed = load_or_init_state(args, states=("A", "B"))
         assert resumed.policy == "v4"
         assert resumed.generation == state.generation
@@ -185,7 +187,8 @@ class TestWorkerCompat:
                 info = {"win": 1, "my_hp": 176, "enemy_hp": 0}
                 return np.zeros(OBS_DIM, dtype=np.float32), 0.0, True, False, info
 
-        monkeypatch.setattr(worker, "_make_env", lambda: FakeEnv())
+        monkeypatch.setattr(worker, "_make_env", lambda _cls: FakeEnv())
+        monkeypatch.setattr(worker, "_ENV_KIND", None)
         monkeypatch.setattr(worker, "_ENV", None)
         theta = MLPPolicy.init_flat(0)
         fit6, steps6 = worker.evaluate_member((theta, 0.02, 123, 1, 1, None))
@@ -203,7 +206,8 @@ class TestWorkerCompat:
                 info = {"win": 0, "my_hp": 0, "enemy_hp": 176}
                 return np.zeros(OBS_DIM, dtype=np.float32), 0.0, True, False, info
 
-        monkeypatch.setattr(worker, "_make_env", lambda: FakeEnv())
+        monkeypatch.setattr(worker, "_make_env", lambda _cls: FakeEnv())
+        monkeypatch.setattr(worker, "_ENV_KIND", None)
         monkeypatch.setattr(worker, "_ENV", None)
         theta = CharOneHotPolicy.init_flat(0)
         fit, steps = worker.evaluate_member(

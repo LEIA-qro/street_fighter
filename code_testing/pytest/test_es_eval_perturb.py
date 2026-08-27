@@ -72,7 +72,9 @@ class TestIdentity:
         args = argparse.Namespace(checkpoint_dir=str(tmp_path), s3_bucket=None,
                                   sigma=0.02, lr=0.01, weight_decay=0.0,
                                   master_seed=3, policy="v4",
-                                  eval_desync_max=0, eval_action_noise=0.0)
+                                  eval_desync_max=0, eval_action_noise=0.0,
+                                  sigma_final=0.0, sigma_decay_gens=0,
+                                  strategy="openes")
         resumed = load_or_init_state(args, states=("A", "B"))
         assert resumed.eval_desync_max == 30
         assert resumed.eval_action_noise == 0.05
@@ -197,7 +199,8 @@ class TestWorkerApplication:
     def _run_member(self, monkeypatch, sign, eval_params):
         from es import worker
         env = _CountingEnv()
-        monkeypatch.setattr(worker, "_make_env", lambda: env)
+        monkeypatch.setattr(worker, "_make_env", lambda _cls: env)
+        monkeypatch.setattr(worker, "_ENV_KIND", None)
         monkeypatch.setattr(worker, "_ENV", None)
         theta = MLPPolicy.init_flat(0)
         worker.evaluate_member((theta, 0.02, 999, sign, 2, None, "v4", eval_params))
