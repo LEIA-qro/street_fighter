@@ -123,3 +123,7 @@ Herramientas nuevas: `tools/forge_states.py` (forja gateada por el veredicto del
 ## [2026-08-27 ~07:30] EL PLENO TRIPLE — v511 barre el banco canónico
 
 **El campeón del curriculum (v511, ~289k grads) hace 100% EN LAS TRES CONDICIONES del banco canónico lvl1** (216/216 episodios): limpio 100/+1.454 (récord de fitness), desfase ≤30 100/+1.415 (le quita al PPO la última corona), ruido 5% 100/+1.420. Y el mismo modelo hace 85.4% en lvl4 (media multi-tier 96.4, selector). Congelado en `benchmarks/apex_milestones/apex_v511_media9640.pt`; acta jsonl en `benchmarks/bench_v511_canonico.jsonl`. La noche completa del learner: congelamiento por captura de consola de wandb (~1.5h zombi, 0 grads perdidos, 3 parches) y de ahí ~12/s sin interrupciones hasta 302k grads. lvl1-3 saturados en el banco → recomendación en pie: extender actores a --difficulty 1..8 (estados listos y validados).
+
+## [2026-08-27 ~08:45] La escalera del v511 — la estrategia VIAJA
+
+Banco canónico (3 condiciones) × niveles 1-6 con el v511 (wr promedio por nivel): **lvl1 100.0 / lvl2 99.7 / lvl3 92.7 / lvl4 74.3 / lvl5 66.3 / lvl6 61.8** — monótona, sin acantilados. En lvl5-6 (JAMÁS entrenados) desfase ≈ ruido ≈ limpio: generalización real, no coreografía. vs el campeón lvl1-only de ayer (50% lvl5, 31% lvl6): el curriculum enseñó a pelear, no a memorizar. Actas: benchmarks/bench_v511_escalera.jsonl (+ canónico en bench_v511_canonico.jsonl). Artifact del equipo actualizado (misma URL). Felipe pidió esta prueba ANTES de soltar los tiers altos → luz verde técnica para extender actores a 1-8.
