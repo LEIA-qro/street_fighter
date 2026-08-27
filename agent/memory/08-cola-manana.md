@@ -42,7 +42,24 @@ subiendo) hasta que la escalera se aplane.**
    (`difficulty_ram_in_fight`). Herramientas: `tools/forge_states.py` +
    `tools/validate_forged_states.py` (+19 tests). **Extender la run a
    `--difficulty 1..8` = decisión de equipo; solo se relanzan actores.**
-3. **Fleet-agent** ("dar de alta y olvidarse"): `fleet.json` en el repo como
+3. **Acelerar el LEARNER — el cuello de botella real de la run** (medido
+   2026-08-27 18:30, dos muestras de /status a 45 s): **8.7 grads/s** con
+   2,031 trans/s entrando → **replay ratio REAL 1.10** contra un tope
+   configurado de 8. O sea: cada transición se entrena ~una vez y el buffer
+   la recicla; la flota entera está sub-explotada y el learner ni siquiera
+   roza su propio límite. ~115 ms por paso de gradiente en una 4090 con una
+   MLP de ~1M params y batch 256 = el tiempo NO se va en la GPU. Sospechosos,
+   en orden: (a) `ApexLearner._featurize` corre `expand_char_onehot` sobre
+   256 muestras en Python puro por paso — vectorizarlo (una sola operación
+   numpy/torch sobre el batch, o mejor: guardar ya expandido / expandir en
+   GPU); (b) `PERBuffer.sample` en Python por índice; (c) contención del lock
+   con los hilos HTTP de ingesta (el sample sí va bajo el lock). Ganancia
+   esperada: 3-8× más gradientes con el MISMO hardware y la MISMA flota —
+   vale más que sumar máquinas o cambiar la mezcla de niveles. Perfilar
+   primero (cProfile alrededor de train_tick, 200 pasos), medir después.
+   Cuidado: toca el corazón de una run viva; probar en un learner de
+   juguete (puerto 8099, buffer chico) y desplegar en un reinicio planeado.
+4. **Fleet-agent** ("dar de alta y olvidarse"): `fleet.json` en el repo como
    plano de control (qué corre cada máquina) + supervisor por máquina (loop:
    git pull rama `fleet-stable` → comparar manifiesto/HEAD → relanzar hijo →
    heartbeat; backoff anti-crash-loop). Deploy = mover el tag. Conversación de
@@ -78,6 +95,20 @@ subiendo) hasta que la escalera se aplane.**
   **apex_escalera_best.pt**(.json). Los campeones de la era lvl1-4
   (apex_curriculum_best/apex_v511_media9640) quedan ARCHIVADOS — su media
   sobre 4 tiers no es comparable con la media sobre 8.
+- **EXPERIMENTO VIVO (decidido 2026-08-27 ~18:30): saturar los tiers altos.**
+  Las 3 máquinas grandes pasan a `--difficulty 4,5,6,7,8`; **la Mac (12p) se
+  queda en `1..8` como CANARIO** (9% del cómputo mantiene los niveles bajos
+  en el buffer y la telemetría de lvl1-3 viva en wandb, que si no se
+  congela). Razón: con replay ratio real ~1.1 la mezcla de los actores ES la
+  dieta de gradientes, y 3/8 de ella venía de niveles al 99-100% (error de
+  predicción ~0). lvl4 se QUEDA (80.2% en el banco: menos que lvl5-6, tiene
+  headroom). Riesgo específico a vigilar: los CPUs bajos son PASIVOS, no
+  solo débiles — una política afinada solo contra agresivos puede
+  sobre-comprometerse contra ellos. **Detector: el selector v3 (los 8 tiers
+  cada 30 min). REGLA DE REVERSA: lvl1-3 por debajo de ~95% en dos exámenes
+  seguidos → relanzar los grandes en `1..8`.** La dificultad NO está en la
+  observación (una sola política sirve a los 8), lo que hace el olvido menos
+  probable que en un setting condicionado por tarea.
 - **Riesgo a vigilar: "coward local minimum" de Diego** — si lvl4 muestra wr
   cayendo + episodios acortándose (aprender a perder rápido), quitar lvl4 de
   los ACTORES (--difficulty 1,2,3 + relanzar; el learner no se toca). La
