@@ -112,6 +112,14 @@ def main():
     ap.add_argument("--out", default=str(REPO / "models" / "rainbow_apex"))
     ap.add_argument("--seed", type=int, default=20260827)
     ap.add_argument("--wandb-project", default=None)
+    ap.add_argument("--wandb-id", default="rainbow-apex",
+                    help="identidad del run en W&B: una run larga NUEVA "
+                         "necesita id nuevo (reusar uno viejo hace que W&B "
+                         "tire en silencio los steps que van hacia atras)")
+    ap.add_argument("--resume-ckpt", default=None,
+                    help="arrancar la red desde un .pt (migracion de "
+                         "learner sin perder gradientes; el buffer se "
+                         "rellena solo en minutos)")
     args = ap.parse_args()
 
     device = pick_device(args.device)
@@ -136,12 +144,27 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"[learner] listening on {args.host}:{args.port}", flush=True)
 
+    if args.resume_ckpt:
+        ckpt = torch.load(args.resume_ckpt, map_location="cpu",
+                          weights_only=False)
+        learner.online.load_state_dict(ckpt["state_dict"])  # estricto
+        learner.sync_target()
+        with learner.lock:
+            learner.weights_version += 1
+            from agents.apex import encode_weights
+            learner._weights_payload = encode_weights(
+                learner.online, learner.weights_version, learner.config)
+        print(f"[learner] red resumida de {args.resume_ckpt} "
+              f"(grads previos: {ckpt.get('meta', {}).get('grad_steps', '?')})",
+              flush=True)
+
     wandb_run = None
     if args.wandb_project:
         try:
             import wandb
-            wandb_run = wandb.init(project=args.wandb_project, entity="leia-qro-rl", id="rainbow-apex",
-                                   name="rainbow-apex", resume="allow",
+            wandb_run = wandb.init(project=args.wandb_project, entity="leia-qro-rl",
+                                   id=args.wandb_id,
+                                   name=args.wandb_id, resume="allow",
                                    group="dqn", tags=["dqn"],
                                    settings=wandb.Settings(x_disable_stats=True))
         except Exception as e:
