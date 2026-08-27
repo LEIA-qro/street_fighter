@@ -163,11 +163,19 @@ def main():
     if args.wandb_project:
         try:
             import wandb
+            # console="off" es OBLIGATORIO: la captura de consola de wandb
+            # envuelve stdout, y un sidecar atorado bloquea CUALQUIER print
+            # del proceso -- asi se congelo la run del curriculum 7 horas la
+            # madrugada del 2026-08-27 (la linea de log de grads 33103 salio
+            # recien al Ctrl+C, con datos de las 00:40: estuvo atorada a
+            # media escritura). El pump en hilo aparte cubre .log(); esto
+            # cubre el stdout del propio loop.
             wandb_run = wandb.init(project=args.wandb_project, entity="leia-qro-rl",
                                    id=args.wandb_id,
                                    name=args.wandb_id, resume="allow",
                                    group="dqn", tags=["dqn"],
-                                   settings=wandb.Settings(x_disable_stats=True))
+                                   settings=wandb.Settings(x_disable_stats=True,
+                                                           console="off"))
         except Exception as e:
             print(f"[learner] wandb off ({e})", flush=True)
 
