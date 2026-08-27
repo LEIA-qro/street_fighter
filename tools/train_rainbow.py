@@ -122,7 +122,7 @@ def main():
     if args.wandb_project:
         try:
             import wandb
-            wandb_run = wandb.init(project=args.wandb_project,
+            wandb_run = wandb.init(project=args.wandb_project, entity="leia-qro-rl",
                                    id=f"rainbow-qr-{args.seed}",
                                    name=f"rainbow-qr-{args.seed}", resume="allow",
                                    group="dqn", tags=["dqn"],

@@ -130,7 +130,7 @@ def main():
     if args.wandb_project:
         try:
             import wandb
-            wandb_run = wandb.init(project=args.wandb_project, id="rainbow-apex",
+            wandb_run = wandb.init(project=args.wandb_project, entity="leia-qro-rl", id="rainbow-apex",
                                    name="rainbow-apex", resume="allow",
                                    group="dqn", tags=["dqn"],
                                    settings=wandb.Settings(x_disable_stats=True))
