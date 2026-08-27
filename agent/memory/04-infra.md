@@ -40,3 +40,9 @@
 
 `--states manifest --difficulty 1 --policy v4onehot --s3-prefix es-run3-perturbed --chunk-size 24 --episodes-per-eval 4 --weight-decay 0.01 --eval-desync-max 30 --eval-action-noise 0.05`
 Runs cerradas archivadas: S3 `es/` (run 1 escalar) y `es-run2-onehot/` (run 2), + benchmarks/run{1,2}_final/ en el repo.
+
+## [2026-08-26 noche-2] Convención W&B: DOS proyectos, no se mezclan
+
+- **leia-sf2-es**: solo la pista ES (runs es-run1-scalar / es-run2-onehot / es-run3-perturbed; id estable = slug del s3-prefix).
+- **leia-sf2-dqn**: toda la pista DQN — train_rainbow single-machine y el Ape-X (learner id "rainbow-apex"). Pasar `--wandb-project leia-sf2-dqn` en ambos.
+- La Mac de Felipe queda fija como worker ES (sin GPU); la pista DQN vive en las máquinas con gráfica.
