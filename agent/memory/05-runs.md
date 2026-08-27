@@ -81,3 +81,18 @@ A ~79k gradientes (~2h en la Legion sola, learner+actor local): **limpio +1.199/
 ## [2026-08-27 ~03:00] 🏆 PLENO PERFECTO — Ape-X 12/12 a 90k gradientes
 
 **Primer modelo en la historia del proyecto que barre los 12 rivales limpios: 24/24, fitness +1.313 (récord absoluto del banco). Desfase honesto: 91.7% (+1.181) — a 1.4pts del campeón (93.1%).** ~2.5h de entrenamiento en la Legion sola, SIN macros. Sagat (+1.034) fue el último en caer. Checkpoint archivado: benchmarks/apex_milestones/apex_grads90k_PLENO12de12.pt (ojo: los .pt de torch son zips — las descargas a veces les añaden .zip; se renombra y listo). Taildrop entre usuarios NO funciona ("peer owned by different user") — los checkpoints se comparten por http.server en la tailnet o el /weights vivo del learner.
+
+## [2026-08-27 ~04:00] TABLA MAESTRA FINAL — ES run 3 cerrada, todo medido
+
+ES run 3 CERRADA en gen 113 (acta en benchmarks/run3_final/: theta+ckpt+metrics.jsonl); madre ociosa lista para run 4; Mac libre. **Matriz completa 7 modelos × 3 condiciones (wr / fitness):**
+| Modelo | Limpio | Desfase | Ruido5% | Prom |
+|---|---|---|---|---|
+| **DQN Ape-X 90k (2.5h)** | **100/+1.313** | 91.7/+1.181 | 95.8/+1.247 | **95.8** |
+| PPO campeón 39.7M | 90.6/+1.152 | **93.1**/+1.188 | 95.8/+1.254 | 93.2 |
+| Glaber 104.7M | 85.4/+1.044 | 79.2/+0.986 | 90.3/+1.154 | 85.0 |
+| PPO 31M | 74.0/+0.858 | 80.6/+0.931 | 81.9/+0.975 | 78.8 |
+| ES3 g113 | 83.3/+1.015 | 79.2/+0.985 | 56.9/+0.570 | 73.1 |
+| ES1 g95 | 83.3/+1.079 | 63.9/+0.785 | 76.4/+0.894 | 74.5 |
+| ES2 g754 | 75.0/+0.924 | 75.0/+0.909 | 65.3/+0.691 | 71.8 |
+
+**DQN líder en promedio (95.8) con ~50× menos cómputo que el campeón; campeón conserva solo la corona del desfase (+1.4pts).** Glaber pierde con desfase (79.2 — tiene algo de coreografía). ES3: robusto al desfase (−4pts) pero débil al ruido (113 gens no alcanzaron a entrenarlo). Reporte para el equipo (artifact): https://claude.ai/code/artifact/cec6dc95-28b1-4cb6-9c62-0a40fbad8531 — siguiente: Ape-X a dificultades altas + estrenar macros.

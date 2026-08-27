@@ -1,0 +1,26 @@
+{
+  "sigma": 0.02,
+  "lr": 0.01,
+  "weight_decay": 0.01,
+  "master_seed": 20260825,
+  "generation": 113,
+  "adam_t": 113,
+  "dim": 21887,
+  "states": [
+    "RYU_BALROG_R1_lvl1",
+    "RYU_BLANKA_R1_lvl1",
+    "RYU_CHUNLI_R1_lvl1",
+    "RYU_DHALSIM_R1_lvl1",
+    "RYU_EHONDA_R1_lvl1",
+    "RYU_GUILE_R1_lvl1",
+    "RYU_KEN_R1_lvl1",
+    "RYU_MBISON_R1_lvl1",
+    "RYU_RYU_R1_lvl1",
+    "RYU_SAGAT_R1_lvl1",
+    "RYU_VEGA_R1_lvl1",
+    "RYU_ZANGIEF_R1_lvl1"
+  ],
+  "policy": "v4onehot",
+  "eval_desync_max": 30,
+  "eval_action_noise": 0.05
+}
