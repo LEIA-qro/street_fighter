@@ -42,6 +42,8 @@ def main():
     ap.add_argument("--theta-npz", default=None)
     ap.add_argument("--policy", default=DEFAULT_POLICY, choices=sorted(POLICIES),
                     help="solo con --theta-npz")
+    ap.add_argument("--rainbow-ckpt", default=None,
+                    help="ver un checkpoint DQN (.pt de train_rainbow/apex) en vez del ES")
     ap.add_argument("--state", default=None,
                     help="un rival fijo (p.ej. RYU_KEN_R1_lvl1); default: rota los 12")
     ap.add_argument("--difficulty", default="1")
@@ -50,12 +52,50 @@ def main():
                     help="1.0 = tiempo real (~15 acciones/s); 2.0 = doble")
     args = ap.parse_args()
 
-    if args.theta_npz:
+    if args.rainbow_ckpt:
+        # adaptador: la red DQN greedy con la MISMA interfaz act()/neutral
+        import torch
+        from agents.rainbow import QRDuelingNet
+        from es.policy import expand_char_onehot
+        ckpt = torch.load(args.rainbow_ckpt, map_location="cpu", weights_only=False)
+        meta = ckpt["meta"]
+        net = QRDuelingNet(meta["in_dim"], n_actions=int(meta.get("n_actions", 63)),
+                           n_quantiles=meta["quantiles"], hidden=meta["hidden"])
+        net.load_state_dict(ckpt["state_dict"])
+        net.eval()
+
+        class _RainbowView:
+            ACTION_KIND = "macro" if meta.get("macros") else "multidiscrete"
+
+            @staticmethod
+            def neutral_action():
+                return 0 if meta.get("macros") else np.array([0, 0], dtype=np.int64)
+
+            @staticmethod
+            def act(obs):
+                feats = (expand_char_onehot(obs) if meta.get("onehot", True)
+                         else np.asarray(obs, dtype=np.float32))
+                with torch.no_grad():
+                    q = net.q_values(torch.as_tensor(
+                        np.asarray(feats, dtype=np.float32)).unsqueeze(0))
+                a = int(q.argmax(dim=1).item())
+                if meta.get("macros"):
+                    return a
+                move, attack = divmod(a, 7)
+                return np.array([move, attack], dtype=np.int64)
+
+        policy = _RainbowView()
+        policy_name = "v4onehot"  # solo para la envoltura del env (sin macros)
+        if meta.get("macros"):
+            policy_name = "v4onehot_macro"
+        version = f"dqn:{os.path.basename(args.rainbow_ckpt)}"
+    elif args.theta_npz:
         theta = np.load(args.theta_npz)["theta"].astype(np.float32)
         version, policy_name = f"npz:{os.path.basename(args.theta_npz)}", args.policy
+        policy = POLICIES[policy_name](theta)
     else:
         version, theta, policy_name = fetch_theta(args.theta_url)
-    policy = POLICIES[policy_name](theta)
+        policy = POLICIES[policy_name](theta)
     states = [args.state] if args.state else resolve_states("manifest",
                                                             args.difficulty)
     print(f"[visor] theta gen {version} ({policy_name}) | rivales: "
