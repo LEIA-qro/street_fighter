@@ -103,3 +103,7 @@ ES run 3 CERRADA en gen 113 (acta en benchmarks/run3_final/: theta+ckpt+metrics.
 - **Lección DQN medida**: entre 90k y 192k grads el limpio cayó 100→83.3 pero el desfase se mantuvo 91.7 (fit subió) — la política CHUREA con el entrenamiento continuo; el checkpoint bueno se SELECCIONA. El pico sigue siendo 90k (archivado).
 - **Selector automático corriendo en la Mac**: cada 30 min jala /weights del learner, banco desfase (72 eps), bitácora en scratchpad/apex_selector.jsonl y guarda el mejor en benchmarks/apex_milestones/apex_best_desync.pt(.json). El campeón DQN se elige solo.
 - `win_rate_recent200` agregado al learner (visible al relanzarlo). air_frac del DQN: 0.432 medio pero MODULADO por matchup (0.23 vs Balrog — primer modelo que decide cuándo no brincar).
+
+## [2026-08-27 ~00:00] LA RUN DEL CURRICULUM VIVA — cierre de la noche
+
+**Learner en la desktop 4090 (24/7, Santiago la onboardeó): 72 acciones (MACROS ESTRENADOS), buffer 1M, wandb `rainbow-apex-curriculum`.** Actores: desktop 44p + Legion 30p + Mac 12p (sobre-suscritos: los hijos cargan ~35-60%/core por el overhead de torch por paso — diagnóstico y fix numpy en 08-cola). Curriculum UNIFORME 1,2,3,4 en todos. **Escalera a 15 min de nacer: lvl1 85.5 / lvl2 74.5 / lvl3 65.5 / lvl4 36 — perfectamente ordenada y toda subiendo; con macros aprende ~5-10× más rápido que la run lvl1 a la misma edad.** Selector v2 multi-tier corriendo en la Mac. Actas archivadas: pleno 90k + final 286k de la run lvl1. Runbooks por rol en tools/RUN_LARGA_*.md. La cola completa de mañana: **08-cola-manana.md**.

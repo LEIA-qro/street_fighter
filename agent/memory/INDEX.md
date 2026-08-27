@@ -24,3 +24,5 @@ Sistema de memoria compartida del proyecto, versionado en git. Convención:
 - **Dos entrenamientos vivos**: PPO en la desktop (rumbo a 31M steps, curriculum lvl2→3, BizHawk) y **ES desde cero en la flota** (madre EC2 + M4 como único worker por ahora, 12 rivales lvl1, ~128s/generación).
 - Retro tiene **212 savestates verificados** (lvl1-4 completos ×12 rivales). El bug histórico del reward (perder pagaba más que ganar, 6 meses) está muerto y doble-validado.
 - Equipo: Felipe (FelipeJackFox), Diego (Perea094, diegop00dx@gmail.com), Santiago (SantiagoSaldanaS, sssubias@gmail.com). Los 3 owners de la org GitHub LEIA-qro = admins de tailnet y W&B.
+
+- **08-cola-manana.md** — LA COLA VIVA post noche-de-los-tres-algoritmos (sustituye a 06 en lo operativo): fix numpy del actor, inferencia de savestates lvl5-8 por poke de 0xFE45, fleet-agent, vigilancia de la run del curriculum, experimentos en cola.
