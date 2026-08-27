@@ -3,6 +3,23 @@
 La cola VIVA post-noche-histórica. Sustituye a 06-pendientes para lo operativo
 (06 queda de histórico). Orden = prioridad sugerida.
 
+## ⚡ CORTE día 2 tarde (2026-08-27 ~18:00) — el estado en un párrafo
+
+**La run del curriculum va en ~735k grads con la FLOTA RÉCORD: 4 máquinas
+(desktop 44p + Legion 40p + Omen 40p + Mac 12p, ~136 procesos, ~8k st/s),
+todas en `--difficulty 1..8`.** Escalera viva: 100/99/99/89/80/74/72/55.
+Campeón vigente: **v1212** (`apex_v1212_escalera854.pt`, media selector 85.4;
+evaluación definitiva 8×3: **85.3% global**, acta en 05-runs). Selector v3
+en la Mac (era-escalera, `apex_escalera_best.pt` + jsonl v3); velador
+re-armado con antirrebote (3 polls). **EL CAMPEÓN CAMINA** (air_frac 0.20).
+Cerrados hoy: malla 96 estados ✓, extensión 1-8 ✓, Omen onboardeada ✓
+(RUN_OMEN_DESDE_CERO.md), saga de red de la Legion ✓ (NAT WSL2 atorado →
+reboot; `--flush` nuevo para redes hostiles), modo STAND construido ✓
+(falta SOLO su end-to-end en Windows), artifact al día (matriz 8×3 +
+diccionario de unidades). **Pendientes reales: el end-to-end del stand, el
+fix numpy del actor, el fleet-agent, y dejar hervir lvl8-desfase (56% y
+subiendo) hasta que la escalera se aplane.**
+
 ## Lo primero de mañana
 
 1. **Fix numpy en el actor Ape-X** — los hijos actúan con torch forward por paso
@@ -48,17 +65,19 @@ La cola VIVA post-noche-histórica. Sustituye a 06-pendientes para lo operativo
   cobarde. La flota siguió generando toda la noche (experiencia a un
   learner paralizado: inofensivo, solo cómputo tirado).
 
-## Vigilancia de la run del curriculum (corriendo AHORA)
+## Vigilancia de la run del curriculum (ACTUALIZADO día 2 tarde)
 
-- **Learner**: desktop-4090-ubuntu-wsl:8090, `--macros` (72 acciones, PRIMER
-  run con macros de la historia), buffer 1M, wandb id `rainbow-apex-curriculum`.
-  Actores: desktop 44p + Legion 30p + Mac 12p, todos `--difficulty 1,2,3,4`
-  (curriculum UNIFORME: decisión de Felipe — bandas por máquina sesgarían el
-  buffer hacia el tier de la CPU fuerte; el PER enfoca solo).
-- **Selector v2 en la Mac** (scratchpad/apex_selector_v2.sh + .jsonl): cada 30
-  min examina el θ vivo greedy con desfase EN CADA TIER (bench --difficulty N)
-  y guarda el mejor por promedio en benchmarks/apex_milestones/
-  apex_curriculum_best.pt(.json).
+- **Learner**: desktop-4090-ubuntu-wsl:8090, `--macros`, buffer 1M,
+  `--weights-every 500`, contador RESUMIDO (arrancó en 33103 tras el zombi),
+  wandb id `rainbow-apex-curriculum`. Actores: desktop 44p + Legion 40p +
+  Omen 40p + Mac 12p, TODOS `--difficulty 1,2,3,4,5,6,7,8` (uniforme, regla
+  de Felipe). Señal de arranque sano de un actor: `estados=96`.
+- **Selector v3 en la Mac** (scratchpad/apex_selector_v3.sh + .jsonl,
+  ERA-ESCALERA): cada 30 min examina el θ vivo greedy con desfase en LOS 8
+  tiers y guarda el mejor por media en benchmarks/apex_milestones/
+  **apex_escalera_best.pt**(.json). Los campeones de la era lvl1-4
+  (apex_curriculum_best/apex_v511_media9640) quedan ARCHIVADOS — su media
+  sobre 4 tiers no es comparable con la media sobre 8.
 - **Riesgo a vigilar: "coward local minimum" de Diego** — si lvl4 muestra wr
   cayendo + episodios acortándose (aprender a perder rápido), quitar lvl4 de
   los ACTORES (--difficulty 1,2,3 + relanzar; el learner no se toca). La
