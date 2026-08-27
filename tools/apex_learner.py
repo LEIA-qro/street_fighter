@@ -198,7 +198,7 @@ def main():
                     for n, r in s["actors"].items())
                 print(f"[learner] grads {s['grad_steps']} ({grads_s:.0f}/s) | "
                       f"buffer {s['buffer']} | trans/s {trans_s:.0f} | "
-                      f"wr acum {s['win_rate_cum']} ({s['episodes']} eps) | "
+                      f"wr acum {s['win_rate_cum']} reciente200 {s['win_rate_recent200']} ({s['episodes']} eps) | "
                       f"loss {np.mean(losses):.4f} | {actor_line}",
                       flush=True)
                 if wandb_run:
@@ -207,6 +207,7 @@ def main():
                                    "grads_per_s": grads_s,
                                    "transitions_per_s": trans_s,
                                    "win_rate_cum": s["win_rate_cum"],
+                                   "win_rate_recent200": s["win_rate_recent200"],
                                    "episodes": s["episodes"]},
                                   step=learner.grad_steps)
                 last_log_t = time.time()

@@ -161,6 +161,10 @@ class ApexLearner:
         self.actors = {}   # name -> {"last_seen", "transitions", "stats"...}
         self.ep_wins = 0
         self.ep_count = 0
+        # ventana reciente: el termometro de tendencia SIN el lastre del
+        # arranque aleatorio ni resets (deque de los ultimos 200 episodios)
+        from collections import deque
+        self.recent_eps = deque(maxlen=200)
 
     # -- ingesta (hilo HTTP) ------------------------------------------------
     def ingest(self, body, now):
@@ -180,8 +184,14 @@ class ApexLearner:
                             if k in stats})
             eps = body.get("episodes")
             if isinstance(eps, dict):
-                self.ep_wins += int(eps.get("wins", 0) or 0)
-                self.ep_count += int(eps.get("count", 0) or 0)
+                wins = int(eps.get("wins", 0) or 0)
+                count = int(eps.get("count", 0) or 0)
+                self.ep_wins += wins
+                self.ep_count += count
+                # el lote agrega episodios en bloque: se reparten como
+                # wins unos y (count-wins) ceros -- el orden intra-lote
+                # no importa para una media movil
+                self.recent_eps.extend([1] * wins + [0] * (count - wins))
         return {"accepted": True, "buffer": self.buffer.size,
                 "weights_version": self.weights_version}
 
@@ -225,6 +235,8 @@ class ApexLearner:
                     "buffer": self.buffer.size,
                     "transitions_in": self.transitions_in,
                     "win_rate_cum": round(self.ep_wins / max(self.ep_count, 1), 3),
+                    "win_rate_recent200": round(
+                        sum(self.recent_eps) / max(len(self.recent_eps), 1), 3),
                     "episodes": self.ep_count,
                     "actors": {n: dict(r, age=round(now - r.get("last_seen", 0), 1))
                                for n, r in self.actors.items()}}
