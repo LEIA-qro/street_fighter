@@ -289,6 +289,9 @@ def report(tag, states, rows, meta, out_path):
 def main():
     ap = argparse.ArgumentParser(description="Banco limpio sobre los 12 rivales lvl1 de la run")
     ap.add_argument("--arm", choices=["es", "ppo", "rainbow"], required=True)
+    ap.add_argument("--difficulty", default="1",
+                    help="que rotacion del manifest examinar (ej. 2 o 2,3): "
+                         "el examen deja de ser solo lvl1")
     ap.add_argument("--ckpt", default=None,
                     help="rainbow: ruta al .pt guardado por train_rainbow.py")
     ap.add_argument("--theta-url", default="http://madre:8080/theta")
@@ -311,7 +314,7 @@ def main():
     ap.add_argument("--out", default=str(REPO / "benchmarks/bench_12rivals.jsonl"))
     args = ap.parse_args()
 
-    states = resolve_states("manifest", "1")
+    states = resolve_states("manifest", args.difficulty)
     print(f"[bench] rotacion: {len(states)} estados, fingerprint "
           f"{protocol.states_fingerprint(states)}")
     perturbed = args.action_noise > 0 or args.desync_max > 0
