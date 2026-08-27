@@ -79,7 +79,17 @@ La cola VIVA post-noche-histórica. Sustituye a 06-pendientes para lo operativo
   --sigma-decay-gens 600` + perturbaciones de run 3, cuando haya slot de
   máquina. La madre (EC2) está VIVA pero ociosa esperándola (unit con flags de
   run 3; cambiar prefijo S3 a es-run4-macro).
-- **Humano vs IA en BizHawk** (una tarde): su `test_ai_vs_ai_v2.py` +
+- ~~**Humano vs IA en BizHawk**~~ — **CONSTRUIDO (2026-08-27 tarde, modo
+  STAND para promocionar LEIA)**: `lua/v2.0/stand_env_client.lua` (payload
+  de 25 vars crudas de data.json) + `src/scripts/stand_leia.py` (obs v4
+  idéntica al entrenamiento, macros calcados del wrapper, KO por signo,
+  time-over, marcador, rematch, P2 = pad físico por passthrough) +
+  `tools/RUN_STAND_LEIA.md`. Revisión adversarial de 16 agentes: 12
+  hallazgos aplicados (el crítico: el prefijo `<len> ` que BizHawk
+  antepone habría matado el parser al primer payload). 9 tests de paridad
+  (gold test MacroPlayer≡MacroActionWrapper). **FALTA solo el end-to-end
+  en Windows con BizHawk** (~5 min con el runbook). Lo viejo:
+  su `test_ai_vs_ai_v2.py` +
   `match_test_env_client.lua` ya hacen VS con doble inyección; falta (1) dejar
   de inyectar P2 en el Lua (passthrough de teclado), (2) adaptador de θ ES/DQN
   a v4-BizHawk (lo puedo escribir; probar exige alguien en la desktop).

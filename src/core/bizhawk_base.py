@@ -92,8 +92,12 @@ class BizHawkBaseEnv(gym.Env):
     def send_command(self, command: str):
         """Standardized protocol for sending a command to Lua."""
         try:
-            formatted_reply = f"{len(command)} {command}"
-            self.conn.sendall(formatted_reply.encode('utf-8'))
+            # BizHawk's SocketServer.ReceiveString consumes EXACTLY the
+            # prefixed number of BYTES; counting characters desyncs the
+            # protocol the moment the command carries non-ASCII (e.g. a
+            # RESET path with acentos). Identical bytes for pure-ASCII.
+            payload = command.encode('utf-8')
+            self.conn.sendall(str(len(payload)).encode('ascii') + b' ' + payload)
 
     
         except (ConnectionResetError, BrokenPipeError) as e:
