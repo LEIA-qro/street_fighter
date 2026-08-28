@@ -72,6 +72,8 @@
   --color-state-alarm: var(--state-alarm); --color-state-alarm-subtle: var(--state-alarm-subtle); --color-state-alarm-fg: var(--state-alarm-fg);
   --color-state-champion: var(--state-champion); --color-state-champion-subtle: var(--state-champion-subtle); --color-state-champion-fg: var(--state-champion-fg);
   --color-state-unknown: var(--state-unknown); --color-state-unknown-subtle: var(--state-unknown-subtle); --color-state-unknown-fg: var(--state-unknown-fg);
+  --color-chrome-line: var(--chrome-line);
+  --color-chrome-card-line: var(--chrome-card-line);
   --font-display: "Chakra Petch", sans-serif;
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -86,6 +88,41 @@ body { background: var(--background); color: var(--foreground);
    Derivados de la consola (no tocan ningun valor pinneado).
    ------------------------------------------------------------ */
 
+/* EL CROMADO: la identidad "cian de titulo sobre indigo profundo" hecha
+   estructura. Todo sale por color-mix de los tokens pinneados — cambiar la
+   paleta re-tinta esto solo. Ningun texto se apoya en estos tintes sin
+   medirse (ver reporte de contraste). */
+:root {
+  /* lavado cian para la cabecera y bandas de seccion */
+  --chrome-tint: color-mix(in srgb, var(--primary) 9%, var(--background));
+  /* la linea luminosa del cromado (bordes estructurales). En claro necesita
+     mas primario para cruzar 3.0 sobre --background: 65% mide 3.31 (45% daba
+     2.45); en oscuro 45% mide 3.14. */
+  --chrome-line: color-mix(in srgb, var(--primary) 65%, var(--border));
+  /* borde de tarjeta con sangre indigo-cian, mas vivo que --border pelado */
+  --chrome-card-line: color-mix(in srgb, var(--primary) 18%, var(--border));
+}
+.dark {
+  --chrome-line: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.chrome-header {
+  background: linear-gradient(180deg, var(--chrome-tint), var(--background));
+  border-bottom: 1px solid var(--chrome-line);
+}
+
+/* El logotipo lleva el cromado literal: degradado DENTRO de la familia del
+   primario (primary → secondary), como las letras de la pantalla de titulo. */
+.chrome-logo {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--primary) 82%, var(--foreground)) 45%,
+    var(--secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: var(--primary);          /* fallback medido */
+  -webkit-text-fill-color: transparent;
+}
+
 /* Etiqueta de dato: la voz de "esto es un instrumento". 10px mono,
    mayusculas, tracking abierto. Se usa en TODO encabezado de dato. */
 .dlabel {
@@ -97,6 +134,10 @@ body { background: var(--background); color: var(--foreground);
   color: var(--muted-foreground);
   font-weight: 500;
 }
+
+/* Variante croma de la etiqueta: cabeceras de tarjeta (Learner, Flota...).
+   primary como texto sobre card: medido 6.88 dark / 6.16 light. */
+.dlabel-chrome { color: var(--primary); }
 
 /* Titular de seccion: Chakra Petch, solo aqui y en el logotipo. */
 .stitle {

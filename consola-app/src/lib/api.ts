@@ -4,6 +4,10 @@ export interface Maquina {
   id: string; estado: "vivo" | "MUDA"; actor: string | null;
   procs: number | null; steps_per_s: number; age_s: number | null;
   critico: boolean;
+  // El wire nuevo del actor manda su banda real (p.ej. "4,5,6,7,8"); los
+  // actores viejos no la traen. Se acepta numero por si un actor manda una
+  // sola dificultad sin comillas.
+  difficulty?: string | number | null;
 }
 export interface Muestra {
   ts: string; grad_steps: number; buffer: number;
@@ -29,9 +33,60 @@ export interface Estado {
   campeon: Campeon | null;
   coronaciones: Campeon[];
   gauntlets: Record<string, Gauntlet>;
-  historia: { ts: string; grads_per_s?: number; trans_per_s?: number; vivas?: number; wr?: number }[];
+  historia: { ts: string; grads_per_s?: number; trans_per_s?: number; replay_ratio?: number;
+              vivas?: number; esperadas?: number; wr?: number; por_nivel?: Record<string, number> }[];
   hub_desde: number; ahora: number;
 }
+// --- plano de control (/api/fleet) -----------------------------------------
+// El documento se edita COMPLETO: las claves que la consola no conoce
+// (_comentario, schema, notas extra) viajan intactas en el PUT.
+export interface FleetMaquina {
+  id: string; host?: string; duenio?: string; rol?: string;
+  procs?: number; difficulty?: string; critico?: boolean; notas?: string;
+  [k: string]: unknown;
+}
+export interface FleetRun {
+  id?: string; nombre?: string; activa?: boolean; descripcion?: string;
+  learner?: string; learner_ip?: string; wandb_id?: string;
+  [k: string]: unknown;
+}
+export interface FleetDoc {
+  schema?: string;
+  expected: FleetMaquina[];
+  umbrales: Record<string, number>;
+  runs?: FleetRun[];
+  [k: string]: unknown;
+}
+export async function leerFleet(): Promise<FleetDoc> {
+  const r = await fetch("/api/fleet");
+  if (!r.ok) throw new Error(`hub ${r.status}`);
+  return r.json();
+}
+/** PUT del documento completo. Un 400 trae el mensaje de validacion del
+ *  backend: se relanza tal cual para mostrarse al operador. */
+export async function guardarFleet(doc: FleetDoc): Promise<void> {
+  const r = await fetch("/api/fleet", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(doc),
+  });
+  if (!r.ok) {
+    let msg = `hub ${r.status}`;
+    try {
+      const cuerpo = await r.text();
+      if (cuerpo) {
+        try {
+          const j = JSON.parse(cuerpo);
+          msg = typeof j === "string" ? j : (j.error ?? j.detail ?? j.mensaje ?? cuerpo);
+        } catch {
+          msg = cuerpo;
+        }
+      }
+    } catch { /* sin cuerpo: se queda el status */ }
+    throw new Error(msg);
+  }
+}
+
 export async function leerEstado(): Promise<Estado> {
   const r = await fetch("/api/state");
   if (!r.ok) throw new Error(`hub ${r.status}`);

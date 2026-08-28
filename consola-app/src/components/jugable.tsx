@@ -60,7 +60,7 @@ export function Jugable({ estado }: { estado: Estado }) {
           <Card className="border-l-2 border-l-champion">
             <CardContent className="space-y-3 p-4">
               <div className="flex items-center justify-between">
-                <div className="dlabel">P1 · fijo</div>
+                <div className="dlabel dlabel-chrome">P1 · fijo</div>
                 <span className="inline-flex items-center gap-1.5 rounded-sm bg-state-champion-subtle px-1.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide text-state-champion-fg">
                   <Crown size={11} aria-hidden />
                   campeon
@@ -87,7 +87,7 @@ export function Jugable({ estado }: { estado: Estado }) {
           {/* -- P2: a elegir ---------------------------------------- */}
           <Card>
             <CardContent className="space-y-4 p-4">
-              <div className="dlabel">P2 · rival</div>
+              <div className="dlabel dlabel-chrome">P2 · rival</div>
               <div className="grid grid-cols-2 gap-2">
                 {MODOS.map((op) => (
                   <button

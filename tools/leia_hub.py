@@ -166,6 +166,11 @@ class _Handler(BaseHTTPRequestHandler):
             self._archivo(os.path.join(WEB, "consola.html"), "text/html")
         elif ruta == "/champion-chrome.css":
             self._archivo(os.path.join(DESIGN, "champion-chrome.css"), "text/css")
+        elif ruta == "/api/fleet":
+            # El plano de control crudo, para la zona de configuracion de la
+            # consola. Se sirve tal cual esta en disco: editar el plano ES
+            # editar este archivo.
+            self._archivo(FLEET_JSON, "application/json")
         elif ruta == "/api/state":
             plano = cargar_plano()
             self._enviar(json.dumps({
@@ -180,6 +185,44 @@ class _Handler(BaseHTTPRequestHandler):
             }, ensure_ascii=False))
         else:
             self._enviar("no encontrado", "text/plain", 404)
+
+
+    def do_PUT(self):
+        # Escritura REAL del plano de control desde la consola. Validacion
+        # minima pero suficiente: JSON parseable, con expected[] y umbrales,
+        # y cada maquina con id y host. Escritura atomica (tmp + rename) y
+        # respaldo de la version anterior -- el plano es el censo del que
+        # dependen las alarmas: corromperlo apagaria los ojos.
+        if self.path.split("?")[0] != "/api/fleet":
+            self._enviar(json.dumps({"error": "ruta desconocida"}), codigo=404)
+            return
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            if n > 256 * 1024:
+                raise ValueError("plano demasiado grande")
+            nuevo = json.loads(self.rfile.read(n).decode("utf-8"))
+            if not isinstance(nuevo.get("expected"), list) or not nuevo["expected"]:
+                raise ValueError("expected[] vacio o ausente")
+            for m in nuevo["expected"]:
+                if not m.get("id") or not m.get("host"):
+                    raise ValueError(f"maquina sin id/host: {m}")
+            if not isinstance(nuevo.get("umbrales"), dict):
+                raise ValueError("umbrales ausentes")
+        except (ValueError, KeyError, TypeError) as e:
+            self._enviar(json.dumps({"error": str(e)}), codigo=400)
+            return
+        try:
+            import shutil
+            shutil.copy2(FLEET_JSON, FLEET_JSON + ".bak")
+            tmp = FLEET_JSON + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(nuevo, f, ensure_ascii=False, indent=2)
+                f.write("\n")
+            os.replace(tmp, FLEET_JSON)
+            self._enviar(json.dumps({"ok": True, "respaldo": "fleet.json.bak"}))
+            print("[hub] fleet.json actualizado desde la consola", flush=True)
+        except OSError as e:
+            self._enviar(json.dumps({"error": str(e)}), codigo=500)
 
 
 def servir(puerto):

@@ -1,5 +1,5 @@
 // FLOTA — responde "¿vive y aprende?" en 3 segundos.
-import { Bird } from "lucide-react";
+import { Bird, TriangleAlert } from "lucide-react";
 import type { Estado, Maquina } from "@/lib/api";
 import { edad, nf, pc } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -18,10 +18,22 @@ import {
   LeyendaEscalera,
   PistaNivel,
   SinDato,
+  Spark,
   Titulo,
   nivelesDe,
   type Semaforo,
 } from "@/components/comunes";
+
+/** Normaliza una banda de dificultad ("4,5,6,7,8" | 8) a tokens ordenados. */
+function banda(v: string | number | null | undefined): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  return String(v)
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .sort((a, b) => Number(a) - Number(b))
+    .join(",");
+}
 
 const FRESCURA_MAX_S = 180;
 
@@ -98,6 +110,29 @@ export function Flota({
     ...new Set([...bancoNiveles.keys(), ...ventanaNiveles.keys()]),
   ].sort((a, b) => a - b);
 
+  // Tendencias desde historia[] (~180 puntos submuestreados por el hub).
+  const historia = estado.historia;
+  const spanH =
+    historia.length > 1
+      ? (Date.parse(historia[historia.length - 1].ts) -
+          Date.parse(historia[0].ts)) /
+        3600000
+      : 0;
+  const etiquetaSpan = `${spanH.toFixed(1)} h · n=${historia.length}`;
+  const serieGrads = historia
+    .map((h) => h.grads_per_s)
+    .filter((v): v is number => v !== undefined);
+  const maxEsperadas = Math.max(
+    m?.esperadas ?? 0,
+    ...historia.map((h) => h.esperadas ?? 0),
+  );
+  const serieVivas = historia
+    .map((h) => h.vivas)
+    .filter((v): v is number => v !== undefined);
+  const serieWr = historia
+    .map((h) => h.wr)
+    .filter((v): v is number => v !== undefined);
+
   // Censo: una fila por maquina ESPERADA, cruzada con la muestra.
   const esperadas = estado.plano.expected ?? [];
   const porId = new Map((m?.maquinas ?? []).map((q) => [q.id, q]));
@@ -112,7 +147,7 @@ export function Flota({
         <div className="grid gap-3 md:grid-cols-3">
           <Card>
             <CardContent className="space-y-3 p-4">
-              <div className="dlabel">Learner</div>
+              <div className="dlabel dlabel-chrome">Learner</div>
               {m ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <Dato label="grad steps" sub="acumulados">
@@ -135,12 +170,18 @@ export function Flota({
               ) : (
                 <SinDato>sin muestra del hub — el learner no se puede leer</SinDato>
               )}
+              {serieGrads.length > 1 && (
+                <div className="flex items-end justify-between gap-3 border-t border-border pt-2">
+                  <div className="dlabel">grads/s · {etiquetaSpan}</div>
+                  <Spark datos={serieGrads} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="space-y-3 p-4">
-              <div className="dlabel">Flota</div>
+              <div className="dlabel dlabel-chrome">Flota</div>
               {m ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <Dato label="vivas" sub={`de ${m.esperadas} esperadas`}>
@@ -162,12 +203,20 @@ export function Flota({
               ) : (
                 <SinDato>sin muestra del hub — censo ciego</SinDato>
               )}
+              {serieVivas.length > 1 && (
+                <div className="flex items-end justify-between gap-3 border-t border-border pt-2">
+                  <div className="dlabel">
+                    vivas 0–{maxEsperadas} · {etiquetaSpan}
+                  </div>
+                  <Spark datos={serieVivas} dominio={[0, maxEsperadas]} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardContent className="space-y-3 p-4">
-              <div className="dlabel">Peleas completas · mas reciente</div>
+              <div className="dlabel dlabel-chrome">Peleas completas · mas reciente</div>
               {ultimo ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <Dato
@@ -220,6 +269,7 @@ export function Flota({
                   <TableHead className="dlabel w-36 pl-4">maquina</TableHead>
                   <TableHead className="dlabel w-44">estado</TableHead>
                   <TableHead className="dlabel hidden md:table-cell">rol</TableHead>
+                  <TableHead className="dlabel hidden md:table-cell">banda lvl</TableHead>
                   <TableHead className="dlabel hidden lg:table-cell">actor</TableHead>
                   <TableHead className="dlabel text-right">procs</TableHead>
                   <TableHead className="dlabel text-right">steps/s</TableHead>
@@ -270,6 +320,27 @@ export function Flota({
                           <span className="text-muted-foreground"> · {e.duenio}</span>
                         ) : null}
                       </TableCell>
+                      <TableCell className="tnum hidden font-mono text-xs md:table-cell">
+                        {(() => {
+                          const real = banda(q?.difficulty);
+                          const esperado = banda(e.difficulty);
+                          // Actor viejo (sin wire de difficulty): la esperada sola.
+                          if (real === null)
+                            return (
+                              <span className="text-muted-foreground">
+                                {esperado ?? "—"}
+                              </span>
+                            );
+                          if (esperado !== null && real !== esperado)
+                            return (
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-state-degraded-fg">
+                                <TriangleAlert size={12} aria-hidden />
+                                {real} ≠ {esperado}
+                              </span>
+                            );
+                          return <span>{real}</span>;
+                        })()}
+                      </TableCell>
                       <TableCell className="hidden font-mono text-xs lg:table-cell">
                         {q?.actor ?? "—"}
                       </TableCell>
@@ -316,6 +387,19 @@ export function Flota({
           <CardContent className="space-y-4 p-4">
             {niveles.length ? (
               <>
+                {serieWr.length > 1 && (
+                  <div className="flex items-end justify-between gap-3 border-b border-border pb-3">
+                    <div className="dlabel">
+                      wr ventana viva (todos los niveles) · n≈200 · {etiquetaSpan}
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <Spark datos={serieWr} />
+                      <span className="tnum font-mono text-xs">
+                        {pc(serieWr[serieWr.length - 1])}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   {niveles.map((n) => {
                     const banco = bancoNiveles.get(n) ?? null;

@@ -20,6 +20,13 @@
  *                   Jamas hovers, links ni decoracion.
  *   -fg slots       todo color usado como TEXTO sobre superficie (warning-fg etc.)
  *   Tinta sobre relleno cromatico: siempre el -foreground del token, nunca a mano.
+ * EL CROMADO (identidad Champion Chrome, sin tocar un hex pinneado):
+ *   derivados color-mix en index.css — --chrome-tint (lavado cian de la
+ *   cabecera), --chrome-line (linea luminosa bajo el header y en las reglas
+ *   de titulo), --chrome-card-line (borde de tarjeta con sangre cian).
+ *   El cian existe ESTRUCTURALMENTE: logo en degradado primary→secondary,
+ *   tab activa en relleno primary, tick+regla de cada titulo de seccion,
+ *   cabeceras de tarjeta en .dlabel-chrome, barras y sparklines en primary.
  * ESTADO POR FORMA ademas de color: icono distinto por estado en EstadoChip,
  * franja izquierda en filas, atenuacion en mudas — legible en gris.
  */
@@ -29,9 +36,11 @@ import { leerEstado, edad, type Estado } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toaster } from "@/components/ui/sonner";
 import { EstadoChip } from "@/components/comunes";
+import { Config } from "@/components/config";
 import { Flota, semaforoGlobal } from "@/components/flota";
 import { Jugable } from "@/components/jugable";
 import { Modelos } from "@/components/modelos";
+import { BotonTema } from "@/components/tema";
 
 const POLL_MS = 5000;
 
@@ -81,24 +90,28 @@ export default function App() {
     <div className="min-h-screen bg-background text-foreground">
       <Toaster position="bottom-right" />
       <Tabs defaultValue="flota">
-        <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <header className="chrome-header sticky top-0 z-10">
           <div className="mx-auto flex min-h-14 max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 py-1.5 px-4 md:px-6">
             <div className="flex items-baseline gap-2">
-              <span className="stitle text-base text-primary">LEIA</span>
+              <span className="stitle chrome-logo text-base">LEIA</span>
               <span className="dlabel hidden sm:block">consola de operacion</span>
             </div>
             <TabsList className="h-8">
-              <TabsTrigger value="flota" className="font-mono text-xs uppercase tracking-wide">
+              <TabsTrigger value="flota" className="font-mono text-xs uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Flota
               </TabsTrigger>
-              <TabsTrigger value="jugable" className="font-mono text-xs uppercase tracking-wide">
+              <TabsTrigger value="jugable" className="font-mono text-xs uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Jugable
               </TabsTrigger>
-              <TabsTrigger value="modelos" className="font-mono text-xs uppercase tracking-wide">
+              <TabsTrigger value="modelos" className="font-mono text-xs uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Modelos
               </TabsTrigger>
+              <TabsTrigger value="config" className="font-mono text-xs uppercase tracking-wide data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Config
+              </TabsTrigger>
             </TabsList>
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex items-center gap-2">
+              <BotonTema />
               {run?.id && (
                 <span className="hidden items-center gap-1.5 font-mono text-[11px] text-muted-foreground md:inline-flex">
                   <Radio size={13} aria-hidden />
@@ -127,25 +140,31 @@ export default function App() {
         </header>
 
         <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
-          {estado ? (
-            <>
-              <TabsContent value="flota">
-                <Flota estado={estado} frescuraS={frescuraS} />
-              </TabsContent>
-              <TabsContent value="jugable">
-                <Jugable estado={estado} />
-              </TabsContent>
-              <TabsContent value="modelos">
-                <Modelos estado={estado} ahora={ahoraServidor} />
-              </TabsContent>
-            </>
-          ) : (
-            <div className="rounded-md border border-dashed border-border px-4 py-16 text-center font-mono text-xs text-muted-foreground">
-              {errorHub
-                ? `sin conexion con el hub (${errorHub}) — reintentando cada ${POLL_MS / 1000} s`
-                : "leyendo /api/state…"}
-            </div>
-          )}
+          {(() => {
+            const placeholder = (
+              <div className="rounded-md border border-dashed border-border px-4 py-16 text-center font-mono text-xs text-muted-foreground">
+                {errorHub
+                  ? `sin conexion con el hub (${errorHub}) — reintentando cada ${POLL_MS / 1000} s`
+                  : "leyendo /api/state…"}
+              </div>
+            );
+            return (
+              <>
+                <TabsContent value="flota">
+                  {estado ? <Flota estado={estado} frescuraS={frescuraS} /> : placeholder}
+                </TabsContent>
+                <TabsContent value="jugable">
+                  {estado ? <Jugable estado={estado} /> : placeholder}
+                </TabsContent>
+                <TabsContent value="modelos">
+                  {estado ? <Modelos estado={estado} ahora={ahoraServidor} /> : placeholder}
+                </TabsContent>
+                <TabsContent value="config">
+                  <Config />
+                </TabsContent>
+              </>
+            );
+          })()}
         </main>
       </Tabs>
     </div>

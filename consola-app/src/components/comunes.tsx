@@ -96,7 +96,8 @@ export function Dato({
   );
 }
 
-/** Titular de seccion (Chakra Petch — solo aqui y en el logotipo). */
+/** Titular de seccion (Chakra Petch — solo aqui y en el logotipo).
+ *  Lleva el cromado estructural: tick cian + regla luminosa hasta el extra. */
 export function Titulo({
   children,
   extra,
@@ -105,10 +106,62 @@ export function Titulo({
   extra?: ReactNode;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <h2 className="stitle text-foreground">{children}</h2>
-      {extra}
+    <div className="flex items-center gap-3">
+      <span className="h-3.5 w-1 shrink-0 bg-primary" aria-hidden />
+      <h2 className="stitle shrink-0 text-foreground">{children}</h2>
+      <span className="h-px min-w-4 flex-1 bg-chrome-line" aria-hidden />
+      {extra ? <span className="shrink-0">{extra}</span> : null}
     </div>
+  );
+}
+
+/** Sparkline SVG discreta. Serie constante se dibuja al CENTRO (pegada al
+ *  suelo se leeria como cero). `dominio` fija la escala cuando el cero y el
+ *  techo importan (p.ej. vivas de 0 a esperadas). */
+export function Spark({
+  datos,
+  dominio,
+  ancho = 128,
+  alto = 26,
+  className,
+}: {
+  datos: number[];
+  dominio?: [number, number];
+  ancho?: number;
+  alto?: number;
+  className?: string;
+}) {
+  const puros = datos.filter((v) => Number.isFinite(v));
+  if (puros.length < 2) return null;
+  let [lo, hi] = dominio ?? [Math.min(...puros), Math.max(...puros)];
+  if (hi - lo < 1e-9) {
+    // serie constante: centrar
+    lo -= 1;
+    hi += 1;
+  }
+  const m = 2; // margen para que el trazo no se recorte
+  const px = (i: number) => m + (i / (puros.length - 1)) * (ancho - 2 * m);
+  const py = (v: number) =>
+    alto - m - ((v - lo) / (hi - lo)) * (alto - 2 * m);
+  const pts = puros.map((v, i) => `${px(i).toFixed(1)},${py(v).toFixed(1)}`);
+  return (
+    <svg
+      width={ancho}
+      height={alto}
+      viewBox={`0 0 ${ancho} ${alto}`}
+      className={className}
+      role="img"
+      aria-label="tendencia"
+    >
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke="var(--primary)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

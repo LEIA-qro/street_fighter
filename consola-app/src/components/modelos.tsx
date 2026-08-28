@@ -66,7 +66,7 @@ function ActaGauntlet({
     <Card>
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="dlabel">
+          <div className="dlabel dlabel-chrome">
             Gauntlet · dificultad {g.dificultad} · peleas completas al mejor de{" "}
             {g.rounds_para_ganar ?? 2}
           </div>
