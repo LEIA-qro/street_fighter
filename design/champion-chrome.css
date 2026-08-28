@@ -1,0 +1,173 @@
+/* champion-chrome.css — el contrato de color de la consola LEIA.
+ *
+ * Paleta "Champion Chrome": medida de la pantalla de título de Street
+ * Fighter II' Special Champion Edition (Genesis). Campo índigo #000060,
+ * el cromado #0088C8/#40A8C8 de las letras, el reflejo verde-lima #C8EC40.
+ * Elegida por Felipe entre cinco candidatas medidas (2026-08-28).
+ *
+ * DOS REGLAS QUE NO SE NEGOCIAN
+ * ----------------------------
+ * 1. Los valores pinneados NO se editan. Donde un color falla AA usado como
+ *    TEXTO, el arreglo es un slot derivado `-fg`, nunca un retoque del hex.
+ *    Así el contraste cumple sin que la paleta cambie de cara.
+ * 2. Regla de tinta, una sola y sin excepciones: sobre relleno cromático, en
+ *    oscuro la tinta es SIEMPRE #05070F y en claro SIEMPRE #FFFFFF. Medido:
+ *    en oscuro la tinta oscura gana en los seis rellenos (destructive 4.86
+ *    contra 4.14 de la blanca). Elegir tinta caso por caso es lo que produjo
+ *    los "rojos que no son el rojo" del dashboard actual.
+ *
+ * EL LIMA ES LA FIRMA, NO EL HOVER
+ * --------------------------------
+ * #C8EC40 vive en `--champion`, token propio, y NO en `--accent`. En el canon
+ * de shadcn `--accent` es el color de hover/focus: dejar el lima ahí pintaría
+ * cada botón fantasma y cada fila enfocada de la app, que es exactamente lo
+ * contrario de una firma que se usa poco. `--accent` queda neutro.
+ * Aprobado por Felipe, 2026-08-28. El hex no cambió; cambió su papel.
+ *
+ * Los ratios anotados los mide design/verificar-contraste.py — se re-corren,
+ * no se creen.
+ */
+
+:root {
+  /* --- estructura --- */
+  --background: #EEF0F6;
+  --foreground: #0F1424;
+  --card: #F8F9FC;
+  --card-foreground: #0F1424;
+  --muted: #E0E4EE;
+  --muted-foreground: #4E5670;
+  --border: #C9CFDE;
+  --input: #7B84A0;
+  --ring: #206488;
+
+  /* --- roles --- */
+  --primary: #206488;
+  --primary-foreground: #FFFFFF;
+  --secondary: #00688C;
+  --secondary-foreground: #FFFFFF;
+  --destructive: #A81400;
+  --destructive-foreground: #FFFFFF;
+  --success: #00684A;
+  --success-foreground: #FFFFFF;
+  --warning: #886400;
+  --warning-foreground: #FFFFFF;
+
+  /* --accent NEUTRO: es hover/focus en el canon shadcn, no identidad. */
+  --accent: #E0E4EE;
+  --accent-foreground: #0F1424;
+
+  /* --- LA FIRMA --- */
+  --champion: #4A6B00;              /* el lima, oscurecido para el polo claro */
+  --champion-foreground: #FFFFFF;
+
+  /* --- slots derivados: SOLO para usar el color como TEXTO --- */
+  --warning-fg: #826000;            /* 4.56 sobre --muted (el pinneado da 4.26 ✗) */
+
+  /* --- estados del dominio (convención de 3 slots) --- */
+  --state-running: #00684A;
+  --state-running-subtle: #D7E7E0;
+  --state-running-fg: #00684A;      /* 5.32 sobre su -subtle */
+  --state-stopped: #4E5670;
+  --state-stopped-subtle: #E2E5EC;
+  --state-stopped-fg: #434B63;      /* 6.41 sobre su -subtle */
+  --state-degraded: #886400;
+  --state-degraded-subtle: #E8E4D9;
+  --state-degraded-fg: #826000;     /* 4.56 sobre su -subtle */
+  --state-alarm: #A81400;
+  --state-alarm-subtle: #EDD9D9;
+  --state-alarm-fg: #A81400;        /* 5.62 sobre su -subtle */
+  --state-champion: #4A6B00;
+  --state-champion-subtle: #E4EBD2;
+  --state-champion-fg: #44620A;     /* 4.71 sobre su -subtle */
+  /* DESCONOCIDO nunca es verde: un dato rancio no es un dato sano. */
+  --state-unknown: #7B84A0;
+  --state-unknown-subtle: #E6E8EE;
+  --state-unknown-fg: #5A6178;      /* 4.63 sobre su -subtle */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #05070F;
+    --foreground: #E8ECE8;
+    --card: #0D1020;
+    --card-foreground: #E8ECE8;
+    --muted: #161B30;
+    --muted-foreground: #9AA3BE;
+    --border: #262C48;
+    --input: #525E8C;
+    --ring: #40A8C8;
+
+    --primary: #40A8C8;
+    --primary-foreground: #05070F;
+    --secondary: #3E85C0;
+    --secondary-foreground: #05070F;
+    --destructive: #E83A2A;
+    --destructive-foreground: #05070F;
+    --success: #40CC88;
+    --success-foreground: #05070F;
+    --warning: #E8CC00;
+    --warning-foreground: #05070F;
+
+    --accent: #161B30;
+    --accent-foreground: #E8ECE8;
+
+    --champion: #C8EC40;
+    --champion-foreground: #05070F;
+
+    --destructive-fg: #EA4B3C;      /* 4.52 sobre --muted (el pinneado da 4.11 ✗) */
+    --secondary-fg: #4389C2;        /* 4.54 sobre --muted (el pinneado da 4.31 ✗) */
+    --warning-fg: #E8CC00;          /* en oscuro el pinneado cumple de sobra (10.59) */
+
+    --state-running: #40CC88;
+    --state-running-subtle: #10241B;
+    --state-running-fg: #40CC88;
+    --state-stopped: #9AA3BE;
+    --state-stopped-subtle: #161B30;
+    --state-stopped-fg: #9AA3BE;
+    --state-degraded: #E8CC00;
+    --state-degraded-subtle: #241F08;
+    --state-degraded-fg: #E8CC00;
+    --state-alarm: #E83A2A;
+    --state-alarm-subtle: #2A100C;
+    --state-alarm-fg: #EE5F51;      /* el pinneado da 4.41 ✗ sobre su -subtle */
+    --state-champion: #C8EC40;
+    --state-champion-subtle: #1E260C;
+    --state-champion-fg: #C8EC40;
+    --state-unknown: #525E8C;
+    --state-unknown-subtle: #14182A;
+    --state-unknown-fg: #8C95B4;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #05070F; --foreground: #E8ECE8;
+  --card: #0D1020; --card-foreground: #E8ECE8;
+  --muted: #161B30; --muted-foreground: #9AA3BE;
+  --border: #262C48; --input: #525E8C; --ring: #40A8C8;
+  --primary: #40A8C8; --primary-foreground: #05070F;
+  --secondary: #3E85C0; --secondary-foreground: #05070F;
+  --destructive: #E83A2A; --destructive-foreground: #05070F;
+  --success: #40CC88; --success-foreground: #05070F;
+  --warning: #E8CC00; --warning-foreground: #05070F;
+  --accent: #161B30; --accent-foreground: #E8ECE8;
+  --champion: #C8EC40; --champion-foreground: #05070F;
+  --destructive-fg: #EA4B3C; --secondary-fg: #4389C2; --warning-fg: #E8CC00;
+  --state-running: #40CC88; --state-running-subtle: #10241B; --state-running-fg: #40CC88;
+  --state-stopped: #9AA3BE; --state-stopped-subtle: #161B30; --state-stopped-fg: #9AA3BE;
+  --state-degraded: #E8CC00; --state-degraded-subtle: #241F08; --state-degraded-fg: #E8CC00;
+  --state-alarm: #E83A2A; --state-alarm-subtle: #2A100C; --state-alarm-fg: #EE5F51;
+  --state-champion: #C8EC40; --state-champion-subtle: #1E260C; --state-champion-fg: #C8EC40;
+  --state-unknown: #525E8C; --state-unknown-subtle: #14182A; --state-unknown-fg: #8C95B4;
+}
+
+/* El foco NO puede depender del anillo solo: --ring sobre relleno primary
+ * mide 1.00 (invisible). Doble anillo obligatorio: separador del color de la
+ * superficie + el anillo del color de foco. */
+:where(:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--background);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
