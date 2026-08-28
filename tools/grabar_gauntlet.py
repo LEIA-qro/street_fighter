@@ -16,6 +16,7 @@
 # comprimido a un tamano objetivo para que se pueda mandar por WhatsApp.
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -37,6 +38,18 @@ RIVALES = ("BALROG", "BLANKA", "CHUNLI", "DHALSIM", "EHONDA", "GUILE",
            "KEN", "MBISON", "RYU", "SAGAT", "VEGA", "ZANGIEF")
 ANCHO, ALTO, FPS = 320, 224, 60
 CAMPEON = os.path.join("benchmarks", "apex_milestones", "apex_v3291_media990.pt")
+
+
+def wilson(k, n, z=1.96):
+    """Intervalo de confianza al 95%. Un porcentaje sin su intervalo, con n
+    chica, es una opinion con aires de medicion."""
+    if n == 0:
+        return [0.0, 0.0]
+    p = k / n
+    d = 1 + z * z / n
+    centro = (p + z * z / (2 * n)) / d
+    margen = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / d
+    return [round(max(0.0, centro - margen), 3), round(min(1.0, centro + margen), 3)]
 
 
 def cargar(ckpt_path, device="cpu"):
@@ -96,6 +109,16 @@ def main():
     ap.add_argument("--rounds-to-win", type=int, default=2, help="2 = al mejor de tres")
     ap.add_argument("--max-steps", type=int, default=6000, help="tope por pelea")
     ap.add_argument("--crf", type=int, default=23)
+    ap.add_argument("--repeticiones", type=int, default=1,
+                    help="peleas por rival. Con 1 la n es 12 y el intervalo de "
+                         "confianza va del 55%% al 95%%: sirve para el video y "
+                         "para saber CONTRA QUIEN pierde, no como porcentaje.")
+    ap.add_argument("--desync-max", type=int, default=0,
+                    help="frames neutrales sorteados antes de soltar el control. "
+                         "SIN esto la pelea es determinista y repetir no aporta "
+                         "informacion: con greedy y estado fijo sale identica.")
+    ap.add_argument("--sin-video", action="store_true",
+                    help="solo medir (rapido): no graba ni codifica")
     args = ap.parse_args()
 
     destino = args.out or os.path.join(
@@ -109,8 +132,13 @@ def main():
           f"rivales en lvl{args.difficulty}, al mejor de "
           f"{args.rounds_to_win * 2 - 1}", flush=True)
 
-    ffmpeg = abrir_ffmpeg(crudo, args.crf)
-    escribir = ffmpeg.stdin.write
+    if args.repeticiones > 1 and not args.desync_max:
+        print("[gauntlet] OJO: repeticiones>1 SIN --desync-max no aporta nada; "
+              "greedy sobre estado fijo da peleas identicas. Usa --desync-max 30.",
+              flush=True)
+
+    ffmpeg = None if args.sin_video else abrir_ffmpeg(crudo, args.crf)
+    escribir = (lambda _f: None) if ffmpeg is None else ffmpeg.stdin.write
 
     # trainable=False es LA pieza: sin el, el env corta en el primer KO.
     base = RetroSF2Env(trainable=False, frame_hook=lambda f: escribir(f.tobytes()))
@@ -118,10 +146,17 @@ def main():
                              frame_size=OBS_FRAME_DIM) if macros else base
 
     marcador, t0 = [], time.time()
+    rng = np.random.default_rng(20260828)
     try:
+      for rep in range(args.repeticiones):
         for rival in RIVALES:
             estado = f"RYU_{rival}_R1_lvl{args.difficulty}"
             obs, _ = env.reset(options={"state": estado})
+            # El desfase es lo unico que hace distintas dos peleas del mismo
+            # rival: rompe la coreografia del arranque y da variedad real.
+            for _ in range(int(rng.integers(0, args.desync_max + 1))
+                           if args.desync_max else 0):
+                obs, _r, _t, _tr, _i = env.step(0 if macros else np.array([0, 0]))
             pasos = 0
             while pasos < args.max_steps:
                 obs, _r, _t, _tr, _i = env.step(actuar(obs))
@@ -133,19 +168,52 @@ def main():
                     break
             gano = nuestros >= args.rounds_to_win
             marcador.append((rival, nuestros, suyos, gano, pasos))
-            print(f"[gauntlet] {rival:<8} {nuestros}-{suyos}  "
+            etiqueta = rival if args.repeticiones == 1 else f"{rival}#{rep + 1}"
+            print(f"[gauntlet] {etiqueta:<11} {nuestros}-{suyos}  "
                   f"{'GANA LA PELEA' if gano else 'pierde'}  ({pasos} pasos)",
                   flush=True)
     finally:
         env.close()
-        ffmpeg.stdin.close()
-        ffmpeg.wait()
+        if ffmpeg is not None:
+            ffmpeg.stdin.close()
+            ffmpeg.wait()
 
     ganadas = sum(1 for _r, _n, _s, g, _p in marcador if g)
-    mb = os.path.getsize(crudo) / 1048576
-    print(f"\n[gauntlet] PELEAS COMPLETAS ganadas: {ganadas}/{len(marcador)}")
+
+    # El acta por escrito, para que la consola pueda mostrar PELEAS COMPLETAS
+    # en vez del win rate de rounds -- que es el numero halagador y el que se
+    # presta a leerse como "le gana al juego" sin serlo.
+    acta = destino.replace(".mp4", ".json")
+    with open(acta, "w", encoding="utf-8") as f:
+        json.dump({
+            "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "checkpoint": os.path.basename(args.ckpt),
+            "dificultad": args.difficulty,
+            "rounds_para_ganar": args.rounds_to_win,
+            "peleas_ganadas": ganadas,
+            "peleas_totales": len(marcador),
+            "repeticiones": args.repeticiones,
+            "desync_max": args.desync_max,
+            "ic95": wilson(ganadas, len(marcador)),
+            "video": os.path.basename(destino),
+            "rivales": [{"rival": r, "rounds_propios": n, "rounds_rival": sv,
+                         "gano": g, "pasos": ps}
+                        for r, n, sv, g, ps in marcador],
+        }, f, ensure_ascii=False, indent=2)
+    print(f"[gauntlet] acta: {acta}")
+
+    mb = os.path.getsize(crudo) / 1048576 if ffmpeg is not None else 0.0
+    ic = wilson(ganadas, len(marcador))
+    print(f"\n[gauntlet] PELEAS COMPLETAS ganadas: {ganadas}/{len(marcador)} "
+          f"({ganadas / len(marcador) * 100:.1f}%) "
+          f"IC95 [{ic[0] * 100:.0f}% - {ic[1] * 100:.0f}%]"
+          + ("  <- n chica: sirve para saber contra QUIEN pierde, no como "
+             "porcentaje" if len(marcador) < 30 else ""))
     print(f"[gauntlet] video crudo: {mb:.1f} MB en {time.time() - t0:.0f}s")
 
+    if ffmpeg is None:
+        print("[gauntlet] sin video (--sin-video)")
+        return
     if args.target_mb and mb > args.target_mb:
         print(f"[gauntlet] recomprimiendo a {args.target_mb} MB...", flush=True)
         recomprimir(crudo, destino, args.target_mb)

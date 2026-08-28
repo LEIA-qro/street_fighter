@@ -36,3 +36,7 @@ gha-creds-*.json
 !retro_integration/**/*.state
 .DS_Store
 .scratch-uiux-*/
+
+# Videos del gauntlet: se regeneran en 80s con tools/grabar_gauntlet.py.
+# El acta .json SI se versiona (es el dato); el video no (son 15 MB).
+benchmarks/*.mp4

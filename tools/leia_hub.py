@@ -46,6 +46,7 @@ DESIGN = os.path.join(REPO, "design")
 CAMPEON = os.path.join(REPO, "benchmarks", "apex_milestones",
                        "apex_escalera_best.pt.json")
 SELECTOR = os.path.join(HIST_DIR, "apex_selector_v3.jsonl")
+BENCHMARKS = os.path.join(REPO, "benchmarks")
 
 # Lo ultimo que se midio, en memoria. El servidor LEE de aqui y nunca vuelve a
 # consultar al learner: un productor, muchos lectores. Asi la pantalla no puede
@@ -72,6 +73,31 @@ def coronaciones(n=12):
     except (OSError, ValueError):
         return []
     return [r for r in filas if r.get("nuevo_mejor")][-n:]
+
+
+def gauntlets():
+    """Las actas de peleas COMPLETAS, por dificultad, la mas reciente de cada.
+
+    Es el numero que de verdad contesta "le gana al juego": el win rate de la
+    escalera es de rounds de APERTURA, que corre por encima y se presta a
+    leerse como si fueran peleas.
+    """
+    out = {}
+    try:
+        nombres = [n for n in os.listdir(BENCHMARKS)
+                   if n.startswith("gauntlet_lvl") and n.endswith(".json")]
+    except OSError:
+        return out
+    for n in nombres:
+        try:
+            with open(os.path.join(BENCHMARKS, n), encoding="utf-8") as f:
+                a = json.load(f)
+        except (OSError, ValueError):
+            continue
+        lvl = str(a.get("dificultad"))
+        if lvl not in out or a.get("fecha", "") > out[lvl].get("fecha", ""):
+            out[lvl] = a
+    return out
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -108,6 +134,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "plano": plano,
                 "campeon": campeon_actual(),
                 "coronaciones": coronaciones(),
+                "gauntlets": gauntlets(),
                 "hub_desde": ESTADO["arranque"],
                 "ahora": time.time(),
             }, ensure_ascii=False))

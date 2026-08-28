@@ -97,6 +97,17 @@
   .campeon .barra i { background: var(--champion); }
   .campeon .peld { border-color: color-mix(in srgb, var(--champion) 25%, var(--border)); }
 
+  .peleas { background: var(--card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 14px 16px; }
+  .peleas .marcador { font-family: "IBM Plex Mono", monospace;
+                      font-variant-numeric: tabular-nums; font-size: 30px;
+                      font-weight: 600; line-height: 1.1; }
+  .rivales { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .riv { font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+         padding: 3px 9px; border-radius: 5px; white-space: nowrap; }
+  .riv.g { background: var(--state-running-subtle); color: var(--state-running-fg); }
+  .riv.p { background: var(--state-alarm-subtle); color: var(--state-alarm-fg);
+           font-weight: 600; }
   .vacio { color: var(--muted-foreground); font-style: italic; padding: 14px 0; }
   footer { margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--border);
            font-family: "IBM Plex Mono", monospace; font-size: 11px;
@@ -130,10 +141,13 @@
     <tbody id="censo"></tbody>
   </table>
 
-  <h2>Escalera en vivo <span class="aclara">— ventana de los últimos 200 episodios de la flota, con exploración: corre POR DEBAJO de lo que rinde el campeón puro</span></h2>
+  <h2>Escalera en vivo <span class="aclara">— <strong>rounds de apertura</strong>, ventana de los últimos 200 episodios por nivel (n=200, con exploración: corre POR DEBAJO del campeón puro)</span></h2>
   <div class="escalera" id="escalera"></div>
 
-  <h2>Campeón vigente <span class="aclara">— medido con política greedy y desfase, 48 episodios por nivel</span></h2>
+  <h2>Peleas completas <span class="aclara">— al mejor de 3, como se juega de verdad. <strong>Este es el número que contesta “¿le gana al juego?”</strong></span></h2>
+  <div id="peleas"><div class="vacio">sin gauntlet grabado todavía · <span class="num">tools/grabar_gauntlet.py --difficulty N</span></div></div>
+
+  <h2>Campeón vigente <span class="aclara">— <strong>rounds de apertura</strong>, greedy + desfase, <span class="num">n=48</span> por nivel (12 rivales × 4). Corre POR ENCIMA de las peleas completas: un round no es una pelea</span></h2>
   <div class="campeon" id="campeon"><div class="vacio">sin campeón coronado todavía</div></div>
 
   <h2>Coronaciones</h2>
@@ -178,17 +192,22 @@ async function pintar() {
   const plano = d.plano || {};
   $("run").textContent = (plano.run?.descripcion || "") + " · " + (plano.run?.nombre || "");
 
-  if (!m) {
-    $("frescura").textContent = "esperando la primera muestra…";
-    $("tiles").innerHTML = "";
-    return;
+  // Cada bloque se pinta por su cuenta. Que falte la muestra del learner NO
+  // puede borrar al campeon ni al gauntlet, que son datos de archivo: una
+  // pagina que se vacia porque le falta una pieza es peor que una incompleta.
+  if (m) {
+    // La frescura es lo primero que hay que poder juzgar: una pantalla que
+    // muestra numeros viejos sin decir que son viejos es peor que una vacia.
+    const edadMuestra = d.ahora - (Date.parse(m.ts) / 1000);
+    $("frescura").textContent = "última medición hace " + edad(edadMuestra);
+  } else {
+    $("frescura").textContent = "sin contacto con el learner";
+    $("tiles").innerHTML = tile("learner", "—", "el hub aún no logra una medición", true);
+    $("censo").innerHTML = `<tr><td colspan="7" class="vacio">el hub no ha podido medir todavía</td></tr>`;
+    $("escalera").innerHTML = [1,2,3,4,5,6,7,8].map(l => peldano(l, null)).join("");
   }
 
-  // La frescura es lo primero que hay que poder juzgar: una pantalla que
-  // muestra numeros viejos sin decir que son viejos es peor que una vacia.
-  const edadMuestra = d.ahora - (Date.parse(m.ts) / 1000);
-  $("frescura").textContent = "última medición hace " + edad(edadMuestra);
-
+  if (m) {
   const vivas = m.vivas, esperadas = m.esperadas;
   const flotaMal = vivas < (plano.umbrales?.minimo_maquinas ?? 2);
   const tope = 8;
@@ -219,11 +238,39 @@ async function pintar() {
   const viva = m.por_nivel || {};
   $("escalera").innerHTML = [1,2,3,4,5,6,7,8].map(l => peldano(l, viva[String(l)])).join("");
 
+  }
+
+  // Peleas completas: el numero honesto, con los rivales que pierde NOMBRADOS.
+  // Un promedio esconde justo lo que hay que saber -- que el 17% que falta no
+  // esta repartido, esta concentrado en dos personajes.
+  const gs = d.gauntlets || {};
+  const niveles = Object.keys(gs).sort((a, b) => b - a);
+  $("peleas").innerHTML = niveles.length ? niveles.map(lv => {
+    const a = gs[lv];
+    const perdidos = a.rivales.filter(r => !r.gano);
+    return `<div class="peleas" style="margin-bottom:8px">
+      <div class="k num" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)">nivel ${lv}</div>
+      <div class="marcador">${(a.peleas_ganadas / a.peleas_totales * 100).toFixed(1)}%
+        <span style="font-size:15px;color:var(--muted-foreground)">${a.peleas_ganadas}/${a.peleas_totales}</span></div>
+      <div class="sub num">n=${a.peleas_totales} · IC95 ${a.ic95 ? (a.ic95[0]*100).toFixed(0) + "–" + (a.ic95[1]*100).toFixed(0) + "%" : "—"}${
+        a.desync_max ? " · desfase ≤" + a.desync_max : ' · <strong style="color:var(--warning-fg)">sin desfase: determinista, repetir no añade n</strong>'}</div>
+      <div class="sub">${a.checkpoint} · ${a.fecha.replace("T", " ")}</div>
+      <div class="rivales">${(() => {
+        const agg = {};
+        a.rivales.forEach(r => { agg[r.rival] = agg[r.rival] || [0, 0];
+                                 agg[r.rival][1]++; if (r.gano) agg[r.rival][0]++; });
+        return Object.entries(agg).sort((x, y) => x[1][0]/x[1][1] - y[1][0]/y[1][1])
+          .map(([riv, [g, t]]) =>
+            `<span class="riv ${g === t ? "g" : "p"}">${riv} ${g}/${t}</span>`).join("");
+      })()}</div>
+    </div>`;
+  }).join("") : `<div class="vacio">sin gauntlet grabado todavía · <span class="num">tools/grabar_gauntlet.py --difficulty N</span></div>`;
+
   const c = d.campeon;
   if (c) {
     const cuando = new Date(c.t * 1000);
     $("campeon").innerHTML =
-      `<div class="t">v${c.weights_version} · media ${pct(c.wr_media)}</div>
+      `<div class="t">v${c.weights_version} · ${pct(c.wr_media)} de rounds de apertura</div>
        <div class="sub">${c.archivo} · coronado ${cuando.toLocaleString("es-MX")}</div>
        <div class="escalera" style="margin-top:10px">` +
        [1,2,3,4,5,6,7,8].map(l => peldano(l, c["wr_lvl" + l], true)).join("") + `</div>`;
