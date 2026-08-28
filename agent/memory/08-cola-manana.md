@@ -3,6 +3,63 @@
 La cola VIVA post-noche-histórica. Sustituye a 06-pendientes para lo operativo
 (06 queda de histórico). Orden = prioridad sugerida.
 
+## 🏁 CIERRE DE LA RUN 1 DEL CURRICULUM (2026-08-28 tarde) + EL DISEÑO DE LA RUN 2
+
+**La run 1 terminó** (decisión de equipo, learner tumbado a propósito). Su
+campeón quedó a salvo y verificado: **v3291** (`benchmarks/apex_milestones/
+apex_v3291_media990.pt`) — 99.0% de rounds de apertura sobre los 8 tiers
+(n=48/nivel) y **~90% de PELEAS COMPLETAS al mejor de 3 en lvl8** (dos
+mediciones independientes de n=360 con semillas distintas: 91.7% [88–94] y
+89.7% [86–92] — el banco replica). Sus muros: BALROG ~50% (el único sin
+proyectil, embestida pura — pista para el backlog de sentidos), GUILE y
+EHONDA ~65-77%. El resto del juego: resuelto.
+
+### LA MEJORA CENTRAL PARA LA RUN 2 — curriculum por MESH, no por worker
+(espec de Felipe, 2026-08-28):
+1. **La proporción de dificultades se define A NIVEL FLOTA** («la mesh»), no
+   como banda fija por worker. Un vector de porcentajes objetivo por tier
+   (p.ej. lvl1..8) que TODOS los actores muestrean por episodio — se acabó el
+   «desktop en 4-8, Mac en 1-8» que hacía la dieta invisible y frágil a
+   relanzamientos con la banda equivocada.
+2. **Decaimiento por dominio**: cuando el modelo le gana a un tier ≥x% durante
+   una cantidad considerable de generaciones/evaluaciones, su proporción
+   DECAE (el cómputo se va a donde aún hay pelea).
+3. **Nunca a 0**: todo tier conserva un piso pequeño de por vida — los
+   «canarios» que delatan si el modelo se está haciendo débil contra niveles
+   bajos. (El canario deja de ser una MÁQUINA y pasa a ser una PROPIEDAD de
+   la mezcla — más robusto: no muere cuando muere una laptop.)
+4. Implementación natural: la mezcla viaja en la config de /weights (los
+   actores ya adoptan config del learner solos); el controlador de decaimiento
+   lee los win rates por tier (idealmente del banco del selector, no de las
+   ventanas vivas con exploración) y ajusta el vector; pisos y umbrales en
+   fleet.json. Diseñar ANTES de arrancar la run 2, junto con:
+   - **checkpoints completos ya arreglados** (optimizador+target van dentro
+     desde f11de3b0; el primer resume de la run 2 ya nace limpio),
+   - wandb-id NUEVO para la run 2 (regla de siempre),
+   - decidir si entran los sentidos nuevos (stun / Y de proyectiles / fase del
+     move rival) — la evidencia de Balrog es el mejor argumento que ha habido.
+
+### La lección que cerró la run: POR QUÉ CADA REINICIO DEGRADABA
+Medido (2026-08-28): tras el resume de 2.1M, lvl8 cayó .75→.695→.615 y seguía
+cayendo; lvl1-4 intactos. Causa doble: (a) el checkpoint guardaba SOLO la red
+→ Adam resumía amnésico (momentos a cero) mordiendo una red convergida; (b)
+learn_start=20k → entrenaba sobre un buffer al 2%, sesgado a lo reciente, con
+replay 8×. Fix en f11de3b0: checkpoint completo + restore + --resume-warmup
+400k. Además C2: la dificultad del actor ya viaja en el wire (un actor
+relanzado con banda equivocada era invisible; sospecha nunca confirmada sobre
+SSS-705 — preguntar a Santiago quedó pendiente y ya es irrelevante).
+
+### UI: EN PAUSA por decisión de Felipe (2026-08-28)
+La consola nueva existe y funciona (consola-app/, React+shadcn+Champion
+Chrome, servida por el hub en :8099 con /simple de respaldo). La primera
+versión fue RECHAZADA (emojis, paddings sin sistema, identidad diluida) y la
+rehizo un subagente limpio sin el contexto de la sesión — esa pasó. Queda una
+ronda 2 en vuelo (identidad de paleta más presente, switcher claro/oscuro,
+sparklines, zona Config contra GET/PUT /api/fleet ya implementados, dificultad
+real vs esperada en el censo); cuando aterrice, se commitea y AHÍ SE PAUSA.
+Pendientes de la UI para cuando se retome: fase de jobs (lanzar de verdad),
+servirla por tailnet, vista multi-run.
+
 ## ⚡ CORTE día 2 tarde (2026-08-27 ~18:00) — el estado en un párrafo
 
 **La run del curriculum va en ~735k grads con la FLOTA RÉCORD: 4 máquinas

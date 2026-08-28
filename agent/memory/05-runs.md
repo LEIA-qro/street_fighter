@@ -157,3 +157,33 @@ Banco canónico × 8 niveles × 3 condiciones (2,592 eps) sobre el campeón v121
 **El salto en una noche**, contra el v1212 medido ayer por la tarde: lvl4 79.2 → **100**, lvl5 84.4 → **99.0**, lvl6 83.3 → **99.0**, lvl7 75.0 → **97.9**, lvl8 56.2 → **93.8**. Media global 85.3 → **98.7**. El learner pasó de 735k a 1.74M grads.
 
 Congelado: `benchmarks/apex_milestones/apex_v3291_media990.pt`; acta cruda en `benchmarks/bench_v3291_verificacion.jsonl`. Nota de honestidad: el modelo churea (el examen siguiente del selector, v3371, dio 0.956) — por eso el campeón se SELECCIONA y este archivo es el que va al stand y a las demos, no los pesos vivos.
+
+## [2026-08-28] Día 3 — el día del rigor: la run 1 muere con el juego casi resuelto
+
+- **El accidente**: Santiago cerró el editor y mató learner+actor (~12:29).
+  Relanzó SIN --resume-ckpt → red desde cero pisando la run de wandb; se
+  detectó por el hub y se corrigió con resume del ckpt de 2.1M. De ahí salió
+  la regla: lanzar con nohup/tmux, no en la terminal del editor.
+- **El hallazgo de Felipe #1 (rounds vs peleas)**: TODO lo medido hasta hoy
+  era win rate del PRIMER ROUND (`terminated = ko if trainable`, y
+  `matches_won` cuenta ROUNDS). Un match real es al mejor de 3 y nunca lo
+  habíamos jugado. Nació `tools/grabar_gauntlet.py`: peleas completas
+  (trainable=False deja al juego seguir a round 2/3), video 60fps con
+  frame_hook (recorte de las 64 columnas muertas del búfer, 4:3 real,
+  CRF por defecto), actas con n/IC/semilla, y semántica medición-de-registro
+  vs sidecar-de-video (un video con n=12 llegó a pisar el acta de n=360).
+- **El hallazgo de Felipe #2 (bancos deterministas)**: greedy+estado fijo =
+  episodios idénticos; repetir no añade n. Fix: desfase POR DEFECTO, semilla
+  del reloj, ruido de acción opcional, Wilson en toda acta. Con n=360×2
+  semillas: lvl8 peleas completas 91.7%[88-94] y 89.7%[86-92] — replica.
+  El mapa real: BALROG ~50 (muro), GUILE/EHONDA 65-77, resto 100.
+- **El hallazgo de Felipe #3 (reinicios que degradan)**: confirmado con datos
+  y arreglado — checkpoint completo (optimizador+target), resume-warmup 400k,
+  y C2 (difficulty en el wire). Ver 08-cola para el detalle.
+- **La consola**: v1 OJOS (fleet.json + leia_hub con censo/alarmas/historia +
+  GET/PUT /api/fleet) → mi UI shadcn RECHAZADA por Felipe (con razón) →
+  rediseño desde cero por subagente limpio que sí pasó → ronda 2 en vuelo →
+  **UI EN PAUSA por decisión de Felipe**.
+- **Cierre**: learner tumbado a propósito; v3291 congelado y commiteado; la
+  run 2 se diseñará con el curriculum por MESH (proporciones a nivel flota
+  con decaimiento por dominio y pisos-canario — espec en 08-cola).
