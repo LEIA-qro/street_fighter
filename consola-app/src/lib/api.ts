@@ -16,6 +16,7 @@ export interface RivalPelea { rival: string; rounds_propios: number; rounds_riva
 export interface Gauntlet {
   fecha: string; checkpoint: string; dificultad: number;
   peleas_ganadas: number; peleas_totales: number; repeticiones?: number;
+  rounds_para_ganar?: number;
   desync_max?: number; ic95?: [number, number]; semilla?: number;
   rivales: RivalPelea[];
 }

@@ -1,712 +1,40 @@
 {
-  "fecha": "2026-08-28T12:57:31",
+  "fecha": "2026-08-28T13:50:24",
   "checkpoint": "apex_v3291_media990.pt",
   "dificultad": 8,
   "rounds_para_ganar": 2,
-  "peleas_ganadas": 330,
+  "peleas_ganadas": 323,
   "peleas_totales": 360,
   "repeticiones": 30,
   "desync_max": 30,
   "action_noise": 0.0,
-  "semilla": 1236296247,
+  "semilla": 1239588488,
   "ic95": [
-    0.884,
-    0.941
+    0.862,
+    0.925
   ],
   "video": "gauntlet_lvl8.mp4",
   "rivales": [
     {
       "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 396
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 550
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 562
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 436
-    },
-    {
-      "rival": "EHONDA",
       "rounds_propios": 1,
       "rounds_rival": 2,
       "gano": false,
-      "pasos": 610
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 523
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 532
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 327
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 883
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 690
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 376
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 447
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 296
+      "pasos": 351
     },
     {
       "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 426
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 562
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 414
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 466
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 531
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 537
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 365
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 889
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 439
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 552
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 381
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 207
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 516
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 562
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 416
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 465
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 522
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 537
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 326
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 883
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 537
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 376
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 470
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 207
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 549
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 750
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 414
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 775
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 528
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 831
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 648
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 889
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 439
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 546
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 383
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 212
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 397
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 559
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 413
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 779
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 556
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 525
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 363
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 965
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 479
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 377
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 472
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 300
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 553
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 751
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 541
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 772
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 798
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 513
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 367
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 889
-    },
-    {
-      "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
       "pasos": 539
     },
     {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 550
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 490
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 394
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 428
-    },
-    {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 561
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 413
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 771
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 548
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 535
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 362
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 885
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 540
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 548
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 383
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 206
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 397
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 756
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 568
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 465
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 557
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 377
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 373
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 891
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 703
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 378
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 461
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 208
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 485
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 566
+      "pasos": 558
     },
     {
       "rival": "DHALSIM",
@@ -720,174 +48,6 @@
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 778
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 793
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 536
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 563
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 972
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 540
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 369
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 385
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 398
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 537
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 561
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 436
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 779
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 550
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 442
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 366
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 788
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 549
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 550
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 396
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 295
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 486
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 556
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 547
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
       "pasos": 776
     },
     {
@@ -895,350 +55,14 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 528
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 830
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 366
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 792
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 691
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 374
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 448
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 256
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 549
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 560
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 824
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 777
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 789
+      "pasos": 555
     },
     {
       "rival": "KEN",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 524
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 651
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 965
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 689
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 544
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 462
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 208
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 517
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 753
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 547
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 469
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 552
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 830
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 366
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 971
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 480
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 552
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 398
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 207
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 515
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 748
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 539
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 610
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 524
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 440
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 367
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 969
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 890
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 548
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 460
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 301
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 486
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 559
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 434
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 464
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 797
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 534
+      "pasos": 442
     },
     {
       "rival": "MBISON",
@@ -1252,70 +76,238 @@
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 966
+      "pasos": 971
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 440
+      "pasos": 604
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 544
+      "pasos": 370
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 458
+      "pasos": 384
     },
     {
       "rival": "BALROG",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 296
+      "pasos": 396
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 515
+      "pasos": 535
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 562
+      "pasos": 751
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 539
+      "pasos": 824
     },
     {
       "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 467
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 613
     },
     {
       "rival": "GUILE",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 531
+      "pasos": 550
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 832
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 367
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 794
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 689
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 547
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 468
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 207
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 427
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 556
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 826
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 610
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 796
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 829
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 556
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 969
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 893
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 543
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 459
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 300
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 425
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 561
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 827
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 605
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 555
     },
     {
       "rival": "KEN",
@@ -1329,70 +321,70 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 356
+      "pasos": 359
     },
     {
       "rival": "RYU",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 972
+      "pasos": 790
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 539
+      "pasos": 702
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 548
+      "pasos": 370
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 451
+      "pasos": 488
     },
     {
       "rival": "BALROG",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 298
+      "pasos": 399
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 517
+      "pasos": 515
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 556
+      "pasos": 561
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 570
+      "pasos": 547
     },
     {
       "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 778
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 604
     },
     {
       "rival": "GUILE",
@@ -1411,79 +403,667 @@
     {
       "rival": "MBISON",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 359
+      "pasos": 653
     },
     {
       "rival": "RYU",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 885
+      "pasos": 797
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 439
+      "pasos": 478
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 373
+      "pasos": 376
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 447
+      "pasos": 448
     },
     {
       "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 301
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 212
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 519
+      "pasos": 552
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 565
+      "pasos": 558
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 538
+      "pasos": 824
     },
     {
       "rival": "EHONDA",
       "rounds_propios": 1,
       "rounds_rival": 2,
       "gano": false,
-      "pasos": 603
+      "pasos": 608
     },
     {
       "rival": "GUILE",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
+      "pasos": 555
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 443
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 362
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 968
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 537
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 376
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 384
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 296
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 399
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 557
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 547
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 774
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 522
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 524
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 362
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 890
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
       "pasos": 550
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 376
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 460
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 208
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 396
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 556
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 415
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 778
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 796
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 513
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 366
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 971
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 892
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 377
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 489
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 351
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 484
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 557
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 436
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 468
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 532
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 377
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 325
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 971
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 538
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 371
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 385
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 399
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 398
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 566
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 546
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 467
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 793
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 534
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 363
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 791
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 537
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 378
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 491
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 206
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 539
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 564
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 827
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 467
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 554
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 829
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 648
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 969
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 603
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 543
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 472
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 303
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 535
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 562
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 548
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 464
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 524
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 525
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 654
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 891
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 602
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 375
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 396
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 206
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 483
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 755
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 567
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 770
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 791
     },
     {
       "rival": "KEN",
@@ -1504,90 +1084,6 @@
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 972
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 603
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 374
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 382
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 210
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 551
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 559
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 570
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 466
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 524
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 523
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 653
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
       "pasos": 788
     },
     {
@@ -1595,63 +1091,63 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 538
+      "pasos": 549
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 376
+      "pasos": 546
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 399
+      "pasos": 490
     },
     {
       "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 206
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 255
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 482
+      "pasos": 517
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 558
+      "pasos": 565
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 549
+      "pasos": 550
     },
     {
       "rival": "EHONDA",
       "rounds_propios": 1,
       "rounds_rival": 2,
       "gano": false,
-      "pasos": 613
+      "pasos": 607
     },
     {
       "rival": "GUILE",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 530
+      "pasos": 548
     },
     {
       "rival": "KEN",
@@ -1665,35 +1161,203 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 327
+      "pasos": 367
     },
     {
       "rival": "RYU",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 967
+      "pasos": 975
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 703
+      "pasos": 549
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 553
+      "pasos": 551
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 467
+      "pasos": 489
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 393
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 398
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 557
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 826
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 471
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 795
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 524
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 326
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 795
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 689
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 373
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 396
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 349
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 540
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 748
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 436
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 610
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 548
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 515
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 373
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 974
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 539
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 543
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 469
     },
     {
       "rival": "BALROG",
@@ -1707,49 +1371,49 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 427
+      "pasos": 515
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 756
+      "pasos": 560
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 568
+      "pasos": 548
     },
     {
       "rival": "EHONDA",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 779
+      "pasos": 465
     },
     {
       "rival": "GUILE",
       "rounds_propios": 1,
       "rounds_rival": 2,
       "gano": false,
-      "pasos": 797
+      "pasos": 796
     },
     {
       "rival": "KEN",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 829
+      "pasos": 376
     },
     {
       "rival": "MBISON",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 651
+      "pasos": 364
     },
     {
       "rival": "RYU",
@@ -1770,98 +1434,14 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 545
+      "pasos": 371
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 491
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 395
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 398
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 755
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 547
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 603
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 557
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 515
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 363
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 788
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 548
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 370
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 397
+      "pasos": 472
     },
     {
       "rival": "BALROG",
@@ -1875,126 +1455,210 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 536
+      "pasos": 515
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 560
+      "pasos": 755
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 413
+      "pasos": 538
     },
     {
       "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 468
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 603
     },
     {
       "rival": "GUILE",
       "rounds_propios": 1,
       "rounds_rival": 2,
       "gano": false,
-      "pasos": 795
+      "pasos": 790
     },
     {
       "rival": "KEN",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 829
+      "pasos": 378
     },
     {
       "rival": "MBISON",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 365
+      "pasos": 652
     },
     {
       "rival": "RYU",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 972
+      "pasos": 965
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
-      "rounds_rival": 1,
+      "rounds_rival": 0,
       "gano": true,
-      "pasos": 891
+      "pasos": 601
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 543
+      "pasos": 371
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 449
+      "pasos": 468
     },
     {
       "rival": "BALROG",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 295
+      "pasos": 302
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 400
+      "pasos": 537
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 563
+      "pasos": 755
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 566
+      "pasos": 567
     },
     {
       "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 470
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 604
     },
     {
       "rival": "GUILE",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 523
+      "pasos": 522
     },
     {
       "rival": "KEN",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 376
+      "pasos": 440
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 654
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 965
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 478
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 369
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 469
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 298
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 484
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 557
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 416
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 610
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 526
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 830
     },
     {
       "rival": "MBISON",
@@ -2008,364 +1672,28 @@
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 796
+      "pasos": 885
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 550
+      "pasos": 478
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 548
+      "pasos": 371
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 470
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 350
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 429
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 564
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 548
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 605
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 525
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 377
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 326
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 966
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 549
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 373
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 395
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 205
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 400
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 755
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 540
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 471
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 530
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 375
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 655
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 882
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 479
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 372
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 460
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 255
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 538
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 558
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 571
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 467
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 549
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 518
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 366
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 969
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 690
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 543
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 448
-    },
-    {
-      "rival": "BALROG",
-      "rounds_propios": 0,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 210
-    },
-    {
-      "rival": "BLANKA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 537
-    },
-    {
-      "rival": "CHUNLI",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 564
-    },
-    {
-      "rival": "DHALSIM",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 827
-    },
-    {
-      "rival": "EHONDA",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 607
-    },
-    {
-      "rival": "GUILE",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 523
-    },
-    {
-      "rival": "KEN",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 515
-    },
-    {
-      "rival": "MBISON",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 367
-    },
-    {
-      "rival": "RYU",
-      "rounds_propios": 2,
-      "rounds_rival": 1,
-      "gano": true,
-      "pasos": 882
-    },
-    {
-      "rival": "SAGAT",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 540
-    },
-    {
-      "rival": "VEGA",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 545
-    },
-    {
-      "rival": "ZANGIEF",
-      "rounds_propios": 2,
-      "rounds_rival": 0,
-      "gano": true,
-      "pasos": 447
+      "pasos": 398
     },
     {
       "rival": "BALROG",
@@ -2379,35 +1707,455 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 550
+      "pasos": 517
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 566
+      "pasos": 561
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 825
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 466
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 796
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 533
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 656
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 887
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 549
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 370
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 448
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 395
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 551
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 565
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 571
+      "pasos": 437
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 472
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 789
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 513
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 324
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 885
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 440
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 369
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 472
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 397
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 515
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 558
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 549
     },
     {
       "rival": "EHONDA",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 777
+      "pasos": 779
     },
     {
       "rival": "GUILE",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 552
+      "pasos": 549
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 525
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 362
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 888
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 480
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 376
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 492
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 209
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 426
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 753
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 547
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 467
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 794
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 517
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 655
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 975
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 604
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 544
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 385
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 211
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 519
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 564
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 416
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 470
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 1,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 790
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 829
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 367
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 791
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 548
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 376
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 469
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 397
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 537
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 752
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 824
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 779
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 550
     },
     {
       "rival": "KEN",
@@ -2421,70 +2169,154 @@
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 365
+      "pasos": 359
     },
     {
       "rival": "RYU",
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 790
+      "pasos": 887
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
-      "rounds_rival": 0,
+      "rounds_rival": 1,
       "gano": true,
-      "pasos": 538
+      "pasos": 892
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 377
+      "pasos": 375
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 468
+      "pasos": 488
     },
     {
       "rival": "BALROG",
-      "rounds_propios": 1,
-      "rounds_rival": 2,
-      "gano": false,
-      "pasos": 349
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 303
     },
     {
       "rival": "BLANKA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 486
+      "pasos": 485
     },
     {
       "rival": "CHUNLI",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 560
+      "pasos": 566
     },
     {
       "rival": "DHALSIM",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 568
+      "pasos": 547
     },
     {
       "rival": "EHONDA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 472
+      "pasos": 470
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 532
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 443
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 326
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 889
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 440
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 548
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 488
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 394
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 515
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 556
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 566
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 773
     },
     {
       "rival": "GUILE",
@@ -2512,28 +2344,196 @@
       "rounds_propios": 2,
       "rounds_rival": 1,
       "gano": true,
-      "pasos": 888
+      "pasos": 884
     },
     {
       "rival": "SAGAT",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 688
+      "pasos": 439
     },
     {
       "rival": "VEGA",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 547
+      "pasos": 373
     },
     {
       "rival": "ZANGIEF",
       "rounds_propios": 2,
       "rounds_rival": 0,
       "gano": true,
-      "pasos": 396
+      "pasos": 451
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 0,
+      "rounds_rival": 2,
+      "gano": false,
+      "pasos": 207
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 518
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 754
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 435
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 471
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 523
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 536
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 365
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 886
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 548
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 369
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 397
+    },
+    {
+      "rival": "BALROG",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 302
+    },
+    {
+      "rival": "BLANKA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 550
+    },
+    {
+      "rival": "CHUNLI",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 556
+    },
+    {
+      "rival": "DHALSIM",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 569
+    },
+    {
+      "rival": "EHONDA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 468
+    },
+    {
+      "rival": "GUILE",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 530
+    },
+    {
+      "rival": "KEN",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 381
+    },
+    {
+      "rival": "MBISON",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 563
+    },
+    {
+      "rival": "RYU",
+      "rounds_propios": 2,
+      "rounds_rival": 1,
+      "gano": true,
+      "pasos": 791
+    },
+    {
+      "rival": "SAGAT",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 478
+    },
+    {
+      "rival": "VEGA",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 374
+    },
+    {
+      "rival": "ZANGIEF",
+      "rounds_propios": 2,
+      "rounds_rival": 0,
+      "gano": true,
+      "pasos": 399
     }
   ]
 }

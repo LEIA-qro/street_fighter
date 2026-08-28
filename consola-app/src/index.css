@@ -81,3 +81,42 @@
 body { background: var(--background); color: var(--foreground);
        font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------
+   Derivados de la consola (no tocan ningun valor pinneado).
+   ------------------------------------------------------------ */
+
+/* Etiqueta de dato: la voz de "esto es un instrumento". 10px mono,
+   mayusculas, tracking abierto. Se usa en TODO encabezado de dato. */
+.dlabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+/* Titular de seccion: Chakra Petch, solo aqui y en el logotipo. */
+.stitle {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Doble anillo de foco (replicado de design/champion-chrome.css):
+   --ring sobre relleno primary mide 1.00, el anillo solo es invisible. */
+:where(:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--background);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
