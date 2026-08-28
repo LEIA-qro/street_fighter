@@ -32,12 +32,16 @@
 
 import argparse
 import atexit
+import hashlib
+import json
 import os
 import random
 import signal
 import sys
 import time
+import traceback
 from collections import deque
+from datetime import datetime, timezone
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -80,6 +84,109 @@ HUMAN_PASSTHROUGH = ".........."   # 10 puntos: el Lua no toca ese pad
 # el modelo que recibe otra maquina mediante git pull.
 DEFAULT_CHECKPOINT = os.path.join(
     "benchmarks", "apex_milestones", "apex_v1592_benchmarked.pt")
+
+
+def checkpoint_provenance(checkpoint_path: str) -> dict:
+    """Identidad reproducible del modelo y resultados publicados al lado."""
+    result = {"checkpoint_path": os.path.normpath(checkpoint_path)}
+    try:
+        digest = hashlib.sha256()
+        with open(checkpoint_path, "rb") as checkpoint_file:
+            for chunk in iter(lambda: checkpoint_file.read(1024 * 1024), b""):
+                digest.update(chunk)
+        result["checkpoint_sha256"] = digest.hexdigest()
+    except OSError as exc:
+        result["checkpoint_sha256"] = None
+        result["checkpoint_identity_error"] = str(exc)
+
+    sidecar_path = checkpoint_path + ".json"
+    try:
+        with open(sidecar_path, "r", encoding="utf-8") as sidecar_file:
+            sidecar = json.load(sidecar_file)
+        if isinstance(sidecar, dict):
+            result["checkpoint_benchmark"] = sidecar
+    except (OSError, ValueError):
+        pass
+    return result
+
+
+class MatchSessionLog:
+    """JSONL durable: cada evento queda flush+fsync antes de seguir jugando."""
+
+    def __init__(self, log_dir: str, session_fields=None):
+        self._file = None
+        self._closed = False
+        self._warning_printed = False
+        self._started_monotonic = time.monotonic()
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        self.session_id = f"{stamp}_{os.getpid()}"
+        self.path = os.path.join(
+            log_dir, f"apex_viewer_{self.session_id}.jsonl")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            self._file = open(
+                self.path, "a", encoding="utf-8", buffering=1, newline="\n")
+        except OSError as exc:
+            self._warn_once(f"no se pudo crear el log persistente: {exc}")
+            self.path = None
+            return
+        self.write("session_start", **(session_fields or {}))
+
+    @staticmethod
+    def _utc_now():
+        return datetime.now(timezone.utc).isoformat(
+            timespec="milliseconds").replace("+00:00", "Z")
+
+    def _warn_once(self, message):
+        if not self._warning_printed:
+            print(f"[viewer] ADVERTENCIA DE LOG: {message}", flush=True)
+            self._warning_printed = True
+
+    def write(self, event: str, **fields) -> bool:
+        if self._file is None or self._closed:
+            return False
+        record = {
+            "schema_version": 1,
+            "timestamp_utc": self._utc_now(),
+            "session_id": self.session_id,
+            "event": event,
+            **fields,
+        }
+        try:
+            self._file.write(json.dumps(
+                record, ensure_ascii=False, separators=(",", ":")) + "\n")
+            self._file.flush()
+            os.fsync(self._file.fileno())
+            return True
+        except (OSError, TypeError, ValueError) as exc:
+            self._warn_once(f"no se pudo guardar el evento {event}: {exc}")
+            return False
+
+    def close(self, reason: str, **fields):
+        if self._closed:
+            return
+        self.write(
+            "session_end",
+            reason=reason,
+            duration_seconds=round(
+                time.monotonic() - self._started_monotonic, 3),
+            **fields,
+        )
+        self._closed = True
+        if self._file is not None:
+            try:
+                self._file.close()
+            except OSError:
+                pass
+
+
+def opponent_from_state(state_path: str) -> str:
+    name = os.path.basename(state_path)
+    prefix = "RYU_"
+    suffix = "_R1_PvP.State"
+    if name.startswith(prefix) and name.endswith(suffix):
+        return name[len(prefix):-len(suffix)]
+    return name
 
 
 def parse_payload(raw: str) -> dict:
@@ -258,6 +365,23 @@ def main():
     agent_state_path = os.path.join(config.PROJECT_ROOT, ".agent_state")
     env = None
     cleanup_done = False
+    ckpt_path = os.path.join(config.PROJECT_ROOT, args.ckpt)
+    checkpoint_info = checkpoint_provenance(ckpt_path)
+    # El JSONL se comparte entre testers: guardar la ruta relativa seleccionada,
+    # no C:\Users\... ni otro dato personal de la máquina anfitriona.
+    checkpoint_info["checkpoint_path"] = os.path.normpath(args.ckpt)
+    session_log = MatchSessionLog(
+        os.path.join(config.LOG_DIR, "model_testing", "apex_viewer"),
+        {
+            "mode": "apex_vs_human",
+            "device": args.device,
+            "requested_opponent": args.opponent,
+            "rematch_delay_seconds": args.rematch_delay,
+            **checkpoint_info,
+        },
+    )
+    if session_log.path:
+        print(f"[viewer] log persistente: {session_log.path}", flush=True)
 
     def cleanup_session():
         nonlocal cleanup_done
@@ -299,7 +423,6 @@ def main():
         def stop_requested() -> bool:
             return os.path.exists(stop_file_path)
 
-        ckpt_path = os.path.join(config.PROJECT_ROOT, args.ckpt)
         choose_action, meta = load_champion(ckpt_path, args.device)
         print(f"[viewer] campeon: {os.path.basename(ckpt_path)} "
               f"({meta['in_dim']} in, {N_ACTIONS} acciones, macros)", flush=True)
@@ -308,7 +431,20 @@ def main():
                                 "stand_env_client.lua")
         env = StreetFighterEnvV2(lua_path=lua_path, trainable=False, rank=0,
                                  player=1)
-    except BaseException:
+    except BaseException as exc:
+        session_log.write(
+            "session_error",
+            phase="startup",
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            traceback=traceback.format_exc(),
+        )
+        session_log.close(
+            "stopped" if isinstance(exc, KeyboardInterrupt) else "startup_error",
+            completed_rounds=0,
+            ia_wins=0,
+            retador_wins=0,
+        )
         cleanup_session()
         raise
 
@@ -317,12 +453,16 @@ def main():
     player = MacroPlayer()
     p1_wins = p2_wins = 0
     match_count = 1
+    completed_rounds = 0
     round_started = False
+    round_started_at = None
+    current_opponent = None
     ko_time = None
     winner_msg = None
 
     def reset_to(state_path: str, discard_pending_payload: bool = False):
-        nonlocal track, round_started, ko_time, winner_msg
+        nonlocal track, round_started, round_started_at, ko_time, winner_msg
+        nonlocal current_opponent
         ram = request_round_reset(
             env, state_path, p1_wins, p2_wins,
             discard_pending_payload=discard_pending_payload,
@@ -334,14 +474,25 @@ def main():
             frames.append(frame)
         player.reset(np.concatenate(frames))
         round_started = False
+        round_started_at = time.time()
         ko_time = None
         winner_msg = None
+        current_opponent = opponent_from_state(state_path)
+        session_log.write(
+            "round_start",
+            round=match_count,
+            opponent=current_opponent,
+            savestate=os.path.basename(state_path),
+            ia_wins=p1_wins,
+            retador_wins=p2_wins,
+        )
 
     print("\n" + "=" * 50)
     print("  MODEL TESTING -- reta a la IA (control = Player 2)")
     print("  Ctrl+C termina la sesion y cierra el emulador")
     print("=" * 50 + "\n", flush=True)
 
+    session_end_reason = "error"
     try:
         # Solo el cold-start hereda el payload que Lua emitió al conectarse.
         reset_to(
@@ -370,26 +521,62 @@ def main():
             if not round_started and p1_hp_f > 0 and p2_hp_f > 0:
                 round_started = True
             if round_started and ko_time is None:
+                p1_ko = hp_to_signed(ram["p1_hp"]) < 0
+                p2_ko = hp_to_signed(ram["p2_hp"]) < 0
+                round_timer = int(ram["round_timer"])
                 result = resolve_round(
-                    hp_to_signed(ram["p1_hp"]) < 0,
-                    hp_to_signed(ram["p2_hp"]) < 0,
-                    int(ram["round_timer"]), p1_hp_f, p2_hp_f)
+                    p1_ko, p2_ko, round_timer, p1_hp_f, p2_hp_f)
                 if result is not None:
                     winner, winner_msg = result
                     if winner == "ia":
                         p1_wins += 1
                     elif winner == "retador":
                         p2_wins += 1
+                    completed_rounds += 1
                     ko_time = time.time()
+                    session_log.write(
+                        "round_end",
+                        round=match_count,
+                        opponent=current_opponent,
+                        winner=winner,
+                        result=winner_msg,
+                        ending="ko" if p1_ko or p2_ko else "time_over",
+                        p1_hp=p1_hp_f,
+                        p2_hp=p2_hp_f,
+                        round_timer=round_timer,
+                        duration_seconds=(
+                            round(time.time() - round_started_at, 3)
+                            if round_started_at is not None else None
+                        ),
+                        ia_wins=p1_wins,
+                        retador_wins=p2_wins,
+                    )
             if ko_time is not None and time.time() - ko_time >= args.rematch_delay:
                 print(f"[round {match_count}] {winner_msg}  |  "
                       f"IA {p1_wins} - {p2_wins} Retador", flush=True)
                 match_count += 1
                 reset_to(pick_state(config.STATES_DIR, args.opponent))
     except KeyboardInterrupt:
+        session_end_reason = "stopped"
         print(f"\n[viewer] sesion terminada. Marcador final: "
               f"IA {p1_wins} - {p2_wins} Retador", flush=True)
+    except BaseException as exc:
+        session_end_reason = "error"
+        session_log.write(
+            "session_error",
+            phase="gameplay",
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            traceback=traceback.format_exc(),
+        )
+        raise
     finally:
+        session_log.close(
+            session_end_reason,
+            completed_rounds=completed_rounds,
+            ia_wins=p1_wins,
+            retador_wins=p2_wins,
+        )
         cleanup_session()
 
 

@@ -43,7 +43,7 @@ los componentes anteriores aunque el backend haya reiniciado. Abrir una carga
 fresca y versionada:
 
 ```powershell
-Start-Process "http://127.0.0.1:7860/?build=v1592-additive-r4"
+Start-Process "http://127.0.0.1:7860/?build=v1592-logs-r5"
 ```
 
 Entrar a **🎮 Model Testing & Matchups**. La
@@ -87,6 +87,17 @@ con **Ctrl+C**.
 ## 3. Señales y trucos
 
 - La consola canta cada round: `[round N] GANA LA IA | IA 3 - 1 Retador`.
+- Cada lanzamiento crea un JSONL durable en
+  `logs\model_testing\apex_viewer\`. Guarda identidad/hash del checkpoint,
+  rival real, inicio y resultado de cada round, marcador, errores y cierre de
+  sesión. Cada evento se fuerza a disco inmediatamente, así que los rounds ya
+  terminados sobreviven aunque se cierre la pestaña o falle el emulador.
+  Para localizar el más reciente en PowerShell:
+
+  ```powershell
+  Get-ChildItem .\logs\model_testing\apex_viewer\*.jsonl |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  ```
 - **La IA juega en serio** (v1592: 363/384, 94.5% en la escalera completa;
   lvl1-3: 100/100/100%). Para
   visitantes casuales usa un checkpoint anterior que también declare

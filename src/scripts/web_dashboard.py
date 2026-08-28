@@ -38,7 +38,7 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1592-additive-r4"
+DASHBOARD_BUILD_ID = "v1592-logs-r5"
 
 # Una pestaña Gradio abierta conserva el schema de componentes aunque el
 # proceso de Python se reinicie. Si el app_id cambia, navegar con una query
@@ -1846,7 +1846,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             with gr.Accordion("Ape-X QR-DQN vs Human (Viewer)", open=False):
                 gr.Markdown(
                     "Prueba el campeón `.pt` contra un retador con el control "
-                    "físico configurado como Player 2 en BizHawk."
+                    "físico configurado como Player 2 en BizHawk. Cada sesión "
+                    "guarda resultados persistentes en "
+                    "`logs/model_testing/apex_viewer/`."
                 )
                 with gr.Row():
                     apex_checkpoint = gr.Dropdown(

@@ -10,6 +10,7 @@
 #   3. los 10 bits del comando calcan el orden del Lua (oracle escrito a mano),
 #   4. la extraccion de HP del frame mas reciente usa los indices correctos.
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -31,7 +32,8 @@ from envs.macro_wrapper import MacroActionWrapper
 from envs.retro_env import V4_FRAME_DIM
 from stand_leia import (
     DEFAULT_CHECKPOINT, HUMAN_PASSTHROUGH, PAYLOAD_KEYS, MacroPlayer,
-    bits_command, parse_payload, pick_state, request_round_reset, resolve_round,
+    MatchSessionLog, bits_command, checkpoint_provenance, opponent_from_state,
+    parse_payload, pick_state, request_round_reset, resolve_round,
 )
 
 
@@ -292,3 +294,43 @@ def test_n_actions_is_72():
 def test_default_checkpoint_tracks_frozen_benchmarked_champion():
     assert Path(DEFAULT_CHECKPOINT).as_posix().endswith(
         "benchmarks/apex_milestones/apex_v1592_benchmarked.pt")
+
+
+def test_match_session_log_flushes_rounds_and_summary(tmp_path):
+    log = MatchSessionLog(str(tmp_path), {"checkpoint": "champion.pt"})
+    assert log.path is not None
+
+    log.write(
+        "round_end", round=1, opponent="KEN", winner="ia",
+        ia_wins=1, retador_wins=0,
+    )
+    # Debe poder leerse antes de close(): write() hace flush + fsync.
+    live_records = [json.loads(line) for line in Path(log.path).read_text(
+        encoding="utf-8").splitlines()]
+    assert [record["event"] for record in live_records] == [
+        "session_start", "round_end"]
+    assert live_records[1]["opponent"] == "KEN"
+
+    log.close("stopped", completed_rounds=1, ia_wins=1, retador_wins=0)
+    records = [json.loads(line) for line in Path(log.path).read_text(
+        encoding="utf-8").splitlines()]
+    assert records[-1]["event"] == "session_end"
+    assert records[-1]["completed_rounds"] == 1
+    assert len({record["session_id"] for record in records}) == 1
+
+
+def test_checkpoint_provenance_records_hash_and_sidecar(tmp_path):
+    checkpoint = tmp_path / "champion.pt"
+    checkpoint.write_bytes(b"model-bytes")
+    Path(str(checkpoint) + ".json").write_text(
+        '{"weights_version":1592,"wr_media":0.945}', encoding="utf-8")
+
+    identity = checkpoint_provenance(str(checkpoint))
+
+    assert identity["checkpoint_sha256"] == (
+        "357e5d6fafa34d27360fec24b4326d3534905e33c6acdee60198fb078b7b79e5")
+    assert identity["checkpoint_benchmark"]["weights_version"] == 1592
+
+
+def test_opponent_from_state_reports_random_choice_character():
+    assert opponent_from_state("C:/LEIA/states/RYU_CHUNLI_R1_PvP.State") == "CHUNLI"
