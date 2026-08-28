@@ -505,6 +505,26 @@ class TestTelemetryDashboard(unittest.TestCase):
             "p1_champion.pt", "cpu", "KEN", 7, 2.5, "auto"))
         self.assertEqual(kwargs["p2_checkpoint"], "p2_champion.pt")
 
+    def test_apex_p2_default_never_overrides_valid_opponent_selection(self):
+        from scripts.web_dashboard import normalize_apex_p2_selection
+
+        self.assertEqual(
+            normalize_apex_p2_selection("apex", "ppo"),
+            "Human Player",
+        )
+        self.assertEqual(
+            normalize_apex_p2_selection("apex", "CPU (Built-in AI)"),
+            "CPU (Built-in AI)",
+        )
+        self.assertEqual(
+            normalize_apex_p2_selection("apex", "apex"),
+            "apex",
+        )
+        self.assertEqual(
+            normalize_apex_p2_selection("ppo", "CPU (Built-in AI)"),
+            "CPU (Built-in AI)",
+        )
+
     def test_run_stand_reports_corrupt_checkpoint_in_console(self):
         from scripts import web_dashboard
 

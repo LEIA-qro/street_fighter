@@ -38,7 +38,7 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1592-unified-r6"
+DASHBOARD_BUILD_ID = "v1592-unified-r7"
 
 # Una pestaña Gradio abierta conserva el schema de componentes aunque el
 # proceso de Python se reinicie. Si el app_id cambia, navegar con una query
@@ -755,6 +755,20 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
+APEX_P2_ALGO_TO_TYPE = {
+    "Human Player": "human",
+    "CPU (Built-in AI)": "cpu",
+    "apex": "model",
+}
+
+
+def normalize_apex_p2_selection(p1_algo, p2_algo):
+    """Sólo corrige el default inválido; nunca pisa CPU/Ape-X elegidos."""
+    if p1_algo == "apex" and p2_algo not in APEX_P2_ALGO_TO_TYPE:
+        return "Human Player"
+    return p2_algo
+
+
 def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
                 p2_algo, p2_env, p2_zip, p2_pkl, p2_device,
                 profile_enabled, infinite_match_enabled=False,
@@ -762,17 +776,12 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
                 p1_apex_checkpoint=None, p2_apex_checkpoint=None,
                 opponent_character="RANDOM"):
     if p1_algo == "apex":
-        opponent_types = {
-            "Human Player": "human",
-            "CPU (Built-in AI)": "cpu",
-            "apex": "model",
-        }
-        if p2_algo not in opponent_types:
+        if p2_algo not in APEX_P2_ALGO_TO_TYPE:
             yield (
                 "Invalid Ape-X matchup: P2 debe ser Human Player, "
                 "CPU (Built-in AI) o Ape-X QR-DQN.")
             return
-        opponent_type = opponent_types[p2_algo]
+        opponent_type = APEX_P2_ALGO_TO_TYPE[p2_algo]
         if opponent_type == "model":
             opponent_character = "RYU"
         for log in run_stand(
@@ -1996,12 +2005,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
             def update_apex_opponent_controls(p1_algorithm, p2_algorithm):
                 apex_match = p1_algorithm == "apex"
-                allowed_apex_opponents = (
-                    "Human Player", "CPU (Built-in AI)", "apex")
-                p2_update = gr.update()
-                if apex_match and p2_algorithm not in allowed_apex_opponents:
-                    p2_algorithm = "Human Player"
-                    p2_update = gr.update(value=p2_algorithm)
+                p2_algorithm = normalize_apex_p2_selection(
+                    p1_algorithm, p2_algorithm)
 
                 if apex_match and p2_algorithm == "apex":
                     character = gr.update(
@@ -2023,17 +2028,32 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     if apex_match and p2_algorithm == "CPU (Built-in AI)"
                     else "CPU Max Level Cap (Infinite Match)"
                 )
-                return p2_update, character, gr.update(label=cpu_label)
+                return character, gr.update(label=cpu_label)
+
+            def default_p2_for_apex(p1_algorithm, p2_algorithm):
+                selected = normalize_apex_p2_selection(
+                    p1_algorithm, p2_algorithm)
+                if selected != p2_algorithm:
+                    return gr.update(value=selected)
+                return gr.update()
+
+            # Sólo P1 puede aplicar el default Human una vez. El evento de P2
+            # jamás escribe sobre sí mismo: CPU y Ape-X quedan seleccionables.
+            p1_algo.change(
+                default_p2_for_apex,
+                inputs=[p1_algo, p2_algo],
+                outputs=[p2_algo],
+            )
 
             p1_algo.change(
                 update_apex_opponent_controls,
                 inputs=[p1_algo, p2_algo],
-                outputs=[p2_algo, matchup_character, cpu_level_cap_slider],
+                outputs=[matchup_character, cpu_level_cap_slider],
             )
             p2_algo.change(
                 update_apex_opponent_controls,
                 inputs=[p1_algo, p2_algo],
-                outputs=[p2_algo, matchup_character, cpu_level_cap_slider],
+                outputs=[matchup_character, cpu_level_cap_slider],
             )
 
             def update_infinite_match_status(is_infinite):
