@@ -30,15 +30,95 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FLEET_JSON = os.path.join(REPO, "fleet", "fleet.json")
 HIST_DIR = os.path.join(REPO, "fleet", "history")
 SAMPLES = os.path.join(HIST_DIR, "hub_samples.jsonl")
 ALARMS = os.path.join(HIST_DIR, "hub_alarms.jsonl")
+WEB = os.path.join(REPO, "web")
+DESIGN = os.path.join(REPO, "design")
+CAMPEON = os.path.join(REPO, "benchmarks", "apex_milestones",
+                       "apex_escalera_best.pt.json")
+SELECTOR = os.path.join(HIST_DIR, "apex_selector_v3.jsonl")
+
+# Lo ultimo que se midio, en memoria. El servidor LEE de aqui y nunca vuelve a
+# consultar al learner: un productor, muchos lectores. Asi la pantalla no puede
+# multiplicar la carga sobre el learner por mas pestanas que se abran.
+ESTADO = {"muestra": None, "arranque": time.time()}
+
+
+def campeon_actual():
+    """La tarjeta de identidad del campeon vigente, o None si no hay."""
+    try:
+        with open(CAMPEON, encoding="utf-8") as f:
+            c = json.load(f)
+    except (OSError, ValueError):
+        return None
+    c["archivo"] = os.path.basename(CAMPEON).replace(".json", "")
+    return c
+
+
+def coronaciones(n=12):
+    """Historial de campeones: solo las filas que de verdad coronaron."""
+    try:
+        with open(SELECTOR, encoding="utf-8") as f:
+            filas = [json.loads(ln) for ln in f if ln.strip()]
+    except (OSError, ValueError):
+        return []
+    return [r for r in filas if r.get("nuevo_mejor")][-n:]
+
+
+class _Handler(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass  # el hub ya imprime lo suyo; no queremos el ruido de acceso
+
+    def _enviar(self, cuerpo, tipo="application/json", codigo=200):
+        if isinstance(cuerpo, str):
+            cuerpo = cuerpo.encode("utf-8")
+        self.send_response(codigo)
+        self.send_header("Content-Type", tipo + "; charset=utf-8")
+        self.send_header("Content-Length", str(len(cuerpo)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(cuerpo)
+
+    def _archivo(self, ruta, tipo):
+        try:
+            with open(ruta, "rb") as f:
+                self._enviar(f.read(), tipo)
+        except OSError:
+            self._enviar("no encontrado", "text/plain", 404)
+
+    def do_GET(self):
+        ruta = self.path.split("?")[0]
+        if ruta in ("/", "/index.html"):
+            self._archivo(os.path.join(WEB, "consola.html"), "text/html")
+        elif ruta == "/champion-chrome.css":
+            self._archivo(os.path.join(DESIGN, "champion-chrome.css"), "text/css")
+        elif ruta == "/api/state":
+            plano = cargar_plano()
+            self._enviar(json.dumps({
+                "muestra": ESTADO["muestra"],
+                "plano": plano,
+                "campeon": campeon_actual(),
+                "coronaciones": coronaciones(),
+                "hub_desde": ESTADO["arranque"],
+                "ahora": time.time(),
+            }, ensure_ascii=False))
+        else:
+            self._enviar("no encontrado", "text/plain", 404)
+
+
+def servir(puerto):
+    srv = ThreadingHTTPServer(("127.0.0.1", puerto), _Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    print(f"[hub] consola en http://127.0.0.1:{puerto}", flush=True)
 
 
 def ahora():
@@ -167,6 +247,8 @@ def main():
     ap = argparse.ArgumentParser(description="Hub de observabilidad de la flota LEIA")
     ap.add_argument("--poll", type=float, default=60.0, help="segundos entre muestras")
     ap.add_argument("--once", action="store_true", help="una sola pasada y salir")
+    ap.add_argument("--serve", type=int, default=0,
+                    help="puerto de la consola web (0 = sin servidor)")
     args = ap.parse_args()
 
     plano = cargar_plano()
@@ -177,6 +259,9 @@ def main():
     prev = None
     consecutivas = {}   # clave de alarma -> muestras seguidas activa
     abiertas = set()    # alarmas ya empujadas (no se repiten hasta resolverse)
+
+    if args.serve:
+        servir(args.serve)
 
     print(f"[hub] vigilando {url} | esperadas: "
           f"{', '.join(m['id'] for m in plano['expected'])} | poll {args.poll:.0f}s",
@@ -200,6 +285,7 @@ def main():
             }
             with open(SAMPLES, "a", encoding="utf-8") as f:
                 f.write(json.dumps(muestra, ensure_ascii=False) + "\n")
+            ESTADO["muestra"] = muestra
             prev = cur
 
             activas = dict(evaluar(filas, status, plano))

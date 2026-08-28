@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consola de flota · LEIA</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/champion-chrome.css">
+<style>
+  /* La consola hereda TODO el color de /champion-chrome.css. Aqui solo vive
+     la forma: densidad alta a proposito (esto se mira durante horas y esta
+     lleno de numeros), y numeros tabulares en todo lo que se alinee en
+     columna, que es la mitad de la pantalla. */
+  * { box-sizing: border-box; }
+  html { color-scheme: dark light; }
+  body {
+    margin: 0; padding: 0 20px 64px;
+    background: var(--background); color: var(--foreground);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  header { padding: 26px 0 18px; display: flex; flex-wrap: wrap; gap: 14px;
+           align-items: baseline; justify-content: space-between; }
+  h1 { font-family: "Chakra Petch", sans-serif; font-weight: 700;
+       font-size: 25px; letter-spacing: .01em; margin: 0; }
+  h1 span { color: var(--primary); }
+  .sub { color: var(--muted-foreground); font-size: 13px; }
+
+  /* --- la lectura de 3 segundos --- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tile { background: var(--card); border: 1px solid var(--border);
+          border-radius: 8px; padding: 12px 14px; min-width: 0; }
+  .tile .k { font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+             letter-spacing: .12em; text-transform: uppercase;
+             color: var(--muted-foreground); }
+  .tile .v { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+             font-size: 26px; font-weight: 600; line-height: 1.15; margin-top: 3px; }
+  .tile .n { font-size: 12px; color: var(--muted-foreground); }
+  .tile.alarma { border-color: var(--state-alarm); }
+  .tile.alarma .v { color: var(--state-alarm-fg); }
+
+  h2 { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 15px;
+       letter-spacing: .06em; text-transform: uppercase;
+       color: var(--muted-foreground); margin: 30px 0 8px; }
+  h2 .aclara { text-transform: none; letter-spacing: 0; font-weight: 400;
+               font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+       letter-spacing: .1em; text-transform: uppercase; text-align: left;
+       color: var(--muted-foreground); font-weight: 500;
+       padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  td.n { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+         text-align: right; white-space: nowrap; }
+  /* La fila FANTASMA: una maquina esperada que no reporta NO desaparece de la
+     tabla. Desaparecer seria mentir por omision -- que es justo como estuvo
+     una hora caida la observabilidad sin que nadie lo viera. */
+  tr.muda td { color: var(--muted-foreground); background: var(--muted); }
+
+  .chip { display: inline-flex; align-items: center; gap: 5px;
+          font-family: "IBM Plex Mono", monospace; font-size: 11px;
+          padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%;
+                  background: currentColor; }
+  .chip.vivo  { background: var(--state-running-subtle); color: var(--state-running-fg); }
+  .chip.muda  { background: var(--state-alarm-subtle);   color: var(--state-alarm-fg); }
+  /* Desconocido JAMAS es verde: un dato rancio no es un dato sano. */
+  .chip.desco { background: var(--state-unknown-subtle); color: var(--state-unknown-fg); }
+  .critica { font-family: "IBM Plex Mono", monospace; font-size: 10px;
+             letter-spacing: .1em; color: var(--warning-fg);
+             border: 1px solid var(--warning); border-radius: 3px;
+             padding: 0 4px; margin-left: 6px; }
+
+  /* --- la escalera --- */
+  .escalera { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+  .peld { background: var(--card); border: 1px solid var(--border);
+          border-radius: 6px; padding: 8px 6px; text-align: center; }
+  .peld .lv { font-family: "IBM Plex Mono", monospace; font-size: 10px;
+              color: var(--muted-foreground); letter-spacing: .08em; }
+  .peld .wr { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+              font-size: 18px; font-weight: 600; }
+  .barra { height: 3px; border-radius: 2px; background: var(--muted); margin-top: 6px; }
+  .barra i { display: block; height: 100%; border-radius: 2px; background: var(--primary); }
+
+  /* --- el campeon: el UNICO lugar donde vive el lima --- */
+  .campeon { background: var(--card); border: 1px solid var(--champion);
+             border-radius: 8px; padding: 14px 16px; }
+  .campeon .t { font-family: "Chakra Petch", sans-serif; font-weight: 600;
+                font-size: 15px; color: var(--champion); }
+  .campeon .barra i { background: var(--champion); }
+  .campeon .peld { border-color: color-mix(in srgb, var(--champion) 25%, var(--border)); }
+
+  .vacio { color: var(--muted-foreground); font-style: italic; padding: 14px 0; }
+  footer { margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--border);
+           font-family: "IBM Plex Mono", monospace; font-size: 11px;
+           color: var(--muted-foreground); }
+  @media (max-width: 860px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .escalera { grid-template-columns: repeat(4, 1fr); }
+    .ocultable { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>CONSOLA DE <span>FLOTA</span></h1>
+      <div class="sub" id="run">cargando…</div>
+    </div>
+    <div class="sub num" id="frescura">—</div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Censo de máquinas <span class="aclara">— lo que <em>debería</em> estar corriendo, contra lo que reporta el learner</span></h2>
+  <table>
+    <thead><tr>
+      <th>máquina</th><th>estado</th><th class="ocultable">rol</th>
+      <th style="text-align:right">procs</th><th style="text-align:right">steps/s</th>
+      <th style="text-align:right">visto hace</th><th class="ocultable">dueño</th>
+    </tr></thead>
+    <tbody id="censo"></tbody>
+  </table>
+
+  <h2>Escalera en vivo <span class="aclara">— ventana de los últimos 200 episodios de la flota, con exploración: corre POR DEBAJO de lo que rinde el campeón puro</span></h2>
+  <div class="escalera" id="escalera"></div>
+
+  <h2>Campeón vigente <span class="aclara">— medido con política greedy y desfase, 48 episodios por nivel</span></h2>
+  <div class="campeon" id="campeon"><div class="vacio">sin campeón coronado todavía</div></div>
+
+  <h2>Coronaciones</h2>
+  <table>
+    <thead><tr><th>versión</th><th style="text-align:right">media</th><th class="ocultable">por nivel</th><th style="text-align:right">cuándo</th></tr></thead>
+    <tbody id="coronaciones"></tbody>
+  </table>
+
+  <footer id="pie">hub local · los datos vienen de /api/state</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const nf = n => n === null || n === undefined ? "—" : n.toLocaleString("es-MX");
+const pct = v => v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%";
+
+function edad(s) {
+  if (s === null || s === undefined) return "nunca";
+  if (s < 90) return Math.round(s) + " s";
+  if (s < 5400) return Math.round(s / 60) + " min";
+  return (s / 3600).toFixed(1) + " h";
+}
+
+function tile(k, v, n, alarma) {
+  return `<div class="tile${alarma ? " alarma" : ""}"><div class="k">${k}</div>
+          <div class="v">${v}</div><div class="n">${n}</div></div>`;
+}
+
+function peldano(lv, wr, campeon) {
+  const w = wr === null || wr === undefined ? 0 : wr * 100;
+  return `<div class="peld"><div class="lv">LVL ${lv}</div>
+          <div class="wr">${wr === null || wr === undefined ? "—" : Math.round(w)}</div>
+          <div class="barra"><i style="width:${w}%"></i></div></div>`;
+}
+
+async function pintar() {
+  let d;
+  try { d = await (await fetch("/api/state")).json(); }
+  catch (e) { $("frescura").textContent = "hub inalcanzable"; return; }
+
+  const m = d.muestra;
+  const plano = d.plano || {};
+  $("run").textContent = (plano.run?.descripcion || "") + " · " + (plano.run?.nombre || "");
+
+  if (!m) {
+    $("frescura").textContent = "esperando la primera muestra…";
+    $("tiles").innerHTML = "";
+    return;
+  }
+
+  // La frescura es lo primero que hay que poder juzgar: una pantalla que
+  // muestra numeros viejos sin decir que son viejos es peor que una vacia.
+  const edadMuestra = d.ahora - (Date.parse(m.ts) / 1000);
+  $("frescura").textContent = "última medición hace " + edad(edadMuestra);
+
+  const vivas = m.vivas, esperadas = m.esperadas;
+  const flotaMal = vivas < (plano.umbrales?.minimo_maquinas ?? 2);
+  const tope = 8;
+  $("tiles").innerHTML =
+    tile("learner", nf(m.grad_steps), (m.grads_per_s ?? "—") + " grads/s · buffer " + nf(m.buffer)) +
+    tile("flota", vivas + "/" + esperadas, (m.trans_per_s ?? "—") + " trans/s entrando", flotaMal) +
+    tile("replay ratio", (m.replay_ratio ?? "—"), "tope " + tope + (m.batch_supuesto ? " · batch supuesto" : " · batch del servidor")) +
+    tile("episodios", nf(m.wr_recent200 !== null ? Math.round((m.wr_recent200 ?? 0) * 100) + "%" : "—"), "win rate de los últimos 200");
+
+  // Censo: una fila por maquina ESPERADA, muda o no.
+  $("censo").innerHTML = (m.maquinas || []).map(x => {
+    const esp = (plano.expected || []).find(e => e.id === x.id) || {};
+    const vivo = x.estado === "vivo";
+    const chip = vivo ? `<span class="chip vivo">vivo</span>`
+                      : (x.age_s === null ? `<span class="chip desco">nunca reportó</span>`
+                                          : `<span class="chip muda">muda</span>`);
+    return `<tr class="${vivo ? "" : "muda"}">
+      <td><strong>${x.id}</strong>${esp.critico ? '<span class="critica">CANARIO</span>' : ""}
+          <div class="sub">${esp.host || ""}</div></td>
+      <td>${chip}</td>
+      <td class="ocultable">${esp.rol || "—"}<div class="sub num">${esp.difficulty || ""}</div></td>
+      <td class="n">${x.procs ?? "—"}</td>
+      <td class="n">${vivo ? Math.round(x.steps_per_s) : "—"}</td>
+      <td class="n">${edad(x.age_s)}</td>
+      <td class="ocultable">${esp.duenio || "—"}</td></tr>`;
+  }).join("");
+
+  const viva = m.por_nivel || {};
+  $("escalera").innerHTML = [1,2,3,4,5,6,7,8].map(l => peldano(l, viva[String(l)])).join("");
+
+  const c = d.campeon;
+  if (c) {
+    const cuando = new Date(c.t * 1000);
+    $("campeon").innerHTML =
+      `<div class="t">v${c.weights_version} · media ${pct(c.wr_media)}</div>
+       <div class="sub">${c.archivo} · coronado ${cuando.toLocaleString("es-MX")}</div>
+       <div class="escalera" style="margin-top:10px">` +
+       [1,2,3,4,5,6,7,8].map(l => peldano(l, c["wr_lvl" + l], true)).join("") + `</div>`;
+  }
+
+  $("coronaciones").innerHTML = (d.coronaciones || []).slice().reverse().map(r => {
+    const niveles = [1,2,3,4,5,6,7,8].map(l => Math.round((r["wr_lvl" + l] ?? 0) * 100)).join(" · ");
+    return `<tr><td class="num">v${r.weights_version}</td>
+      <td class="n">${pct(r.wr_media)}</td>
+      <td class="ocultable num sub">${niveles}</td>
+      <td class="n">${edad(d.ahora - r.t)}</td></tr>`;
+  }).join("") || `<tr><td colspan="4" class="vacio">todavía ninguna</td></tr>`;
+
+  $("pie").textContent = "hub arriba desde hace " + edad(d.ahora - d.hub_desde) +
+    " · muestreo cada minuto · datos de /api/state";
+}
+
+pintar();
+setInterval(pintar, 5000);
+</script>
+</body>
+</html>
