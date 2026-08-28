@@ -14,23 +14,18 @@ desktop, o una laptop para exhibición). Piezas internas:
 
 1. El rig BizHawk del proyecto funcionando (el mismo de `test_ai_vs_ai_v2` /
    entrenamientos: BizHawk 2.8, ROM en `roms/`, venv de Windows con torch).
-2. `git pull` (trae Lua + driver + el checkpoint NO — ver 3).
-3. **El checkpoint del campeón** en `benchmarks\apex_milestones\`:
-   `apex_escalera_best.pt` (4 MB — es el alias del mejor selector vigente y
-   está en la Mac de Felipe; pedirlo por
-   la tailnet: en la Mac `python3 -m http.server 8099` dentro de
-   `benchmarks/apex_milestones/` y en Windows bajarlo con el navegador o
-   `curl -O http://mini-fzamorano:8099/apex_escalera_best.pt`). Bajar también
-   `apex_escalera_best.pt.json` para que el dashboard muestre versión y WR.
-4. **El control del retador como Player 2**: BizHawk → Config → Controllers
+2. `git pull` trae Lua, driver, dashboard y el checkpoint congelado
+   `benchmarks\apex_milestones\apex_v1592_benchmarked.pt`, junto con su
+   sidecar de resultados. No hace falta copiar el modelo por separado.
+3. **El control del retador como Player 2**: BizHawk → Config → Controllers
    → Genesis 3-button/6-button → asignar el pad USB al **puerto 2** y
    guardar. (La IA inyecta P1 por socket; el pad 2 pasa directo.) Probar los
    6 botones: X/Y/Z = puños débil/medio/fuerte, A/B/C = patadas.
-5. **Limpiar TODOS los bindings de Player 1** (teclado incluido) en ese
+4. **Limpiar TODOS los bindings de Player 1** (teclado incluido) en ese
    mismo menú, y dejar Start/Mode SIN asignar en el pad del retador: el Lua
    ya blinda el pad de la IA, pero un Start suelto pausando el juego a media
    demo no se lo deseamos a nadie.
-6. **Ruta del proyecto SIN acentos ni caracteres raros** (p.ej. `C:\LEIA\`):
+5. **Ruta del proyecto SIN acentos ni caracteres raros** (p.ej. `C:\LEIA\`):
    el protocolo del socket cuenta bytes y una ruta con acentos en los
    comandos RESET es buscarle ruido a la feria.
 
@@ -48,7 +43,7 @@ los componentes anteriores aunque el backend haya reiniciado. Abrir una carga
 fresca y versionada:
 
 ```powershell
-Start-Process "http://127.0.0.1:7860/?build=v1404-additive-r3"
+Start-Process "http://127.0.0.1:7860/?build=v1592-additive-r4"
 ```
 
 Entrar a **🎮 Model Testing & Matchups**. La
@@ -75,7 +70,8 @@ Para diagnosticar sin Gradio se puede llamar al driver interno directamente:
 .venv\Scripts\python.exe src\scripts\stand_leia.py --opponent RANDOM
 ```
 
-Sin `--ckpt`, usa `benchmarks\apex_milestones\apex_escalera_best.pt`.
+Sin `--ckpt`, usa
+`benchmarks\apex_milestones\apex_v1592_benchmarked.pt`.
 Admite `--opponent KEN`, `--ckpt <ruta>` y `--rematch-delay 4.0`; se termina
 con **Ctrl+C**.
 
@@ -91,7 +87,8 @@ con **Ctrl+C**.
 ## 3. Señales y trucos
 
 - La consola canta cada round: `[round N] GANA LA IA | IA 3 - 1 Retador`.
-- **La IA juega en serio** (selector robusto lvl1-3: 100/100/97.9%). Para
+- **La IA juega en serio** (v1592: 363/384, 94.5% en la escalera completa;
+  lvl1-3: 100/100/100%). Para
   visitantes casuales usa un checkpoint anterior que también declare
   `macros=true` y 72 acciones. Los `apex_grads_*.pt` viejos de 63 acciones
   **no son compatibles** con este viewer.

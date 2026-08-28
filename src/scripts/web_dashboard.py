@@ -38,7 +38,7 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1404-additive-r3"
+DASHBOARD_BUILD_ID = "v1592-additive-r4"
 
 # Una pestaña Gradio abierta conserva el schema de componentes aunque el
 # proceso de Python se reinicie. Si el app_id cambia, navegar con una query

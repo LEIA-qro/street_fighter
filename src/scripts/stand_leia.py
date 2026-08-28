@@ -1,6 +1,6 @@
 # stand_leia.py -- HUMANO vs el campeon DQN, en BizHawk (modo stand LEIA).
 #
-#   .venv\Scripts\python.exe src\scripts\stand_leia.py --ckpt benchmarks\apex_milestones\apex_escalera_best.pt
+#   .venv\Scripts\python.exe src\scripts\stand_leia.py --ckpt benchmarks\apex_milestones\apex_v1592_benchmarked.pt
 #
 # P1 = la IA (Ryu, el campeon Ape-X con macros). P2 = el visitante, con el
 # control fisico configurado como Player 2 en BizHawk (este script manda
@@ -75,12 +75,11 @@ OPPONENTS = ("RYU", "EHONDA", "BLANKA", "GUILE", "KEN", "CHUNLI",
 
 HUMAN_PASSTHROUGH = ".........."   # 10 puntos: el Lua no toca ese pad
 
-# Alias que mantiene el selector de la escalera completa (niveles 1-8).  A
-# diferencia de un checkpoint versionado, este nombre sigue apuntando al
-# campeon vigente sin tener que editar el stand cada vez que aparece uno
-# mejor.
+# Campeon congelado despues de completar el benchmark de la escalera 1-8.
+# Se usa un nombre versionado para que una run activa no cambie silenciosamente
+# el modelo que recibe otra maquina mediante git pull.
 DEFAULT_CHECKPOINT = os.path.join(
-    "benchmarks", "apex_milestones", "apex_escalera_best.pt")
+    "benchmarks", "apex_milestones", "apex_v1592_benchmarked.pt")
 
 
 def parse_payload(raw: str) -> dict:

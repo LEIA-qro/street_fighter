@@ -289,6 +289,6 @@ def test_n_actions_is_72():
     assert N_ACTIONS == 72  # el vocabulario del campeon con macros
 
 
-def test_default_checkpoint_tracks_full_ladder_champion():
+def test_default_checkpoint_tracks_frozen_benchmarked_champion():
     assert Path(DEFAULT_CHECKPOINT).as_posix().endswith(
-        "benchmarks/apex_milestones/apex_escalera_best.pt")
+        "benchmarks/apex_milestones/apex_v1592_benchmarked.pt")
