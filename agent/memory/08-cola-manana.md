@@ -177,3 +177,27 @@ subiendo) hasta que la escalera se aplane.**
   código viejo, no lo mata).
 - La desktop entrenó BizHawk 6 meses con OTRO dump del ROM (sin consecuencias
   para BizHawk; para retro solo vale el a5aa).
+
+## Dashboard web — auditoría y plan de reconstrucción (2026-08-28)
+
+Corrida del skill `uiux-workflow-architect-v2` (archetype Planning, 14 agentes) sobre
+`src/scripts/web_dashboard.py`. **Todo en `agent/dashboard/`**: `PLAN-reconstruccion.md`
+(el plan por fases), `paletas-sf2-medidas.md` (5 paletas muestreadas de píxeles del juego),
+`inventario-funcional.md`, `que-no-reconstruir.md`, `AUDITORIA-ledger.md`.
+
+**El veredicto, sostenido con evidencia verificada por mí una por una: NO reconstruir entero.**
+El equipo ya no usa el dashboard — de 5 runbooks vivos sólo `RUN_STAND_LEIA.md` lo abre. Y buena
+parte de lo que muestra NO PUEDE funcionar: `ray` no está en requirements (PBT), SAC lanza
+`NotImplementedError` en sus dos entrypoints, `models/production/league/` está vacío, y
+`stand_leia.py` no llama `write_telemetry` (la pestaña Telemetría es imposible para el flujo vivo).
+Lo que sí vale: el **Modo Stand** (`gr.Blocks.route` YA existe en el gradio 6.25.0 instalado — las
+vistas separadas cuestan una función, no una migración) y la poda. La migración a React+shadcn
+queda **aplazada y condicionada**, no descartada: después del stand y fuera de una run crítica.
+
+**Higiene urgente (hazlo aunque no hagas nada más):** el dashboard se sirve en `0.0.0.0` SIN
+autenticación (`web_dashboard.py:2310`) — en la red del evento, cualquiera con un teléfono puede
+matar la demo. Y `gr.Timer(value=0.1)` (:2133) repinta 10 veces por segundo una cadena estática.
+
+**11 decisiones esperan a Felipe** al final de `PLAN-reconstruccion.md`. Las que bloquean:
+¿migrar o podar Gradio? · ¿se sigue lanzando el entrenamiento clásico desde la web? · qué paleta
+(artifact: https://claude.ai/code/artifact/53cfb6ff-717c-43b5-800d-cbbe06a91747).

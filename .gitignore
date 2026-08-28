@@ -35,3 +35,4 @@ gha-creds-*.json
 # stable-retro es un asset versionado (la flota lo necesita en cada clon).
 !retro_integration/**/*.state
 .DS_Store
+.scratch-uiux-*/
