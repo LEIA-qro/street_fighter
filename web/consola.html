@@ -4,118 +4,169 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consola de flota · LEIA</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap">
 <link rel="stylesheet" href="/champion-chrome.css">
 <style>
-  /* La consola hereda TODO el color de /champion-chrome.css. Aqui solo vive
-     la forma: densidad alta a proposito (esto se mira durante horas y esta
-     lleno de numeros), y numeros tabulares en todo lo que se alinee en
-     columna, que es la mitad de la pantalla. */
+  /* El color vive entero en /champion-chrome.css. Aqui solo la forma.
+     Tres profundidades de lectura: (1) el titular, que contesta "vive y gana"
+     de un vistazo; (2) la flota y la tendencia; (3) la evidencia -- campeon,
+     peleas, coronaciones. Densidad alta a proposito: esto se mira durante
+     horas y esta lleno de numeros. */
   * { box-sizing: border-box; }
   html { color-scheme: dark light; }
   body {
-    margin: 0; padding: 0 20px 64px;
+    margin: 0; padding: 0 22px 72px;
     background: var(--background); color: var(--foreground);
     font-family: "IBM Plex Sans", system-ui, sans-serif;
-    font-size: 14px; line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
+    font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; }
-  .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .m { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted-foreground); font-size: 12.5px; }
 
-  header { padding: 26px 0 18px; display: flex; flex-wrap: wrap; gap: 14px;
-           align-items: baseline; justify-content: space-between; }
-  h1 { font-family: "Chakra Petch", sans-serif; font-weight: 700;
-       font-size: 25px; letter-spacing: .01em; margin: 0; }
-  h1 span { color: var(--primary); }
-  .sub { color: var(--muted-foreground); font-size: 13px; }
+  /* ---------- cabecera ---------- */
+  header { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+           justify-content: space-between; padding: 30px 0 20px;
+           border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  h1 { font-family: "Chakra Petch", sans-serif; font-weight: 700; font-size: 27px;
+       letter-spacing: .005em; margin: 0 0 3px; line-height: 1; }
+  h1 em { font-style: normal; color: var(--primary); }
+  .runs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .run { font-family: "IBM Plex Mono", monospace; font-size: 11px;
+         padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border);
+         color: var(--muted-foreground); }
+  .run.activa { border-color: var(--primary); color: var(--primary); }
+  .frescura { text-align: right; }
+  .frescura .d { font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .pulso { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+           background: var(--state-running); margin-right: 6px; vertical-align: 1px; }
+  .pulso.mal { background: var(--state-alarm); }
+  .pulso.rancio { background: var(--state-degraded); }
 
-  /* --- la lectura de 3 segundos --- */
-  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .tile { background: var(--card); border: 1px solid var(--border);
-          border-radius: 8px; padding: 12px 14px; min-width: 0; }
-  .tile .k { font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
-             letter-spacing: .12em; text-transform: uppercase;
+  /* ---------- (1) el titular ---------- */
+  .titular { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; }
+  .caja { background: var(--card); border: 1px solid var(--border);
+          border-radius: 10px; padding: 15px 17px; position: relative;
+          overflow: hidden; min-width: 0; }
+  /* franja de estado: el estado se lee por FORMA, no solo por color */
+  .caja::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+                  width: 3px; background: var(--border); }
+  .caja.ok::before   { background: var(--state-running); }
+  .caja.mal::before  { background: var(--state-alarm); }
+  .caja.tibio::before{ background: var(--state-degraded); }
+  .caja .k { font-family: "IBM Plex Mono", monospace; font-size: 10px;
+             letter-spacing: .14em; text-transform: uppercase;
              color: var(--muted-foreground); }
-  .tile .v { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
-             font-size: 26px; font-weight: 600; line-height: 1.15; margin-top: 3px; }
-  .tile .n { font-size: 12px; color: var(--muted-foreground); }
-  .tile.alarma { border-color: var(--state-alarm); }
-  .tile.alarma .v { color: var(--state-alarm-fg); }
+  .caja .v { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+             font-size: 34px; font-weight: 600; line-height: 1.1; margin: 4px 0 1px;
+             letter-spacing: -.02em; }
+  .caja .v small { font-size: .45em; font-weight: 500; color: var(--muted-foreground);
+                   letter-spacing: 0; }
+  .caja .n { font-size: 12.5px; color: var(--muted-foreground); }
+  .caja .spark { margin-top: 9px; }
 
-  h2 { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 15px;
-       letter-spacing: .06em; text-transform: uppercase;
-       color: var(--muted-foreground); margin: 30px 0 8px; }
-  h2 .aclara { text-transform: none; letter-spacing: 0; font-weight: 400;
-               font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px; }
+  /* ---------- secciones ---------- */
+  h2 { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 13px;
+       letter-spacing: .13em; text-transform: uppercase; color: var(--muted-foreground);
+       margin: 34px 0 3px; display: flex; align-items: baseline; gap: 10px; }
+  h2::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .aclara { font-family: "IBM Plex Sans", sans-serif; font-size: 12.5px;
+            letter-spacing: 0; text-transform: none; font-weight: 400;
+            color: var(--muted-foreground); max-width: 72ch; margin: 0 0 14px; }
+  .aclara strong { color: var(--foreground); font-weight: 600; }
+
+  /* ---------- censo ---------- */
+  .censo { display: grid; gap: 7px; }
+  .maq { display: grid; grid-template-columns: 1.6fr .8fr .7fr .7fr .8fr;
+         gap: 12px; align-items: center;
+         background: var(--card); border: 1px solid var(--border);
+         border-left: 3px solid var(--state-running);
+         border-radius: 8px; padding: 11px 14px; }
+  .maq.muda { border-left-color: var(--state-alarm); background: var(--muted); }
+  .maq.muda .id, .maq.muda .dato { color: var(--muted-foreground); }
+  .maq.nunca { border-left-color: var(--state-unknown); }
+  .id { font-weight: 600; font-size: 15px; }
+  .dato { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+          text-align: right; font-size: 14px; }
+  .dato .u { font-size: 10.5px; color: var(--muted-foreground); display: block;
+             letter-spacing: .08em; text-transform: uppercase; }
+  .etq { font-family: "IBM Plex Mono", monospace; font-size: 9.5px;
+         letter-spacing: .12em; padding: 1px 5px; border-radius: 3px;
+         border: 1px solid var(--warning); color: var(--warning-fg);
+         margin-left: 7px; vertical-align: 1.5px; }
+
+  /* ---------- la escalera como grafica ---------- */
+  .esc { background: var(--card); border: 1px solid var(--border);
+         border-radius: 10px; padding: 14px 18px 8px; }
+  .fila { display: grid; grid-template-columns: 52px 1fr 62px 62px;
+          gap: 12px; align-items: center; padding: 5px 0; }
+  .fila + .fila { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+  .fila .lv { font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+              color: var(--muted-foreground); letter-spacing: .08em; }
+  .pista { position: relative; height: 16px; background: var(--muted);
+           border-radius: 3px; overflow: hidden; }
+  .pista .banco { position: absolute; inset: 0 auto 0 0; background: var(--primary);
+                  border-radius: 3px; }
+  /* la ventana viva es una MARCA, no una barra: son dos medidas distintas y
+     no deben poder confundirse (una lleva exploracion, la otra no) */
+  .pista .vivo { position: absolute; top: -2px; bottom: -2px; width: 2px;
+                 background: var(--foreground); }
+  .leyenda { display: flex; gap: 16px; font-size: 11.5px; color: var(--muted-foreground);
+             margin: 10px 0 4px; flex-wrap: wrap; }
+  .leyenda i { display: inline-block; width: 11px; height: 8px; border-radius: 2px;
+               background: var(--primary); margin-right: 5px; vertical-align: 0; }
+  .leyenda i.marca { width: 2px; height: 12px; background: var(--foreground); }
+
+  /* ---------- peleas (el numero honesto) ---------- */
+  .peleas { background: var(--card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 16px 18px; }
+  .peleas .gran { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+                  font-size: 40px; font-weight: 600; line-height: 1;
+                  letter-spacing: -.02em; }
+  .peleas .gran small { font-size: .35em; color: var(--muted-foreground); font-weight: 500; }
+  .rivs { display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+          gap: 6px; margin-top: 14px; }
+  .riv { border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px;
+         font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+  .riv .nom { display: flex; justify-content: space-between; gap: 8px; }
+  .riv .ic { color: var(--muted-foreground); font-size: 10px; }
+  .riv .bar { height: 3px; background: var(--muted); border-radius: 2px; margin: 5px 0 3px; }
+  .riv .bar i { display: block; height: 100%; border-radius: 2px; background: var(--success); }
+  .riv.duro { border-color: var(--state-degraded); }
+  .riv.duro .bar i { background: var(--state-degraded); }
+  .riv.muro { border-color: var(--state-alarm); }
+  .riv.muro .bar i { background: var(--state-alarm); }
+  .riv.muro .nom { color: var(--state-alarm-fg); font-weight: 600; }
+
+  /* ---------- campeon: el UNICO lima de la pantalla ---------- */
+  .camp { background: var(--card); border: 1px solid var(--champion);
+          border-radius: 10px; padding: 16px 18px; }
+  .camp .t { font-family: "Chakra Petch", sans-serif; font-weight: 600; font-size: 17px;
+             color: var(--champion); }
+  .camp .banco { background: var(--champion); }
 
   table { width: 100%; border-collapse: collapse; background: var(--card);
-          border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  th { font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
-       letter-spacing: .1em; text-transform: uppercase; text-align: left;
-       color: var(--muted-foreground); font-weight: 500;
-       padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: .12em;
+       text-transform: uppercase; text-align: left; color: var(--muted-foreground);
+       font-weight: 500; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
   tr:last-child td { border-bottom: none; }
-  td.n { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
-         text-align: right; white-space: nowrap; }
-  /* La fila FANTASMA: una maquina esperada que no reporta NO desaparece de la
-     tabla. Desaparecer seria mentir por omision -- que es justo como estuvo
-     una hora caida la observabilidad sin que nadie lo viera. */
-  tr.muda td { color: var(--muted-foreground); background: var(--muted); }
+  td.r { text-align: right; font-family: "IBM Plex Mono", monospace;
+         font-variant-numeric: tabular-nums; }
 
-  .chip { display: inline-flex; align-items: center; gap: 5px;
-          font-family: "IBM Plex Mono", monospace; font-size: 11px;
-          padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%;
-                  background: currentColor; }
-  .chip.vivo  { background: var(--state-running-subtle); color: var(--state-running-fg); }
-  .chip.muda  { background: var(--state-alarm-subtle);   color: var(--state-alarm-fg); }
-  /* Desconocido JAMAS es verde: un dato rancio no es un dato sano. */
-  .chip.desco { background: var(--state-unknown-subtle); color: var(--state-unknown-fg); }
-  .critica { font-family: "IBM Plex Mono", monospace; font-size: 10px;
-             letter-spacing: .1em; color: var(--warning-fg);
-             border: 1px solid var(--warning); border-radius: 3px;
-             padding: 0 4px; margin-left: 6px; }
-
-  /* --- la escalera --- */
-  .escalera { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
-  .peld { background: var(--card); border: 1px solid var(--border);
-          border-radius: 6px; padding: 8px 6px; text-align: center; }
-  .peld .lv { font-family: "IBM Plex Mono", monospace; font-size: 10px;
-              color: var(--muted-foreground); letter-spacing: .08em; }
-  .peld .wr { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
-              font-size: 18px; font-weight: 600; }
-  .barra { height: 3px; border-radius: 2px; background: var(--muted); margin-top: 6px; }
-  .barra i { display: block; height: 100%; border-radius: 2px; background: var(--primary); }
-
-  /* --- el campeon: el UNICO lugar donde vive el lima --- */
-  .campeon { background: var(--card); border: 1px solid var(--champion);
-             border-radius: 8px; padding: 14px 16px; }
-  .campeon .t { font-family: "Chakra Petch", sans-serif; font-weight: 600;
-                font-size: 15px; color: var(--champion); }
-  .campeon .barra i { background: var(--champion); }
-  .campeon .peld { border-color: color-mix(in srgb, var(--champion) 25%, var(--border)); }
-
-  .peleas { background: var(--card); border: 1px solid var(--border);
-            border-radius: 8px; padding: 14px 16px; }
-  .peleas .marcador { font-family: "IBM Plex Mono", monospace;
-                      font-variant-numeric: tabular-nums; font-size: 30px;
-                      font-weight: 600; line-height: 1.1; }
-  .rivales { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  .riv { font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
-         padding: 3px 9px; border-radius: 5px; white-space: nowrap; }
-  .riv.g { background: var(--state-running-subtle); color: var(--state-running-fg); }
-  .riv.p { background: var(--state-alarm-subtle); color: var(--state-alarm-fg);
-           font-weight: 600; }
-  .vacio { color: var(--muted-foreground); font-style: italic; padding: 14px 0; }
-  footer { margin-top: 34px; padding-top: 12px; border-top: 1px solid var(--border);
+  .vacio { color: var(--muted-foreground); font-style: italic; padding: 16px 0; }
+  footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--border);
            font-family: "IBM Plex Mono", monospace; font-size: 11px;
            color: var(--muted-foreground); }
-  @media (max-width: 860px) {
-    .tiles { grid-template-columns: repeat(2, 1fr); }
-    .escalera { grid-template-columns: repeat(4, 1fr); }
-    .ocultable { display: none; }
+  @media (max-width: 900px) {
+    .titular { grid-template-columns: 1fr; }
+    /* en angosto se esconden DOS datos (niveles y procs): si se esconde solo
+       uno quedan cuatro hijos para tres columnas y el ultimo se cae de fila */
+    .maq { grid-template-columns: 1.5fr .75fr .75fr; }
+    .maq .oculta, .maq .oculta-xs { display: none; }
+    .fila { grid-template-columns: 46px 1fr 54px; }
+    .fila .oculta { display: none; }
   }
 </style>
 </head>
@@ -123,171 +174,202 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>CONSOLA DE <span>FLOTA</span></h1>
-      <div class="sub" id="run">cargando…</div>
+      <h1>CONSOLA DE <em>FLOTA</em></h1>
+      <div class="sub" id="desc">cargando…</div>
+      <div class="runs" id="runs"></div>
     </div>
-    <div class="sub num" id="frescura">—</div>
+    <div class="frescura">
+      <div class="d" id="pulso">—</div>
+      <div class="sub" id="hubinfo"></div>
+    </div>
   </header>
 
-  <div class="tiles" id="tiles"></div>
+  <div class="titular" id="titular"></div>
 
-  <h2>Censo de máquinas <span class="aclara">— lo que <em>debería</em> estar corriendo, contra lo que reporta el learner</span></h2>
-  <table>
-    <thead><tr>
-      <th>máquina</th><th>estado</th><th class="ocultable">rol</th>
-      <th style="text-align:right">procs</th><th style="text-align:right">steps/s</th>
-      <th style="text-align:right">visto hace</th><th class="ocultable">dueño</th>
-    </tr></thead>
-    <tbody id="censo"></tbody>
-  </table>
+  <h2>Censo de máquinas</h2>
+  <p class="aclara">Lo que <strong>debería</strong> estar corriendo según <span class="m">fleet.json</span>, contra lo que el learner reporta. Una máquina esperada que calla <strong>no desaparece de la lista</strong>: sale en gris con desde cuándo.</p>
+  <div class="censo" id="censo"></div>
 
-  <h2>Escalera en vivo <span class="aclara">— <strong>rounds de apertura</strong>, ventana de los últimos 200 episodios por nivel (n=200, con exploración: corre POR DEBAJO del campeón puro)</span></h2>
-  <div class="escalera" id="escalera"></div>
+  <h2>Peleas completas</h2>
+  <p class="aclara">Al mejor de tres, como se juega de verdad. <strong>Este es el número que contesta “¿le gana al juego?”.</strong> Con desfase aleatorio en cada pelea, porque sin él la política greedy da combates idénticos y repetir no añade muestra.</p>
+  <div id="peleas"></div>
 
-  <h2>Peleas completas <span class="aclara">— al mejor de 3, como se juega de verdad. <strong>Este es el número que contesta “¿le gana al juego?”</strong></span></h2>
-  <div id="peleas"><div class="vacio">sin gauntlet grabado todavía · <span class="num">tools/grabar_gauntlet.py --difficulty N</span></div></div>
+  <h2>Escalera por nivel</h2>
+  <p class="aclara">La barra es el <strong>banco del campeón</strong> (greedy + desfase, n=48 por nivel). La marca vertical es la <strong>ventana viva</strong> de la flota, que lleva exploración y por eso corre más abajo. Son dos medidas distintas y por eso se dibujan distinto: <em>rounds de apertura</em> las dos, que no es lo mismo que una pelea.</p>
+  <div class="esc" id="escalera"></div>
 
-  <h2>Campeón vigente <span class="aclara">— <strong>rounds de apertura</strong>, greedy + desfase, <span class="num">n=48</span> por nivel (12 rivales × 4). Corre POR ENCIMA de las peleas completas: un round no es una pelea</span></h2>
-  <div class="campeon" id="campeon"><div class="vacio">sin campeón coronado todavía</div></div>
+  <h2>Campeón vigente</h2>
+  <div class="camp" id="campeon"><div class="vacio">sin campeón coronado todavía</div></div>
 
   <h2>Coronaciones</h2>
   <table>
-    <thead><tr><th>versión</th><th style="text-align:right">media</th><th class="ocultable">por nivel</th><th style="text-align:right">cuándo</th></tr></thead>
+    <thead><tr><th>versión</th><th class="r">media</th><th class="oculta">por nivel</th><th class="r">cuándo</th></tr></thead>
     <tbody id="coronaciones"></tbody>
   </table>
 
-  <footer id="pie">hub local · los datos vienen de /api/state</footer>
+  <footer id="pie"></footer>
 </div>
 
 <script>
-const $ = id => document.getElementById(id);
-const nf = n => n === null || n === undefined ? "—" : n.toLocaleString("es-MX");
-const pct = v => v === null || v === undefined ? "—" : (v * 100).toFixed(1) + "%";
+const $ = i => document.getElementById(i);
+const nf = n => (n === null || n === undefined) ? "—" : n.toLocaleString("es-MX");
+const pc = v => (v === null || v === undefined) ? "—" : (v * 100).toFixed(1);
 
 function edad(s) {
   if (s === null || s === undefined) return "nunca";
   if (s < 90) return Math.round(s) + " s";
   if (s < 5400) return Math.round(s / 60) + " min";
-  return (s / 3600).toFixed(1) + " h";
+  if (s < 172800) return (s / 3600).toFixed(1) + " h";
+  return (s / 86400).toFixed(1) + " d";
 }
 
-function tile(k, v, n, alarma) {
-  return `<div class="tile${alarma ? " alarma" : ""}"><div class="k">${k}</div>
-          <div class="v">${v}</div><div class="n">${n}</div></div>`;
+/* Sparkline en SVG: la tendencia es la mitad de la informacion -- una consola
+   que solo ensena el instante no deja ver que algo se esta degradando. */
+function spark(vals, alto = 26, color = "var(--primary)") {
+  const v = vals.filter(x => x !== null && x !== undefined);
+  if (v.length < 2) return "";
+  const mn = Math.min(...v), mx = Math.max(...v), plana = mx === mn;
+  const rg = (mx - mn) || 1;
+  const W = 100;
+  const pts = v.map((x, i) => [(i / (v.length - 1)) * W,
+    plana ? alto / 2 : alto - ((x - mn) / rg) * (alto - 3) - 1.5]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+  const area = d + ` L${W} ${alto} L0 ${alto} Z`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${alto}" preserveAspectRatio="none"
+    width="100%" height="${alto}" aria-hidden="true">
+    <path d="${area}" fill="${color}" opacity=".12"/>
+    <path d="${d}" fill="none" stroke="${color}" stroke-width="1.4"
+      vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
-function peldano(lv, wr, campeon) {
-  const w = wr === null || wr === undefined ? 0 : wr * 100;
-  return `<div class="peld"><div class="lv">LVL ${lv}</div>
-          <div class="wr">${wr === null || wr === undefined ? "—" : Math.round(w)}</div>
-          <div class="barra"><i style="width:${w}%"></i></div></div>`;
+function caja(clase, k, v, n, sp) {
+  return `<div class="caja ${clase}"><div class="k">${k}</div>
+    <div class="v">${v}</div><div class="n">${n}</div>${sp || ""}</div>`;
 }
 
 async function pintar() {
   let d;
   try { d = await (await fetch("/api/state")).json(); }
-  catch (e) { $("frescura").textContent = "hub inalcanzable"; return; }
+  catch { $("pulso").innerHTML = '<span class="pulso mal"></span>hub inalcanzable'; return; }
 
-  const m = d.muestra;
-  const plano = d.plano || {};
-  $("run").textContent = (plano.run?.descripcion || "") + " · " + (plano.run?.nombre || "");
+  const m = d.muestra, plano = d.plano || {}, hist = d.historia || [];
+  $("desc").textContent = plano.run?.descripcion || "";
+  $("runs").innerHTML = (plano.runs || []).map(r =>
+    `<span class="run ${r.activa ? "activa" : ""}">${r.id}${r.activa ? " · activa" : ""}</span>`).join("");
 
-  // Cada bloque se pinta por su cuenta. Que falte la muestra del learner NO
-  // puede borrar al campeon ni al gauntlet, que son datos de archivo: una
-  // pagina que se vacia porque le falta una pieza es peor que una incompleta.
-  if (m) {
-    // La frescura es lo primero que hay que poder juzgar: una pantalla que
-    // muestra numeros viejos sin decir que son viejos es peor que una vacia.
-    const edadMuestra = d.ahora - (Date.parse(m.ts) / 1000);
-    $("frescura").textContent = "última medición hace " + edad(edadMuestra);
-  } else {
-    $("frescura").textContent = "sin contacto con el learner";
-    $("tiles").innerHTML = tile("learner", "—", "el hub aún no logra una medición", true);
-    $("censo").innerHTML = `<tr><td colspan="7" class="vacio">el hub no ha podido medir todavía</td></tr>`;
-    $("escalera").innerHTML = [1,2,3,4,5,6,7,8].map(l => peldano(l, null)).join("");
-  }
+  // Frescura primero: una pantalla que ensena numeros viejos sin decir que
+  // son viejos es peor que una vacia.
+  const edadM = m ? d.ahora - Date.parse(m.ts) / 1000 : null;
+  const rancio = edadM !== null && edadM > 180;
+  $("pulso").innerHTML = m
+    ? `<span class="pulso ${rancio ? "rancio" : ""}"></span>medido hace ${edad(edadM)}`
+    : '<span class="pulso mal"></span>sin contacto con el learner';
+  $("hubinfo").textContent = "hub arriba desde hace " + edad(d.ahora - d.hub_desde);
 
-  if (m) {
-  const vivas = m.vivas, esperadas = m.esperadas;
-  const flotaMal = vivas < (plano.umbrales?.minimo_maquinas ?? 2);
-  const tope = 8;
-  $("tiles").innerHTML =
-    tile("learner", nf(m.grad_steps), (m.grads_per_s ?? "—") + " grads/s · buffer " + nf(m.buffer)) +
-    tile("flota", vivas + "/" + esperadas, (m.trans_per_s ?? "—") + " trans/s entrando", flotaMal) +
-    tile("replay ratio", (m.replay_ratio ?? "—"), "tope " + tope + (m.batch_supuesto ? " · batch supuesto" : " · batch del servidor")) +
-    tile("episodios", nf(m.wr_recent200 !== null ? Math.round((m.wr_recent200 ?? 0) * 100) + "%" : "—"), "win rate de los últimos 200");
-
-  // Censo: una fila por maquina ESPERADA, muda o no.
-  $("censo").innerHTML = (m.maquinas || []).map(x => {
-    const esp = (plano.expected || []).find(e => e.id === x.id) || {};
-    const vivo = x.estado === "vivo";
-    const chip = vivo ? `<span class="chip vivo">vivo</span>`
-                      : (x.age_s === null ? `<span class="chip desco">nunca reportó</span>`
-                                          : `<span class="chip muda">muda</span>`);
-    return `<tr class="${vivo ? "" : "muda"}">
-      <td><strong>${x.id}</strong>${esp.critico ? '<span class="critica">CANARIO</span>' : ""}
-          <div class="sub">${esp.host || ""}</div></td>
-      <td>${chip}</td>
-      <td class="ocultable">${esp.rol || "—"}<div class="sub num">${esp.difficulty || ""}</div></td>
-      <td class="n">${x.procs ?? "—"}</td>
-      <td class="n">${vivo ? Math.round(x.steps_per_s) : "—"}</td>
-      <td class="n">${edad(x.age_s)}</td>
-      <td class="ocultable">${esp.duenio || "—"}</td></tr>`;
-  }).join("");
-
-  const viva = m.por_nivel || {};
-  $("escalera").innerHTML = [1,2,3,4,5,6,7,8].map(l => peldano(l, viva[String(l)])).join("");
-
-  }
-
-  // Peleas completas: el numero honesto, con los rivales que pierde NOMBRADOS.
-  // Un promedio esconde justo lo que hay que saber -- que el 17% que falta no
-  // esta repartido, esta concentrado en dos personajes.
+  // ---------- (1) titular ----------
   const gs = d.gauntlets || {};
-  const niveles = Object.keys(gs).sort((a, b) => b - a);
-  $("peleas").innerHTML = niveles.length ? niveles.map(lv => {
-    const a = gs[lv];
-    const perdidos = a.rivales.filter(r => !r.gano);
-    return `<div class="peleas" style="margin-bottom:8px">
-      <div class="k num" style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)">nivel ${lv}</div>
-      <div class="marcador">${(a.peleas_ganadas / a.peleas_totales * 100).toFixed(1)}%
-        <span style="font-size:15px;color:var(--muted-foreground)">${a.peleas_ganadas}/${a.peleas_totales}</span></div>
-      <div class="sub num">n=${a.peleas_totales} · IC95 ${a.ic95 ? (a.ic95[0]*100).toFixed(0) + "–" + (a.ic95[1]*100).toFixed(0) + "%" : "—"}${
-        a.desync_max ? " · desfase ≤" + a.desync_max : ' · <strong style="color:var(--warning-fg)">sin desfase: determinista, repetir no añade n</strong>'}</div>
-      <div class="sub">${a.checkpoint} · ${a.fecha.replace("T", " ")}</div>
-      <div class="rivales">${(() => {
-        const agg = {};
-        a.rivales.forEach(r => { agg[r.rival] = agg[r.rival] || [0, 0];
-                                 agg[r.rival][1]++; if (r.gano) agg[r.rival][0]++; });
-        return Object.entries(agg).sort((x, y) => x[1][0]/x[1][1] - y[1][0]/y[1][1])
-          .map(([riv, [g, t]]) =>
-            `<span class="riv ${g === t ? "g" : "p"}">${riv} ${g}/${t}</span>`).join("");
-      })()}</div>
-    </div>`;
-  }).join("") : `<div class="vacio">sin gauntlet grabado todavía · <span class="num">tools/grabar_gauntlet.py --difficulty N</span></div>`;
+  const lvls = Object.keys(gs).sort((a, b) => b - a);
+  const g0 = lvls.length ? gs[lvls[0]] : null;
+  const vivas = m ? m.vivas : 0, esp = m ? m.esperadas : (plano.expected || []).length;
+  const minimo = plano.umbrales?.minimo_maquinas ?? 2;
 
+  $("titular").innerHTML =
+    caja(m ? (rancio ? "tibio" : "ok") : "mal", "learner",
+         m ? nf(m.grad_steps) : "—",
+         m ? `${m.grads_per_s ?? "—"} grads/s · buffer ${nf(m.buffer)}` : "el hub no logra medir",
+         spark(hist.map(h => h.grads_per_s))) +
+    caja(vivas >= esp ? "ok" : (vivas >= minimo ? "tibio" : "mal"), "flota",
+         `${vivas}<small>/${esp}</small>`,
+         m ? `${nf(Math.round(m.trans_per_s || 0))} trans/s · ratio ${m.replay_ratio ?? "—"}` : "—",
+         spark(hist.map(h => h.vivas), 26, "var(--secondary)")) +
+    caja(g0 ? (g0.peleas_ganadas / g0.peleas_totales >= .9 ? "ok" : "tibio") : "",
+         `peleas completas · lvl ${g0 ? g0.dificultad : "—"}`,
+         g0 ? `${(g0.peleas_ganadas / g0.peleas_totales * 100).toFixed(1)}<small>%</small>` : "—",
+         g0 ? `${g0.peleas_ganadas}/${g0.peleas_totales} · IC95 ${(g0.ic95[0]*100).toFixed(0)}–${(g0.ic95[1]*100).toFixed(0)}%`
+            : "sin gauntlet grabado");
+
+  // ---------- censo ----------
+  const filas = m ? m.maquinas : (plano.expected || []).map(e =>
+    ({ id: e.id, estado: "MUDA", procs: null, steps_per_s: 0, age_s: null, critico: e.critico }));
+  $("censo").innerHTML = filas.map(x => {
+    const e = (plano.expected || []).find(q => q.id === x.id) || {};
+    const vivo = x.estado === "vivo", nunca = x.age_s === null;
+    return `<div class="maq ${vivo ? "" : (nunca ? "nunca" : "muda")}">
+      <div><span class="id">${x.id}</span>${e.critico ? '<span class="etq">CANARIO</span>' : ""}
+        <div class="sub">${e.host || ""} · ${e.duenio || ""}</div></div>
+      <div class="dato oculta">${e.difficulty || "—"}<span class="u">niveles</span></div>
+      <div class="dato oculta-xs">${x.procs ?? "—"}<span class="u">procs</span></div>
+      <div class="dato">${vivo ? Math.round(x.steps_per_s) : "—"}<span class="u">steps/s</span></div>
+      <div class="dato">${edad(x.age_s)}<span class="u">${vivo ? "visto" : "callada"}</span></div>
+    </div>`;
+  }).join("") || `<div class="vacio">fleet.json no declara máquinas</div>`;
+
+  // ---------- peleas ----------
+  $("peleas").innerHTML = lvls.length ? lvls.map(lv => {
+    const a = gs[lv], agg = {};
+    a.rivales.forEach(r => { agg[r.rival] = agg[r.rival] || [0, 0];
+                             agg[r.rival][1]++; if (r.gano) agg[r.rival][0]++; });
+    const orden = Object.entries(agg).sort((x, y) => x[1][0]/x[1][1] - y[1][0]/y[1][1]);
+    return `<div class="peleas" style="margin-bottom:10px">
+      <div class="k m sub" style="letter-spacing:.14em;text-transform:uppercase">nivel ${lv}</div>
+      <div class="gran">${(a.peleas_ganadas / a.peleas_totales * 100).toFixed(1)}<small>%</small>
+        <span style="font-size:15px;color:var(--muted-foreground)">${a.peleas_ganadas}/${a.peleas_totales}</span></div>
+      <div class="sub m">n=${a.peleas_totales} · IC95 ${(a.ic95[0]*100).toFixed(0)}–${(a.ic95[1]*100).toFixed(0)}%
+        · desfase ≤${a.desync_max}${a.desync_max ? "" : ' · <strong style="color:var(--warning-fg)">SIN desfase: determinista</strong>'}
+        · semilla ${a.semilla ?? "—"}</div>
+      <div class="sub">${a.checkpoint} · ${(a.fecha || "").replace("T", " ")}</div>
+      <div class="rivs">${orden.map(([riv, [w, t]]) => {
+        const p = w / t, cl = p < .6 ? "muro" : (p < .95 ? "duro" : "");
+        return `<div class="riv ${cl}"><div class="nom"><span>${riv}</span><span>${w}/${t}</span></div>
+          <div class="bar"><i style="width:${p*100}%"></i></div>
+          <div class="ic">${(p*100).toFixed(0)}%</div></div>`;
+      }).join("")}</div></div>`;
+  }).join("") : `<div class="peleas"><div class="vacio">sin gauntlet grabado ·
+      <span class="m">tools/grabar_gauntlet.py --difficulty N --repeticiones 30</span></div></div>`;
+
+  // ---------- escalera: niveles LEIDOS del dato, no fijos ----------
   const c = d.campeon;
+  const viva = (m && m.por_nivel) || {};
+  const niveles = [...new Set([...Object.keys(viva),
+    ...(c ? Object.keys(c).filter(k => k.startsWith("wr_lvl")).map(k => k.slice(6)) : [])])]
+    .map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+  $("escalera").innerHTML = niveles.length ? (
+    `<div class="leyenda"><span><i></i>banco del campeón (n=48)</span>
+     <span><i class="marca"></i>ventana viva de la flota (n≈200, con exploración)</span></div>` +
+    niveles.map(l => {
+      const b = c ? c["wr_lvl" + l] : null, v = viva[String(l)];
+      return `<div class="fila"><div class="lv">LVL ${l}</div>
+        <div class="pista">${b != null ? `<div class="banco" style="width:${b*100}%"></div>` : ""}
+          ${v != null ? `<div class="vivo" style="left:calc(${v*100}% - 1px)"></div>` : ""}</div>
+        <div class="dato">${b != null ? pc(b) : "—"}<span class="u">banco</span></div>
+        <div class="dato oculta">${v != null ? pc(v) : "—"}<span class="u">viva</span></div></div>`;
+    }).join("")) : `<div class="vacio">sin datos por nivel todavía</div>`;
+
+  // ---------- campeon ----------
   if (c) {
-    const cuando = new Date(c.t * 1000);
-    $("campeon").innerHTML =
-      `<div class="t">v${c.weights_version} · ${pct(c.wr_media)} de rounds de apertura</div>
-       <div class="sub">${c.archivo} · coronado ${cuando.toLocaleString("es-MX")}</div>
-       <div class="escalera" style="margin-top:10px">` +
-       [1,2,3,4,5,6,7,8].map(l => peldano(l, c["wr_lvl" + l], true)).join("") + `</div>`;
+    const ns = Object.keys(c).filter(k => k.startsWith("wr_lvl")).map(k => +k.slice(6)).sort((a,b)=>a-b);
+    $("campeon").innerHTML = `<div class="t">v${c.weights_version} · ${pc(c.wr_media)}% de rounds de apertura</div>
+      <div class="sub m">${c.archivo} · coronado hace ${edad(d.ahora - c.t)} · n=48 por nivel</div>
+      <div style="display:grid;grid-template-columns:repeat(${ns.length},1fr);gap:5px;margin-top:12px">
+      ${ns.map(l => `<div style="text-align:center">
+        <div class="sub m" style="font-size:10px">LVL ${l}</div>
+        <div class="m" style="font-size:17px;font-weight:600">${Math.round(c["wr_lvl"+l]*100)}</div>
+        <div class="bar" style="height:3px;background:var(--muted);border-radius:2px">
+          <i style="display:block;height:100%;border-radius:2px;background:var(--champion);width:${c["wr_lvl"+l]*100}%"></i></div>
+      </div>`).join("")}</div>`;
   }
 
+  // ---------- coronaciones ----------
   $("coronaciones").innerHTML = (d.coronaciones || []).slice().reverse().map(r => {
-    const niveles = [1,2,3,4,5,6,7,8].map(l => Math.round((r["wr_lvl" + l] ?? 0) * 100)).join(" · ");
-    return `<tr><td class="num">v${r.weights_version}</td>
-      <td class="n">${pct(r.wr_media)}</td>
-      <td class="ocultable num sub">${niveles}</td>
-      <td class="n">${edad(d.ahora - r.t)}</td></tr>`;
+    const ns = Object.keys(r).filter(k => k.startsWith("wr_lvl")).map(k => +k.slice(6)).sort((a,b)=>a-b);
+    return `<tr><td class="m">v${r.weights_version}</td>
+      <td class="r">${pc(r.wr_media)}%</td>
+      <td class="oculta m sub">${ns.map(l => Math.round(r["wr_lvl"+l]*100)).join(" · ")}</td>
+      <td class="r sub">${edad(d.ahora - r.t)}</td></tr>`;
   }).join("") || `<tr><td colspan="4" class="vacio">todavía ninguna</td></tr>`;
 
-  $("pie").textContent = "hub arriba desde hace " + edad(d.ahora - d.hub_desde) +
-    " · muestreo cada minuto · datos de /api/state";
+  $("pie").textContent = `${hist.length} muestras en la sesión · muestreo cada minuto · /api/state`;
 }
-
 pintar();
 setInterval(pintar, 5000);
 </script>

@@ -100,6 +100,30 @@ def gauntlets():
     return out
 
 
+def historia(maximo=180):
+    """Las ultimas muestras, submuestreadas a `maximo` puntos.
+
+    Una consola que solo ensena el instante no deja ver si algo se esta
+    degradando: la tendencia es la mitad de la informacion. Se submuestrea
+    aqui y no en el navegador para no mandar megabytes por la red.
+    """
+    try:
+        with open(SAMPLES, encoding="utf-8") as f:
+            filas = [json.loads(ln) for ln in f if ln.strip()]
+    except (OSError, ValueError):
+        return []
+    filas = [f for f in filas if f.get("grads_per_s") is not None]
+    if len(filas) > maximo:
+        paso = len(filas) / maximo
+        filas = [filas[int(i * paso)] for i in range(maximo)]
+    return [{"ts": f["ts"], "grads_per_s": f.get("grads_per_s"),
+             "trans_per_s": f.get("trans_per_s"),
+             "replay_ratio": f.get("replay_ratio"),
+             "vivas": f.get("vivas"), "esperadas": f.get("esperadas"),
+             "wr": f.get("wr_recent200"), "por_nivel": f.get("por_nivel")}
+            for f in filas]
+
+
 class _Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass  # el hub ya imprime lo suyo; no queremos el ruido de acceso
@@ -135,6 +159,7 @@ class _Handler(BaseHTTPRequestHandler):
                 "campeon": campeon_actual(),
                 "coronaciones": coronaciones(),
                 "gauntlets": gauntlets(),
+                "historia": historia(),
                 "hub_desde": ESTADO["arranque"],
                 "ahora": time.time(),
             }, ensure_ascii=False))
@@ -153,8 +178,16 @@ def ahora():
 
 
 def cargar_plano():
+    """El plano, normalizado. Acepta `run` (una sola, formato viejo) o `runs`
+    (lista con una marcada `activa`): la consola no debe romperse el dia que
+    haya dos entrenamientos, ni asumir que el unico que existe es este."""
     with open(FLEET_JSON, encoding="utf-8") as f:
-        return json.load(f)
+        plano = json.load(f)
+    if "runs" not in plano:
+        plano["runs"] = [dict(plano.get("run", {}), id="actual", activa=True)]
+    activa = next((r for r in plano["runs"] if r.get("activa")), None)
+    plano["run"] = activa or (plano["runs"][0] if plano["runs"] else {})
+    return plano
 
 
 def leer_status(url, timeout=15):
