@@ -143,3 +143,17 @@ Banco canónico × 8 niveles × 3 condiciones (2,592 eps) sobre el campeón v121
 - **Selector v3 / era-escalera**: mejor por media de los 8 tiers → `apex_escalera_best.pt`; campeones v781 (83.1) → v1212 (85.4) en horas. La era lvl1-4 quedó archivada (medias no comparables).
 - **Artifact del equipo al día** (misma URL): matriz definitiva 8×3 del v1212, podio nuevo, "El día 2 en cinco actos", y la sección pedida por Felipe: **"Diccionario de la cabina"** — qué es cada unidad de las terminales (grads/buffer/loss/epsilons/estados=96) y de wandb (win_rate_recent/lvlN, beta, el eje X en grads, el hueco del zombi).
 - Modo STAND: construido, revisado (16 agentes, 12 hallazgos aplicados, el crítico: el framing `<len> ` de BizHawk) y commiteado — SOLO falta el end-to-end en Windows.
+
+## [2026-08-28 ~00:30] EL JUEGO, RESUELTO — v3291 hace 98.7% de la escalera completa
+
+**El experimento de saturar tiers altos (los 3 workers grandes a `--difficulty 4..8`, la Mac de canario en 1..8) pagó por encima de cualquier expectativa.** El campeón v3291, verificado INDEPENDIENTEMENTE con el doble de muestra del selector (768 eps, 8 por estado, desfase ≤30 — la vara honesta):
+
+| lvl1 | lvl2 | lvl3 | lvl4 | lvl5 | lvl6 | lvl7 | lvl8 | **media** |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 100 | 100 | 100 | 99.0 | 99.0 | 97.9 | **93.8** | **98.7%** |
+
+**Cero olvido**: lvl1-3 clavados en 100% pese a que las máquinas grandes llevan horas sin verlos — el canario del 9% bastó, y la hipótesis de que una sola política sirve a los 8 niveles (la dificultad NO está en la observación) quedó confirmada en producción. La regla de reversa nunca se disparó.
+
+**El salto en una noche**, contra el v1212 medido ayer por la tarde: lvl4 79.2 → **100**, lvl5 84.4 → **99.0**, lvl6 83.3 → **99.0**, lvl7 75.0 → **97.9**, lvl8 56.2 → **93.8**. Media global 85.3 → **98.7**. El learner pasó de 735k a 1.74M grads.
+
+Congelado: `benchmarks/apex_milestones/apex_v3291_media990.pt`; acta cruda en `benchmarks/bench_v3291_verificacion.jsonl`. Nota de honestidad: el modelo churea (el examen siguiente del selector, v3371, dio 0.956) — por eso el campeón se SELECCIONA y este archivo es el que va al stand y a las demos, no los pesos vivos.
