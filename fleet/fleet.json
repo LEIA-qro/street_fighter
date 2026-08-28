@@ -1,0 +1,64 @@
+{
+  "_comentario": [
+    "Plano de control de la flota LEIA. Versionado en el repo A PROPOSITO:",
+    "el censo de quien DEBERIA estar corriendo no puede vivir en la memoria de",
+    "nadie ni en un /tmp. Regla dura A7 del plan: este archivo NUNCA alimenta",
+    "un valor que se muestre como medicion -- solo dice que se ESPERA. Lo que",
+    "esta pasando de verdad lo mide el hub contra /status del learner.",
+    "Plan: .scratch-uiux-reconstruccion/41-PLAN-sistema.md seccion 3.2"
+  ],
+  "schema": "leia-fleet/v1",
+  "run": {
+    "nombre": "curriculum-escalera-1a8",
+    "learner": "http://desktop-4090-ubuntu-wsl:8090",
+    "learner_ip": "http://100.121.228.49:8090",
+    "wandb_id": "rainbow-apex-curriculum",
+    "descripcion": "Ape-X con macros (72 acciones) sobre la escalera completa de 8 niveles"
+  },
+  "expected": [
+    {
+      "id": "sss",
+      "host": "SSS",
+      "duenio": "Santiago",
+      "rol": "learner + actor",
+      "procs": 44,
+      "difficulty": "4,5,6,7,8",
+      "notas": "la desktop 13900K/4090, 24/7. Hospeda el learner: su terminal de learner NO se toca."
+    },
+    {
+      "id": "legion",
+      "host": "PEREA",
+      "duenio": "Diego",
+      "rol": "actor",
+      "procs": 40,
+      "difficulty": "4,5,6,7,8",
+      "notas": "Legion 275HX/5070Ti. Precedente: el NAT de WSL2 se atora al cambiar de red y mata los POST grandes aunque los GET pasen; se cura reiniciando Windows (o --flush 100)."
+    },
+    {
+      "id": "omen",
+      "host": "LAPTOP-1VCCKQL9",
+      "duenio": "Santiago",
+      "rol": "actor",
+      "procs": 40,
+      "difficulty": "4,5,6,7,8",
+      "notas": "Onboardeada 2026-08-27 (tools/RUN_OMEN_DESDE_CERO.md). Su tailscale resuelve mal el nombre del learner: usa learner_ip."
+    },
+    {
+      "id": "mac",
+      "host": "mini-fzamorano",
+      "duenio": "Felipe",
+      "rol": "actor CANARIO + observabilidad",
+      "procs": 12,
+      "difficulty": "1,2,3,4,5,6,7,8",
+      "critico": true,
+      "notas": "EL CANARIO: la unica maquina que alimenta lvl1-3 desde que los grandes pasaron a 4-8. Si se cae, el detector de olvido queda ciego y las ventanas de lvl1-3 del /status pasan a ser datos RANCIOS, no datos. Corre ademas el selector y el hub."
+    }
+  ],
+  "umbrales": {
+    "actor_fresco_s": 600,
+    "minimo_maquinas": 2,
+    "histeresis_muestras": 2,
+    "olvido_umbral_lvl1a3": 0.95,
+    "olvido_examenes": 2
+  }
+}
