@@ -810,7 +810,7 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
             "Para modelo vs modelo selecciona Ape-X también como P2.")
         return
 
-    ai_algos = ["ppo", "sac", "dqn"]
+    ai_algos = ["ppo", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
 
@@ -890,7 +890,7 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
             _p2_path, p2_relative, _p2_meta = _resolve_stand_checkpoint(
                 p2_checkpoint)
         if opponent_type == "sb3":
-            if p2_algo not in ("ppo", "sac", "dqn"):
+            if p2_algo not in ("ppo", "dqn"):
                 raise ValueError("el rival SB3 debe ser PPO, SAC o DQN")
             if p2_env not in ("v2", "v3"):
                 raise ValueError("el environment del rival SB3 debe ser v2 o v3")
@@ -1717,9 +1717,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             gr.Markdown("### Global Settings")
             with gr.Row():
                 with gr.Column(scale=1):
-                    algo_sel = gr.Dropdown(label="Algorithm", choices=["ppo", "sac", "dqn"], value="ppo")
+                    algo_sel = gr.Dropdown(label="Algorithm", choices=["ppo", "dqn"], value="ppo")
                 with gr.Column(scale=1):
-                    env_sel = gr.Dropdown(label="Environment", choices=["v1", "v2", "v3"], value="v2")
+                    env_sel = gr.Dropdown(label="Environment", choices=["v2", "v3", "v4"], value="v2")
                 with gr.Column(scale=1):
                     tb_main_btn = gr.Button("📈 Launch TensorBoard", variant="secondary")
             
@@ -1814,7 +1814,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
                 # RIGHT: Terminal
                 with gr.Column(scale=2):
-                    unified_logs = gr.Textbox(label="Console Output", lines=35, max_lines=45, interactive=False, elem_id="terminal")
+                    unified_logs = gr.Textbox(label="Console Output", lines=35, max_lines=45, interactive=False, elem_id="terminal-train")
                     copy_btn = gr.Button("📋 Copy Logs", size="sm")
 
         # --- TAB 1.5: AUTO-LEARNING LEAGUE ---
@@ -1832,7 +1832,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             with gr.Row():
                                 league_model_name = gr.Textbox(label="League Model Name", value="league")
                                 league_steps = gr.Number(label="Total Timesteps", value=5000000, precision=0)
-                                league_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3"], value="v2")
+                                league_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3", "v4"], value="v2")
                                 league_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 
                             all_states = get_all_state_files()
@@ -1870,7 +1870,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 exploiter_steps = gr.Number(label="Timesteps", value=1000000, precision=0)
                                 
                             with gr.Row():
-                                exploiter_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3"], value="v2")
+                                exploiter_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3", "v4"], value="v2")
                                 exploiter_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 exploiter_matchup_mode = gr.Dropdown(
                                     label="Matchup Mode", 
@@ -1895,7 +1895,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             start_exploiter_btn = gr.Button("⚔️ Launch Exploiter Training", variant="primary")
                     
                     gr.Markdown("---")
-                    league_logs = gr.Textbox(label="League Console Output", lines=20, max_lines=25, interactive=False, elem_id="terminal")
+                    league_logs = gr.Textbox(label="League Console Output", lines=20, max_lines=25, interactive=False, elem_id="terminal-league")
                     
                     with gr.Row():
                         refresh_league_btn = gr.Button("🔄 Refresh Pool Status & States")
@@ -1916,13 +1916,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         p1_algo = gr.Dropdown(
                             label="P1 Algorithm",
                             choices=[
-                                "ppo", "sac", "dqn",
+                                "ppo", "dqn",
                                 ("Ape-X QR-DQN (.pt)", "apex"),
                                 "Human Player",
                             ],
                             value="ppo",
                         )
-                        p1_env = gr.Dropdown(label="P1 Environment", choices=["v2", "v3"], value="v2")
+                        p1_env = gr.Dropdown(label="P1 Environment", choices=["v2", "v3", "v4"], value="v2")
                     p1_device = gr.Dropdown(label="P1 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p1_model_group:
@@ -1944,13 +1944,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         p2_algo = gr.Dropdown(
                             label="P2 Algorithm",
                             choices=[
-                                "ppo", "sac", "dqn",
+                                "ppo", "dqn",
                                 ("Ape-X QR-DQN (.pt)", "apex"),
                                 "Human Player", "CPU (Built-in AI)",
                             ],
                             value="ppo",
                         )
-                        p2_env = gr.Dropdown(label="P2 Environment", choices=["v2", "v3"], value="v2")
+                        p2_env = gr.Dropdown(label="P2 Environment", choices=["v2", "v3", "v4"], value="v2")
                     p2_device = gr.Dropdown(label="P2 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p2_model_group:
@@ -2001,12 +2001,12 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     match_upload_status = gr.Markdown("")
                 
                 with gr.Column():
-                    match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False, elem_id="terminal")
+                    match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False, elem_id="terminal-match")
                     copy_match_btn = gr.Button("📋 Copy Match Logs", size="sm")
 
             # Interactive visibility and filtering toggles
             def update_match_ui(algo):
-                is_sb3 = algo in ["ppo", "sac", "dqn"]
+                is_sb3 = algo in ["ppo", "dqn"]
                 is_apex = algo == "apex"
                 z, p = get_model_files(algo) if is_sb3 else (["None"], ["None"])
                 return (
@@ -2040,7 +2040,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 p2_algorithm = normalize_apex_p2_selection(
                     p1_algorithm, p2_algorithm)
 
-                if apex_match and p2_algorithm in ("apex", "ppo", "sac", "dqn"):
+                if apex_match and p2_algorithm in ("apex", "ppo", "dqn"):
                     character = gr.update(
                         visible=True, choices=["RYU"], value="RYU",
                         label="P2 Character (AI model)",
@@ -2129,8 +2129,11 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             
             telemetry_html = gr.HTML(value=get_live_telemetry_html())
             
-            # Poll every 100ms
-            telemetry_timer = gr.Timer(value=0.1, active=True)
+            # 2 Hz. Estuvo en 10 Hz y ACTIVO SIEMPRE, aunque nadie tuviera
+            # esta pestana abierta: eran diez lecturas de disco por segundo
+            # eternas. El arreglo de fondo (activarlo solo con la pestana
+            # visible) vive en la reconstruccion, no en este parche.
+            telemetry_timer = gr.Timer(value=0.5, active=True)
             telemetry_timer.tick(get_live_telemetry_html, outputs=[telemetry_html])
 
         # --- TAB 3: CONFIG ---
@@ -2318,7 +2321,7 @@ def main():
         server_port=args.server_port, 
         share=args.share,
         theme=gr.themes.Soft(primary_hue="blue"), 
-        css="#terminal textarea { font-family: monospace; }",
+        css="#terminal-train textarea, #terminal-league textarea, #terminal-match textarea { font-family: monospace; }",
         head=_DASHBOARD_RELOAD_HEAD,
     )
 
