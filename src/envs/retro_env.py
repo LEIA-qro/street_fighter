@@ -276,7 +276,7 @@ class RetroSF2Env(gymnasium.Env):
 
     def __init__(self, state: str = DEFAULT_STATE, trainable: bool = True,
                  verbose: bool = False, ground_gate: bool = False,
-                 render_mode=None):
+                 render_mode=None, frame_hook=None):
         # Lazy import: everything above this class must stay importable on
         # machines without stable-retro (the unit tests run there).
         import stable_retro as retro
@@ -299,6 +299,7 @@ class RetroSF2Env(gymnasium.Env):
         )
         self._loaded_state = state
         self._buttons = list(self._env.buttons)
+        self._frame_hook = frame_hook
 
         # All 63 (direction, button) products, pre-translated. Sticky can only
         # rewrite the direction bits into another DIRECTION_MAP image, so every
@@ -428,6 +429,13 @@ class RetroSF2Env(gymnasium.Env):
         ram = None
         for _ in range(FRAME_SKIP):
             _, _, _, _, ram = self._env.step(retro_action)
+            # Gancho por FRAME de emulador, no por paso de agente: quien graba
+            # video necesita los 60 fps reales: muestrear una vez por paso de
+            # agente da 15 fps y el juego se ve a tirones. None por defecto,
+            # asi que el camino de entrenamiento no paga ni una comparacion
+            # de mas... salvo esta, que es un `is not None` por frame.
+            if self._frame_hook is not None:
+                self._frame_hook(self._env.em.get_screen())
 
         observation = self._ingest(ram)
         self.frames.append(observation)
