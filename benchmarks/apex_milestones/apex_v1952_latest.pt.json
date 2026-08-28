@@ -1,0 +1,22 @@
+{
+  "artifact_role": "latest_live_weights",
+  "benchmark_status": "not_evaluated",
+  "downloaded_at_utc": "2026-08-28T02:58:51Z",
+  "grad_steps_near_download": 1008780,
+  "learner_version_after": 1952,
+  "learner_version_before": 1952,
+  "sha256": "4f8189a623267bb4c35502051b8bed4ba9241083b3ced1e464d17d16686ea476",
+  "source": "http://desktop-4090-ubuntu-wsl:8090/weights",
+  "weights_version": 1952,
+  "win_rate_recent200_near_download": 0.775,
+  "win_rate_recent_by_lvl_near_download": {
+    "1": 0.995,
+    "2": 1.0,
+    "3": 0.99,
+    "4": 0.88,
+    "5": 0.86,
+    "6": 0.845,
+    "7": 0.785,
+    "8": 0.6
+  }
+}
