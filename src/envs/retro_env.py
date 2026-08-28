@@ -273,6 +273,11 @@ class RetroSF2Env(gymnasium.Env):
     """
 
     HP_SENTINEL_THRESHOLD = HP_SENTINEL_THRESHOLD
+    # Default de CLASE, no solo de instancia: los tests (y cualquier fake)
+    # construyen el env sin pasar por __init__ completo, y un atributo que
+    # solo nace ahi truena en step() con AttributeError (paso 2026-08-28:
+    # 11 tests rojos por esto).
+    _frame_hook = None
 
     def __init__(self, state: str = DEFAULT_STATE, trainable: bool = True,
                  verbose: bool = False, ground_gate: bool = False,
