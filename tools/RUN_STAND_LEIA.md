@@ -43,7 +43,7 @@ los componentes anteriores aunque el backend haya reiniciado. Abrir una carga
 fresca y versionada:
 
 ```powershell
-Start-Process "http://127.0.0.1:7860/?build=v1592-unified-r6"
+Start-Process "http://127.0.0.1:7860/?build=v1592-unified-r8"
 ```
 
 Entrar a **🎮 Model Testing & Matchups**. Ape-X ya vive en los mismos
@@ -56,6 +56,8 @@ selectores P1/P2 del probador clásico; no hay una sección duplicada abajo:
    - **CPU (Built-in AI)**: aparecen personaje y nivel exacto 1–8.
    - **Ape-X QR-DQN (.pt)**: aparece el checkpoint de P2 para modelo vs
      modelo; ambos usan Ryu para mantener la perspectiva entrenada.
+   - **PPO/SAC/DQN**: seleccionar también environment, modelo `.zip` y
+     normalización `.pkl`; permite Ape-X contra los modelos clásicos.
 3. Pulsar **Launch Match**. **Terminate Match** registra el cierre, pausa el
    Lua y cierra BizHawk. Si se copia otro `.pt` con la página abierta, usar
    **Refresh Ape-X checkpoints**.
@@ -65,7 +67,9 @@ selectores P1/P2 del probador clásico; no hay una sección duplicada abajo:
   entrenó); también se puede fijar, por ejemplo, `KEN`.
 - Contra CPU, el nivel seleccionado usa exactamente
   `RYU_<PERSONAJE>_R1_lvlN.State`; nivel 8 usa `_HARD.State`.
-- El slider de rematch controla la pausa de KO.
+- El slider de rematch controla la pausa de KO. Sólo hay RESET automático si
+  **Infinite Matchups (Auto-Rematch)** está marcado; desmarcado deja BizHawk
+  abierto en el resultado de la primera partida.
 - BizHawk abre solo (ventana 4×, sonido ON) y el marcador vive en pantalla:
   IA abajo-izquierda, RETADOR abajo-derecha.
 
@@ -97,9 +101,9 @@ termina con **Ctrl+C**.
 ## 2. El flujo del visitante
 
 1. El round arranca solo al cargar el estado (ambos con vida completa).
-2. Pelea normal con el pad; al KO, pantalla de resultado ~2 s por defecto
-   (ajustable en el slider) y **rematch automático** con el marcador
-   acumulado. Nadie toca teclado ni menús.
+2. Pelea normal con el pad; al KO, la pantalla de resultado queda abierta. Si
+   **Infinite Matchups** está marcado, después del retraso ajustable se carga
+   el rematch automático con el marcador acumulado.
 3. Con `RANDOM`, cada round el retador recibe personaje nuevo — la IA
    siempre es Ryu (así entrenó).
 

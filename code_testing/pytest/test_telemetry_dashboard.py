@@ -32,6 +32,20 @@ def save_test_apex_checkpoint(path, broken=False):
 
 
 class TestTelemetryDashboard(unittest.TestCase):
+    def test_model_dropdown_includes_latest_benchmarked_models(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory() as tmp:
+            model_dir = Path(tmp) / "models" / "latest" / "v3" / "ppo"
+            model_dir.mkdir(parents=True)
+            (model_dir / "champion.zip").write_bytes(b"model")
+            (model_dir / "champion.pkl").write_bytes(b"norm")
+            with patch.object(config, "PROJECT_ROOT", tmp):
+                zips, pkls = web_dashboard.get_model_files("ppo")
+
+        self.assertIn("models/latest/v3/ppo/champion.zip", zips)
+        self.assertIn("models/latest/v3/ppo/champion.pkl", pkls)
+
     def test_clean_telemetry(self):
         target_path = os.path.join(config.PROJECT_ROOT, ".telemetry.json")
         with open(target_path, "w") as f:
@@ -451,6 +465,7 @@ class TestTelemetryDashboard(unittest.TestCase):
             self.assertEqual(command[command.index("--opponent") + 1], "KEN")
             self.assertEqual(command[command.index("--cpu-level") + 1], "1")
             self.assertEqual(command[command.index("--rematch-delay") + 1], "3.5")
+            self.assertNotIn("--infinite-match", command)
             self.assertNotIn("test_agent_v2.py", " ".join(command))
 
     def test_run_stand_builds_apex_vs_apex_command(self):
@@ -482,6 +497,45 @@ class TestTelemetryDashboard(unittest.TestCase):
             self.assertEqual(command[command.index("--p2-ckpt") + 1], p2_relative)
             self.assertEqual(command[command.index("--p2-device") + 1], "cpu")
 
+    def test_run_stand_builds_apex_vs_ppo_v3_command(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            p1 = root / "p1.pt"
+            p2_zip = root / "p2.zip"
+            p2_pkl = root / "p2.pkl"
+            save_test_apex_checkpoint(p1)
+            p2_zip.write_bytes(b"model")
+            p2_pkl.write_bytes(b"normalization")
+            relative = lambda path: path.relative_to(
+                config.PROJECT_ROOT).as_posix()
+            captured = []
+
+            def fake_stream(cmd):
+                captured.append(cmd)
+                yield "hybrid duel ready"
+
+            with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)), \
+                 patch.object(web_dashboard, "stream_logs", fake_stream):
+                output = list(web_dashboard.run_stand(
+                    relative(p1), "sb3", "RYU", 1, 2.0, "cpu",
+                    p2_device="cpu", p2_algo="ppo", p2_env="v3",
+                    p2_zip=relative(p2_zip), p2_pkl=relative(p2_pkl),
+                    infinite_match=True,
+                ))
+
+            self.assertEqual(output, ["hybrid duel ready"])
+            command = captured[0]
+            self.assertEqual(command[command.index("--opponent-type") + 1], "sb3")
+            self.assertEqual(command[command.index("--p2-algo") + 1], "ppo")
+            self.assertEqual(command[command.index("--p2-env") + 1], "v3")
+            self.assertEqual(
+                command[command.index("--p2-model-zip") + 1], relative(p2_zip))
+            self.assertEqual(
+                command[command.index("--p2-model-pkl") + 1], relative(p2_pkl))
+            self.assertIn("--infinite-match", command)
+
     def test_run_matchup_routes_unified_apex_cpu_controls_to_stand(self):
         from scripts import web_dashboard
 
@@ -504,13 +558,40 @@ class TestTelemetryDashboard(unittest.TestCase):
         self.assertEqual(args[:6], (
             "p1_champion.pt", "cpu", "KEN", 7, 2.5, "auto"))
         self.assertEqual(kwargs["p2_checkpoint"], "p2_champion.pt")
+        self.assertTrue(kwargs["infinite_match"])
+
+    def test_run_matchup_routes_apex_vs_ppo_v3_to_hybrid_stand(self):
+        from scripts import web_dashboard
+
+        captured = []
+
+        def fake_run_stand(*args, **kwargs):
+            captured.append((args, kwargs))
+            yield "apex ppo ready"
+
+        with patch.object(web_dashboard, "run_stand", fake_run_stand):
+            output = list(web_dashboard.run_matchup(
+                "apex", "v2", "None", "None", "cpu",
+                "ppo", "v3", "p2.zip", "p2.pkl", "cpu",
+                False, True, 2.5, 7,
+                "p1_champion.pt", "p2_champion.pt", "RANDOM",
+            ))
+
+        self.assertEqual(output, ["apex ppo ready"])
+        args, kwargs = captured[0]
+        self.assertEqual(args[:3], ("p1_champion.pt", "sb3", "RYU"))
+        self.assertEqual(kwargs["p2_algo"], "ppo")
+        self.assertEqual(kwargs["p2_env"], "v3")
+        self.assertEqual(kwargs["p2_zip"], "p2.zip")
+        self.assertEqual(kwargs["p2_pkl"], "p2.pkl")
+        self.assertTrue(kwargs["infinite_match"])
 
     def test_apex_p2_default_never_overrides_valid_opponent_selection(self):
         from scripts.web_dashboard import normalize_apex_p2_selection
 
         self.assertEqual(
             normalize_apex_p2_selection("apex", "ppo"),
-            "Human Player",
+            "ppo",
         )
         self.assertEqual(
             normalize_apex_p2_selection("apex", "CPU (Built-in AI)"),

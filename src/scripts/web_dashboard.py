@@ -38,7 +38,7 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1592-unified-r7"
+DASHBOARD_BUILD_ID = "v1592-unified-r8"
 
 # Una pestaña Gradio abierta conserva el schema de componentes aunque el
 # proceso de Python se reinicie. Si el app_id cambia, navegar con una query
@@ -163,7 +163,7 @@ def get_model_files(algo=None):
     
     if algo:
         # Search recursively for algorithm subfolders (e.g. models/production/v2/ppo/ or models/production/ppo/)
-        for category in ["production", "tuning"]:
+        for category in ["production", "tuning", "latest"]:
             cat_dir = os.path.join(models_dir, category)
             if os.path.exists(cat_dir):
                 for root, dirs, files in os.walk(cat_dir):
@@ -759,6 +759,9 @@ APEX_P2_ALGO_TO_TYPE = {
     "Human Player": "human",
     "CPU (Built-in AI)": "cpu",
     "apex": "model",
+    "ppo": "sb3",
+    "sac": "sb3",
+    "dqn": "sb3",
 }
 
 
@@ -779,10 +782,10 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
         if p2_algo not in APEX_P2_ALGO_TO_TYPE:
             yield (
                 "Invalid Ape-X matchup: P2 debe ser Human Player, "
-                "CPU (Built-in AI) o Ape-X QR-DQN.")
+                "CPU (Built-in AI), PPO/SAC/DQN o Ape-X QR-DQN.")
             return
         opponent_type = APEX_P2_ALGO_TO_TYPE[p2_algo]
-        if opponent_type == "model":
+        if opponent_type in ("model", "sb3"):
             opponent_character = "RYU"
         for log in run_stand(
             p1_apex_checkpoint,
@@ -793,6 +796,11 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
             p1_device,
             p2_checkpoint=p2_apex_checkpoint,
             p2_device=p2_device,
+            p2_algo=p2_algo,
+            p2_env=p2_env,
+            p2_zip=p2_zip,
+            p2_pkl=p2_pkl,
+            infinite_match=infinite_match_enabled,
         ):
             yield log
         return
@@ -859,12 +867,14 @@ def _resolve_apex_device(device):
 
 
 def run_stand(checkpoint, opponent_type, opponent, cpu_level,
-              rematch_delay, device, p2_checkpoint=None, p2_device="auto"):
-    """Lanza Ape-X vs humano, CPU integrada o un segundo Ape-X."""
+              rematch_delay, device, p2_checkpoint=None, p2_device="auto",
+              p2_algo=None, p2_env="v2", p2_zip=None, p2_pkl=None,
+              infinite_match=False):
+    """Lanza Ape-X vs humano, CPU integrada, Ape-X o modelo SB3."""
     try:
         _path, relative, _meta = _resolve_stand_checkpoint(checkpoint)
         opponent_type = str(opponent_type).lower()
-        if opponent_type not in ("human", "cpu", "model"):
+        if opponent_type not in ("human", "cpu", "model", "sb3"):
             raise ValueError(f"tipo de rival no válido: {opponent_type}")
         opponent = str(opponent).upper()
         if opponent not in ("RANDOM",) + tuple(STAND_OPPONENTS):
@@ -879,13 +889,25 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
                     "Ape-X vs Ape-X usa RYU para P2; selecciona RYU")
             _p2_path, p2_relative, _p2_meta = _resolve_stand_checkpoint(
                 p2_checkpoint)
+        if opponent_type == "sb3":
+            if p2_algo not in ("ppo", "sac", "dqn"):
+                raise ValueError("el rival SB3 debe ser PPO, SAC o DQN")
+            if p2_env not in ("v2", "v3"):
+                raise ValueError("el environment del rival SB3 debe ser v2 o v3")
+            for label, selected in (("modelo .zip", p2_zip),
+                                    ("normalización .pkl", p2_pkl)):
+                if not selected or selected == "None":
+                    raise ValueError(f"selecciona el {label} de P2")
+                full_path = os.path.join(config.PROJECT_ROOT, selected)
+                if not os.path.isfile(full_path):
+                    raise ValueError(f"no existe el {label} de P2: {selected}")
         rematch_delay = float(rematch_delay)
         if rematch_delay < 0:
             raise ValueError("el rematch delay no puede ser negativo")
         device = _resolve_apex_device(device)
         p2_device = (
             _resolve_apex_device(p2_device)
-            if opponent_type == "model" else "cpu"
+            if opponent_type in ("model", "sb3") else "cpu"
         )
     except Exception as exc:
         yield f"Error de configuración del modelo Ape-X: {exc}"
@@ -903,6 +925,16 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
     ]
     if opponent_type == "model":
         cmd += ["--p2-ckpt", p2_relative, "--p2-device", p2_device]
+    elif opponent_type == "sb3":
+        cmd += [
+            "--p2-algo", p2_algo,
+            "--p2-env", p2_env,
+            "--p2-model-zip", p2_zip,
+            "--p2-model-pkl", p2_pkl,
+            "--p2-device", p2_device,
+        ]
+    if infinite_match:
+        cmd += ["--infinite-match"]
     for log in stream_logs(cmd):
         yield log
 
@@ -2008,10 +2040,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 p2_algorithm = normalize_apex_p2_selection(
                     p1_algorithm, p2_algorithm)
 
-                if apex_match and p2_algorithm == "apex":
+                if apex_match and p2_algorithm in ("apex", "ppo", "sac", "dqn"):
                     character = gr.update(
                         visible=True, choices=["RYU"], value="RYU",
-                        label="P2 Character (Ape-X model)",
+                        label="P2 Character (AI model)",
                     )
                 elif apex_match and p2_algorithm in (
                         "Human Player", "CPU (Built-in AI)"):

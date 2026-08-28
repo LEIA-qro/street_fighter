@@ -32,8 +32,10 @@ from envs.macro_wrapper import MacroActionWrapper
 from envs.retro_env import V4_FRAME_DIM
 from stand_leia import (
     DEFAULT_CHECKPOINT, HUMAN_PASSTHROUGH, PAYLOAD_KEYS, MacroPlayer,
-    MatchSessionLog, bits_command, checkpoint_provenance, opponent_from_state,
-    parse_payload, pick_state, ram_for_player, request_round_reset, resolve_round,
+    MatchSessionLog, SB3Opponent, bits_command, checkpoint_provenance,
+    opponent_from_state, parse_payload, pick_state,
+    ram_for_player, request_round_reset, resolve_round, sb3_action_to_command,
+    sb3_payload_from_ram,
 )
 
 
@@ -54,6 +56,13 @@ def test_parse_payload_round_trip_with_bizhawk_framing():
 def test_parse_payload_rejects_old_lua():
     with pytest.raises(ValueError, match="stand_env_client"):
         parse_payload("29 0 1,2,3,4,5,6,7,8,9,10,11,12,13")  # el de 13 campos
+
+
+def test_sb3_payload_from_ram_uses_compatible_legacy_layout():
+    ram = {key: index - 4 for index, key in enumerate(PAYLOAD_KEYS)}
+    payload_values = sb3_payload_from_ram(ram).split(" ")[-1].split(",")
+    assert payload_values == [str(ram[key]) for key in PAYLOAD_KEYS[:13]]
+    assert len(payload_values) == 13
 
 
 # --------------------------------------------------------------------------
@@ -164,6 +173,14 @@ def test_random_opponent_only_chooses_an_available_savestate(tmp_path, monkeypat
 def test_random_opponent_without_savestates_fails_before_launch(tmp_path):
     with pytest.raises(SystemExit, match="no hay savestates"):
         pick_state(str(tmp_path), "RANDOM")
+
+
+def test_sb3_opponent_uses_pvp_savestate(tmp_path):
+    state = tmp_path / "RYU_RYU_R1_PvP.State"
+    state.touch()
+    assert pick_state(
+        str(tmp_path), "RYU", opponent_type="sb3"
+    ) == str(state)
 
 
 def test_cpu_opponent_uses_exact_selected_level_and_hard_for_level_8(tmp_path):
@@ -330,6 +347,58 @@ def test_bits_command_oracle():
         for button in range(7):
             cmd = bits_command(direction, button)
             assert len(cmd) == 10 and set(cmd) <= {"0", "1"}
+
+
+def test_sb3_actions_encode_v2_and_v3_commands():
+    assert sb3_action_to_command(
+        np.array([[1, 0, 1, 0, 0, 1, 0, 0, 0, 1]]), "ppo", "v2"
+    ) == "1010010001"
+    assert sb3_action_to_command(
+        np.array([[8, 6]]), "ppo", "v3"
+    ) == "0101000001"
+    assert sb3_action_to_command(np.array([62]), "dqn", "v3") == (
+        "0101000001")
+    assert sb3_action_to_command(np.array([513]), "dqn", "v2") == (
+        "1000000001")
+
+
+def test_sb3_opponent_primes_stack_normalizes_and_predicts():
+    class Parser:
+        def __init__(self):
+            self.calls = []
+
+        def parse(self, raw, is_reset=False):
+            self.calls.append((raw, is_reset))
+            return np.array([float(raw)], dtype=np.float32)
+
+    class Normalizer:
+        def __init__(self):
+            self.seen = None
+
+        def normalize_obs(self, observation, update=False):
+            self.seen = (observation.copy(), update)
+            return observation + 10
+
+    class Model:
+        def __init__(self):
+            self.seen = None
+
+        def predict(self, observation, deterministic=False):
+            self.seen = (observation.copy(), deterministic)
+            return np.array([[0, 0, 0, 1, 0, 0, 0, 0, 0, 0]]), None
+
+    parser = Parser()
+    normalizer = Normalizer()
+    model = Model()
+    opponent = SB3Opponent(parser, normalizer, model, "ppo", "v2", 4)
+    opponent.reset("1")
+    opponent.observe("2")
+
+    assert opponent.command() == "0001000000"
+    assert parser.calls == [("1", True), ("2", False)]
+    assert normalizer.seen[0].tolist() == [[1.0, 1.0, 1.0, 2.0]]
+    assert normalizer.seen[1] is False
+    assert model.seen[0].tolist() == [[11.0, 11.0, 11.0, 12.0]]
 
 
 # --------------------------------------------------------------------------

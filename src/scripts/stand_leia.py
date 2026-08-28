@@ -2,9 +2,9 @@
 #
 #   .venv\Scripts\python.exe src\scripts\stand_leia.py --ckpt benchmarks\apex_milestones\apex_v1592_benchmarked.pt
 #
-# P1 = la IA (Ryu, el campeon Ape-X con macros). P2 = el visitante, con el
-# control fisico configurado como Player 2 en BizHawk (este script manda
-# ".........." para P2: el Lua no inyecta y el pad pasa directo). Corre sobre
+# P1 = la IA (Ryu, el campeon Ape-X con macros). P2 puede ser humano, CPU del
+# juego, otro Ape-X o un modelo clasico SB3 (PPO/SAC/DQN). En modo humano este
+# script manda ".........." para P2: el Lua no inyecta y el pad pasa directo. Corre sobre
 # lua/v2.0/stand_env_client.lua, que manda las 25 variables de RAM crudas del
 # data.json; la observacion se arma aqui con el MISMO assemble_v4_frame del
 # entrenamiento y los macros se reproducen con la MISMA semantica que
@@ -236,6 +236,16 @@ def parse_payload(raw: str) -> dict:
     return {k: int(v) for k, v in zip(PAYLOAD_KEYS, values)}
 
 
+def sb3_payload_from_ram(ram: dict) -> str:
+    """Adapta el RAM del stand al payload legacy de 13 campos de SB3.
+
+    El payload expandido del stand tiene 25 campos, pero no comparte el layout
+    opcional de 24/26/27 campos de ``StreetFighterBaseEnv``. Los primeros 13 sí
+    son idénticos y contienen todo lo que consumen las observaciones v2/v3.
+    """
+    return "0 " + ",".join(str(ram[key]) for key in PAYLOAD_KEYS[:13])
+
+
 def resolve_round(p1_ko: bool, p2_ko: bool, timer: int,
                   p1_hp: float, p2_hp: float):
     """-> (winner, msg) al resolverse el round, o None si sigue vivo.
@@ -324,10 +334,143 @@ def load_champion(ckpt_path: str, device: str):
     return choose_action, meta
 
 
+def sb3_action_to_command(action, algo: str, env_version: str) -> str:
+    """Convierte la salida batch de SB3 al protocolo de 10 bits de BizHawk."""
+    algo = str(algo).lower()
+    env_version = str(env_version).lower()
+    if algo == "sac":
+        if env_version == "v3":
+            from envs.sf2_v3 import discrete_to_binary
+            row = np.asarray(action)[0]
+            discrete = np.array([
+                np.argmax(row[:9]), np.argmax(row[9:]),
+            ])
+            return discrete_to_binary(discrete)
+        return "".join(str(int(bit)) for bit in (
+            np.asarray(action)[0] > 0.0).astype(np.int8))
+    if algo == "dqn":
+        value = int(np.asarray(action).reshape(-1)[0])
+        if env_version == "v3":
+            from envs.sf2_v3 import discrete_to_binary
+            return discrete_to_binary(np.array([value // 7, value % 7]))
+        return format(value, "010b")
+    if env_version == "v3":
+        from envs.sf2_v3 import discrete_to_binary
+        return discrete_to_binary(np.asarray(action)[0])
+    return "".join(str(int(bit)) for bit in np.asarray(action)[0])
+
+
+class SB3PerspectiveParser:
+    """Aísla el estado de velocidad de la perspectiva P2 del parser v2."""
+
+    def __init__(self, env):
+        self.env = env
+        self.prev_p1_x = 0
+        self.prev_p2_x = 0
+
+    def parse(self, raw_payload: str, is_reset: bool = False) -> np.ndarray:
+        self.env.player = 2
+        self.env.prev_p1_x = self.prev_p1_x
+        self.env.prev_p2_x = self.prev_p2_x
+        observation = self.env._parse_payload(
+            raw_payload, is_reset=is_reset)
+        self.prev_p1_x = self.env.prev_p1_x
+        self.prev_p2_x = self.env.prev_p2_x
+        return observation
+
+
+class SB3Opponent:
+    """Frame stack + normalización + inferencia para un rival SB3 en P2."""
+
+    def __init__(self, parser, normalizer, model, algo: str,
+                 env_version: str, n_frames: int):
+        self.parser = parser
+        self.normalizer = normalizer
+        self.model = model
+        self.algo = algo
+        self.env_version = env_version
+        self.frames = deque(maxlen=n_frames)
+
+    def reset(self, raw_payload: str) -> None:
+        observation = self.parser.parse(raw_payload, is_reset=True)
+        self.frames.clear()
+        for _ in range(self.frames.maxlen):
+            self.frames.append(observation.copy())
+
+    def observe(self, raw_payload: str) -> None:
+        self.frames.append(self.parser.parse(raw_payload, is_reset=False))
+
+    def command(self) -> str:
+        stacked = np.concatenate(self.frames)[np.newaxis, :]
+        normalized = self.normalizer.normalize_obs(
+            stacked.copy(), update=False)
+        action, _state = self.model.predict(normalized, deterministic=False)
+        return sb3_action_to_command(action, self.algo, self.env_version)
+
+
+def load_sb3_opponent(env, algo: str, env_version: str, model_path: str,
+                      vecnorm_path: str, device: str) -> SB3Opponent:
+    """Carga un PPO/SAC/DQN sin abrir un segundo emulador/socket."""
+    import gymnasium as gym
+    import torch
+    from gymnasium import spaces
+    from stable_baselines3 import DQN, PPO, SAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    from core import config
+    from core.selective_norm import SelectiveVecNormalize
+    from envs.base_env import TOTAL_OBS_DIM
+
+    torch.set_num_threads(1)
+    model_classes = {"ppo": PPO, "sac": SAC, "dqn": DQN}
+    algo = str(algo).lower()
+    env_version = str(env_version).lower()
+    if algo not in model_classes:
+        raise ValueError(f"algoritmo SB3 no válido: {algo}")
+    if env_version not in ("v2", "v3"):
+        raise ValueError(f"environment SB3 no válido: {env_version}")
+
+    class _MockEnv(gym.Env):
+        def __init__(self):
+            super().__init__()
+            self.observation_space = spaces.Box(
+                low=-np.inf, high=np.inf,
+                shape=(TOTAL_OBS_DIM * config.NUM_FRAMES,),
+                dtype=np.float32,
+            )
+            self.action_space = (
+                spaces.MultiDiscrete([9, 7]) if env_version == "v3"
+                else spaces.MultiBinary(config.ACTION_DIM)
+            )
+
+        def reset(self, **_kwargs):
+            return np.zeros(self.observation_space.shape, dtype=np.float32), {}
+
+        def step(self, _action):
+            return (
+                np.zeros(self.observation_space.shape, dtype=np.float32),
+                0.0, False, False, {},
+            )
+
+    dummy_env = DummyVecEnv([_MockEnv])
+    normalizer = SelectiveVecNormalize.load(vecnorm_path, dummy_env)
+    normalizer.training = False
+    normalizer.norm_reward = False
+    custom_objects = {"learning_rate": 0.0, "clip_range": 0.0}
+    if algo in ("dqn", "sac"):
+        custom_objects["buffer_size"] = 1
+    model = model_classes[algo].load(
+        model_path, device=device, custom_objects=custom_objects)
+    return SB3Opponent(
+        SB3PerspectiveParser(env), normalizer, model, algo, env_version,
+        config.NUM_FRAMES,
+    )
+
+
 def pick_state(states_dir: str, opponent: str, opponent_type: str = "human",
                cpu_level: int = 1) -> str:
     opponent_type = str(opponent_type).lower()
-    if opponent_type not in ("human", "cpu", "model"):
+    if opponent_type not in ("human", "cpu", "model", "sb3"):
         raise SystemExit(f"[viewer] tipo de rival inválido: {opponent_type}")
 
     if opponent_type == "cpu":
@@ -338,7 +481,7 @@ def pick_state(states_dir: str, opponent: str, opponent_type: str = "human",
             "_R1_HARD.State" if cpu_level == 8
             else f"_R1_lvl{cpu_level}.State"
         )
-    else:  # humano o segundo modelo usan un savestate PvP
+    else:  # humano o cualquier modelo P2 usan un savestate PvP
         state_suffix = "_R1_PvP.State"
 
     if opponent == "RANDOM":
@@ -395,16 +538,26 @@ def main():
                     help="personaje DEL RETADOR (el rival de la IA; la IA "
                          "siempre es Ryu); RANDOM rota por round")
     ap.add_argument("--opponent-type", default="human",
-                    choices=("human", "cpu", "model"),
-                    help="humano, CPU integrada o segundo checkpoint Ape-X")
+                    choices=("human", "cpu", "model", "sb3"),
+                    help="humano, CPU integrada, segundo Ape-X o PPO/SAC/DQN")
     ap.add_argument("--cpu-level", type=int, default=1, choices=range(1, 9),
                     help="nivel exacto de la CPU integrada (1-8)")
     ap.add_argument("--p2-ckpt", default=None,
                     help="checkpoint Ape-X de Player 2 en modo model")
     ap.add_argument("--p2-device", default=None,
                     help="device de P2; por defecto usa el mismo que P1")
+    ap.add_argument("--p2-algo", choices=("ppo", "sac", "dqn"),
+                    help="algoritmo del modelo clásico de P2")
+    ap.add_argument("--p2-env", choices=("v2", "v3"), default="v2",
+                    help="versión del environment usada por el modelo P2")
+    ap.add_argument("--p2-model-zip",
+                    help="modelo SB3 .zip de P2, relativo al proyecto")
+    ap.add_argument("--p2-model-pkl",
+                    help="normalización .pkl de P2, relativa al proyecto")
     ap.add_argument("--rematch-delay", type=float, default=4.0,
                     help="segundos de pantalla de KO antes del rematch")
+    ap.add_argument("--infinite-match", action="store_true",
+                    help="hace RESET automático tras cada round")
     ap.add_argument("--device", default="cpu",
                     help="cpu basta y sobra (una inferencia cada 1-3 pasos)")
     args = ap.parse_args()
@@ -421,6 +574,9 @@ def main():
         config.P2_MODEL_NAME = f"CPU NIVEL {args.cpu_level}"
     elif args.opponent_type == "model":
         config.P2_MODEL_NAME = "LEIA - IA P2"
+    elif args.opponent_type == "sb3":
+        model_name = os.path.basename(args.p2_model_zip or "MODELO")
+        config.P2_MODEL_NAME = model_name.replace(".zip", "")
     else:
         config.P2_MODEL_NAME = "RETADOR (tu)"
     config.generate_lua_config()
@@ -435,6 +591,11 @@ def main():
     checkpoint_info["checkpoint_path"] = os.path.normpath(args.ckpt)
     if args.opponent_type == "model" and not args.p2_ckpt:
         raise SystemExit("[viewer] modo model requiere --p2-ckpt")
+    if args.opponent_type == "sb3" and not all((
+            args.p2_algo, args.p2_model_zip, args.p2_model_pkl)):
+        raise SystemExit(
+            "[viewer] modo sb3 requiere --p2-algo, --p2-model-zip y "
+            "--p2-model-pkl")
     p2_ckpt_path = (
         os.path.join(config.PROJECT_ROOT, args.p2_ckpt)
         if args.p2_ckpt else None
@@ -447,6 +608,15 @@ def main():
         }
         p2_checkpoint_info["p2_checkpoint_path"] = os.path.normpath(
             args.p2_ckpt)
+    if args.opponent_type == "sb3":
+        for prefix, selected in (
+                ("p2_model", args.p2_model_zip),
+                ("p2_normalization", args.p2_model_pkl)):
+            identity = checkpoint_provenance(os.path.join(
+                config.PROJECT_ROOT, selected))
+            identity.pop("checkpoint_benchmark", None)
+            for key, value in identity.items():
+                p2_checkpoint_info[f"{prefix}_{key}"] = value
     session_log = MatchSessionLog(
         os.path.join(config.LOG_DIR, "model_testing", "apex_viewer"),
         {
@@ -455,7 +625,12 @@ def main():
             "opponent_type": args.opponent_type,
             "requested_opponent": args.opponent,
             "cpu_level": args.cpu_level if args.opponent_type == "cpu" else None,
+            "p2_algorithm": (
+                args.p2_algo if args.opponent_type == "sb3" else None),
+            "p2_environment": (
+                args.p2_env if args.opponent_type == "sb3" else None),
             "rematch_delay_seconds": args.rematch_delay,
+            "infinite_match": args.infinite_match,
             **checkpoint_info,
             **p2_checkpoint_info,
         },
@@ -507,6 +682,7 @@ def main():
         print(f"[viewer] campeon: {os.path.basename(ckpt_path)} "
               f"({meta['in_dim']} in, {N_ACTIONS} acciones, macros)", flush=True)
         choose_action_p2 = None
+        sb3_opponent = None
         if args.opponent_type == "model":
             p2_device = args.p2_device or args.device
             choose_action_p2, p2_meta = load_champion(p2_ckpt_path, p2_device)
@@ -518,6 +694,21 @@ def main():
                                 "stand_env_client.lua")
         env = StreetFighterEnvV2(lua_path=lua_path, trainable=False, rank=0,
                                  player=1)
+        if args.opponent_type == "sb3":
+            p2_device = args.p2_device or args.device
+            sb3_opponent = load_sb3_opponent(
+                env,
+                args.p2_algo,
+                args.p2_env,
+                os.path.join(config.PROJECT_ROOT, args.p2_model_zip),
+                os.path.join(config.PROJECT_ROOT, args.p2_model_pkl),
+                p2_device,
+            )
+            print(
+                f"[viewer] modelo P2: {os.path.basename(args.p2_model_zip)} "
+                f"({args.p2_algo.upper()} {args.p2_env}, {p2_device})",
+                flush=True,
+            )
     except BaseException as exc:
         session_log.write(
             "session_error",
@@ -570,6 +761,8 @@ def main():
             for _ in range(NUM_FRAMES):
                 frames_p2.append(p2_frame)
             player_p2.reset(np.concatenate(frames_p2))
+        if sb3_opponent is not None:
+            sb3_opponent.reset(sb3_payload_from_ram(ram))
         round_started = False
         round_started_at = time.time()
         ko_time = None
@@ -613,6 +806,8 @@ def main():
                 p2_direction, p2_button = player_p2.next_step(
                     stacked_p2, choose_action_p2)
                 p2_command = bits_command(p2_direction, p2_button)
+            elif sb3_opponent is not None:
+                p2_command = sb3_opponent.command()
             env.send_command(bits_command(direction, button) + p2_command + "\n")
 
             raw = env.receive_payload()
@@ -628,6 +823,8 @@ def main():
                 p2_frame, track_p2, _p2s1, _p2s2 = assemble_v4_frame(
                     ram_for_player(ram, 2), track_p2)
                 frames_p2.append(p2_frame)
+            if sb3_opponent is not None:
+                sb3_opponent.observe(sb3_payload_from_ram(ram))
 
             p1_hp_f, p2_hp_f = float(frame[0]), float(frame[1])
             if not round_started and p1_hp_f > 0 and p2_hp_f > 0:
@@ -670,12 +867,48 @@ def main():
             if ko_time is not None and time.time() - ko_time >= args.rematch_delay:
                 print(f"[round {match_count}] {winner_msg}  |  "
                       f"IA {p1_wins} - {p2_wins} Retador", flush=True)
-                match_count += 1
-                reset_to(pick_state(
-                    config.STATES_DIR, args.opponent,
-                    opponent_type=args.opponent_type,
-                    cpu_level=args.cpu_level,
-                ))
+                if args.infinite_match:
+                    match_count += 1
+                    reset_to(pick_state(
+                        config.STATES_DIR, args.opponent,
+                        opponent_type=args.opponent_type,
+                        cpu_level=args.cpu_level,
+                    ))
+                else:
+                    # Sin auto-rematch dejamos BizHawk abierto en el resultado.
+                    # Lua sigue avanzando frames en PAUSE sin esperar socket, y
+                    # el botón Toggle puede reanudar esta misma sesión.
+                    with open(agent_state_path, "w") as state_file:
+                        state_file.write("PAUSE")
+                    session_log.write(
+                        "match_paused",
+                        round=match_count,
+                        reason="infinite_match_disabled",
+                        ia_wins=p1_wins,
+                        retador_wins=p2_wins,
+                    )
+                    print(
+                        "[viewer] Auto-rematch desactivado: BizHawk queda "
+                        "abierto. Usa Toggle para reanudar o Terminate Match "
+                        "para cerrar.",
+                        flush=True,
+                    )
+                    while not stop_requested():
+                        try:
+                            with open(agent_state_path, "r") as state_file:
+                                resumed = "PLAY" in state_file.read()
+                        except OSError:
+                            resumed = False
+                        if resumed:
+                            round_started = False
+                            round_started_at = time.time()
+                            ko_time = None
+                            winner_msg = None
+                            print("[viewer] sesión reanudada.", flush=True)
+                            break
+                        time.sleep(0.1)
+                    if stop_requested():
+                        raise KeyboardInterrupt
     except KeyboardInterrupt:
         session_end_reason = "stopped"
         print(f"\n[viewer] sesion terminada. Marcador final: "
