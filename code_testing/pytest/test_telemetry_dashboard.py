@@ -441,15 +441,69 @@ class TestTelemetryDashboard(unittest.TestCase):
             with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)), \
                  patch.object(web_dashboard, "stream_logs", fake_stream):
                 output = list(web_dashboard.run_stand(
-                    relative, "KEN", 3.5, "cpu"))
+                    relative, "human", "KEN", 1, 3.5, "cpu"))
 
             self.assertEqual(output, ["stand command ready"])
             command = captured[0]
             self.assertTrue(command[1].endswith(os.path.join("scripts", "stand_leia.py")))
             self.assertIn(relative, command)
+            self.assertEqual(command[command.index("--opponent-type") + 1], "human")
             self.assertEqual(command[command.index("--opponent") + 1], "KEN")
+            self.assertEqual(command[command.index("--cpu-level") + 1], "1")
             self.assertEqual(command[command.index("--rematch-delay") + 1], "3.5")
             self.assertNotIn("test_agent_v2.py", " ".join(command))
+
+    def test_run_stand_builds_apex_vs_apex_command(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            p1 = root / "p1.pt"
+            p2 = root / "p2.pt"
+            save_test_apex_checkpoint(p1)
+            save_test_apex_checkpoint(p2)
+            p1_relative = p1.relative_to(config.PROJECT_ROOT).as_posix()
+            p2_relative = p2.relative_to(config.PROJECT_ROOT).as_posix()
+            captured = []
+
+            def fake_stream(cmd):
+                captured.append(cmd)
+                yield "duel ready"
+
+            with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)), \
+                 patch.object(web_dashboard, "stream_logs", fake_stream):
+                output = list(web_dashboard.run_stand(
+                    p1_relative, "model", "RYU", 1, 2.0, "cpu",
+                    p2_checkpoint=p2_relative, p2_device="cpu"))
+
+            self.assertEqual(output, ["duel ready"])
+            command = captured[0]
+            self.assertEqual(command[command.index("--opponent-type") + 1], "model")
+            self.assertEqual(command[command.index("--p2-ckpt") + 1], p2_relative)
+            self.assertEqual(command[command.index("--p2-device") + 1], "cpu")
+
+    def test_run_matchup_routes_unified_apex_cpu_controls_to_stand(self):
+        from scripts import web_dashboard
+
+        captured = []
+
+        def fake_run_stand(*args, **kwargs):
+            captured.append((args, kwargs))
+            yield "apex cpu ready"
+
+        with patch.object(web_dashboard, "run_stand", fake_run_stand):
+            output = list(web_dashboard.run_matchup(
+                "apex", "v2", "None", "None", "auto",
+                "CPU (Built-in AI)", "v2", "None", "None", "auto",
+                False, True, 2.5, 7,
+                "p1_champion.pt", "p2_champion.pt", "KEN",
+            ))
+
+        self.assertEqual(output, ["apex cpu ready"])
+        args, kwargs = captured[0]
+        self.assertEqual(args[:6], (
+            "p1_champion.pt", "cpu", "KEN", 7, 2.5, "auto"))
+        self.assertEqual(kwargs["p2_checkpoint"], "p2_champion.pt")
 
     def test_run_stand_reports_corrupt_checkpoint_in_console(self):
         from scripts import web_dashboard
@@ -462,7 +516,7 @@ class TestTelemetryDashboard(unittest.TestCase):
 
             with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)):
                 output = list(web_dashboard.run_stand(
-                    relative, "KEN", 3.5, "cpu"))
+                    relative, "human", "KEN", 1, 3.5, "cpu"))
 
             self.assertEqual(len(output), 1)
             self.assertIn("Error de configuración del modelo Ape-X", output[0])
@@ -487,7 +541,8 @@ class TestTelemetryDashboard(unittest.TestCase):
         p2_algo = by_label("P2 Algorithm")
         self.assertEqual(p1_algo["props"]["value"], "ppo")
         self.assertEqual(p2_algo["props"]["value"], "ppo")
-        self.assertNotIn("apex", [choice[1] for choice in p1_algo["props"]["choices"]])
+        self.assertIn("apex", [choice[1] for choice in p1_algo["props"]["choices"]])
+        self.assertIn("apex", [choice[1] for choice in p2_algo["props"]["choices"]])
         self.assertNotEqual(p2_algo["props"].get("interactive", True), False)
 
         expected_defaults = {
@@ -508,7 +563,7 @@ class TestTelemetryDashboard(unittest.TestCase):
         self.assertTrue(by_label(
             "Enable Performance Profiling")["props"]["visible"])
         self.assertTrue(by_label(
-            "CPU Max Level Cap (Infinite Match)")["props"]["visible"])
+            "CPU Level / Classic Max Cap")["props"]["visible"])
         self.assertTrue(by_value(
             "⏯️ Toggle Agent (Play/Pause)")["props"]["visible"])
         by_value("Agent State: **PAUSED** (Default)")
@@ -524,23 +579,31 @@ class TestTelemetryDashboard(unittest.TestCase):
             and "stand" in c.get("props", {}).get("label", "").lower()
             for c in components
         ))
-        accordion = by_label("Ape-X QR-DQN vs Human (Viewer)")
-        self.assertEqual(accordion["type"], "accordion")
-        self.assertFalse(accordion["props"]["open"])
+        p1_apex = by_label("P1 Ape-X checkpoint (.pt)")
+        p2_apex = by_label("P2 Ape-X checkpoint (.pt)")
+        self.assertFalse(p1_apex["props"]["visible"])
+        self.assertFalse(p2_apex["props"]["visible"])
+        self.assertTrue(str(p1_apex["props"]["value"]).endswith(
+            "apex_v1592_benchmarked.pt"))
+        self.assertFalse(by_label(
+            "P2 Character (Ape-X matches)")["props"]["visible"])
+        self.assertFalse(any(
+            c["type"] == "accordion"
+            and "Ape-X" in c.get("props", {}).get("label", "")
+            for c in components
+        ))
 
         classic_launch = by_value("⚔️ Launch Match")
-        apex_launch = by_value("🥊 Launch Ape-X vs Human")
         dependencies = dashboard["dependencies"]
         classic_event = next(
             dep for dep in dependencies
             if (classic_launch["id"], "click") in dep.get("targets", []))
-        apex_event = next(
-            dep for dep in dependencies
-            if (apex_launch["id"], "click") in dep.get("targets", []))
         self.assertEqual(classic_event["api_name"], "run_matchup")
-        self.assertEqual(len(classic_event["inputs"]), 14)
-        self.assertEqual(apex_event["api_name"], "run_stand")
-        self.assertEqual(len(apex_event["inputs"]), 4)
+        self.assertEqual(len(classic_event["inputs"]), 17)
+        self.assertFalse(any(
+            c.get("props", {}).get("value") == "🥊 Launch Ape-X vs Human"
+            for c in components
+        ))
 
     def test_ai_vs_ai_cli_args(self):
         import argparse

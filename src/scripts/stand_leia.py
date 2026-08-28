@@ -36,6 +36,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import signal
 import sys
 import time
@@ -182,11 +183,42 @@ class MatchSessionLog:
 
 def opponent_from_state(state_path: str) -> str:
     name = os.path.basename(state_path)
-    prefix = "RYU_"
-    suffix = "_R1_PvP.State"
-    if name.startswith(prefix) and name.endswith(suffix):
-        return name[len(prefix):-len(suffix)]
+    match = re.fullmatch(
+        r"RYU_(.+)_R1_(?:PvP|lvl[1-7]|HARD)\.State", name,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1).upper()
     return name
+
+
+def ram_for_player(ram: dict, player: int) -> dict:
+    """Devuelve el RAM con el jugador elegido ocupando el contrato P1.
+
+    QR-DQN fue entrenado desde la perspectiva del luchador controlado. Para
+    usarlo como P2 hay que intercambiar todos los campos por lado y adaptar
+    las dos lecturas de airborne, cuyos valores crudos usan convenciones
+    distintas en las direcciones P1 y P2.
+    """
+    if player == 1:
+        return dict(ram)
+    if player != 2:
+        raise ValueError("player debe ser 1 o 2")
+
+    swapped = dict(ram)
+    for stem in (
+        "hp", "x", "y", "state_word", "proj_x", "char", "btn",
+        "chest", "head",
+    ):
+        swapped[f"p1_{stem}"], swapped[f"p2_{stem}"] = (
+            ram[f"p2_{stem}"], ram[f"p1_{stem}"])
+
+    # P1: 0=floor, distinto de 0=air. P2: 14=floor, 13=air.
+    swapped["p1_air_raw"] = 257 if int(ram["p2_air_raw"]) == 13 else 0
+    swapped["p2_air_raw"] = 13 if int(ram["p1_air_raw"]) != 0 else 14
+    swapped["matches_won"] = ram["enemy_matches_won"]
+    swapped["enemy_matches_won"] = ram["matches_won"]
+    return swapped
 
 
 def parse_payload(raw: str) -> dict:
@@ -292,19 +324,36 @@ def load_champion(ckpt_path: str, device: str):
     return choose_action, meta
 
 
-def pick_state(states_dir: str, opponent: str) -> str:
+def pick_state(states_dir: str, opponent: str, opponent_type: str = "human",
+               cpu_level: int = 1) -> str:
+    opponent_type = str(opponent_type).lower()
+    if opponent_type not in ("human", "cpu", "model"):
+        raise SystemExit(f"[viewer] tipo de rival inválido: {opponent_type}")
+
+    if opponent_type == "cpu":
+        cpu_level = int(cpu_level)
+        if cpu_level not in range(1, 9):
+            raise SystemExit("[viewer] el nivel de CPU debe estar entre 1 y 8")
+        state_suffix = (
+            "_R1_HARD.State" if cpu_level == 8
+            else f"_R1_lvl{cpu_level}.State"
+        )
+    else:  # humano o segundo modelo usan un savestate PvP
+        state_suffix = "_R1_PvP.State"
+
     if opponent == "RANDOM":
         available = [
             name for name in OPPONENTS
             if os.path.isfile(os.path.join(
-                states_dir, f"RYU_{name}_R1_PvP.State"))
+                states_dir, f"RYU_{name}{state_suffix}"))
         ]
         if not available:
             raise SystemExit(
-                f"[viewer] no hay savestates RYU_*_R1_PvP.State en "
-                f"{states_dir}")
+                f"[viewer] no hay savestates para rival {opponent_type} "
+                f"nivel {cpu_level if opponent_type == 'cpu' else 'PvP'} "
+                f"en {states_dir}")
         opponent = random.choice(available)
-    path = os.path.join(states_dir, f"RYU_{opponent}_R1_PvP.State")
+    path = os.path.join(states_dir, f"RYU_{opponent}{state_suffix}")
     if not os.path.exists(path):
         raise SystemExit(f"[viewer] no existe {path}")
     return path
@@ -345,6 +394,15 @@ def main():
                     choices=("RANDOM",) + OPPONENTS,
                     help="personaje DEL RETADOR (el rival de la IA; la IA "
                          "siempre es Ryu); RANDOM rota por round")
+    ap.add_argument("--opponent-type", default="human",
+                    choices=("human", "cpu", "model"),
+                    help="humano, CPU integrada o segundo checkpoint Ape-X")
+    ap.add_argument("--cpu-level", type=int, default=1, choices=range(1, 9),
+                    help="nivel exacto de la CPU integrada (1-8)")
+    ap.add_argument("--p2-ckpt", default=None,
+                    help="checkpoint Ape-X de Player 2 en modo model")
+    ap.add_argument("--p2-device", default=None,
+                    help="device de P2; por defecto usa el mismo que P1")
     ap.add_argument("--rematch-delay", type=float, default=4.0,
                     help="segundos de pantalla de KO antes del rematch")
     ap.add_argument("--device", default="cpu",
@@ -359,7 +417,12 @@ def main():
     # Etiquetas ASCII a proposito: viajan por generated_config.lua a
     # gui.text, cuyo manejo de UTF-8 no esta garantizado en BizHawk.
     config.P1_MODEL_NAME = "LEIA - IA"
-    config.P2_MODEL_NAME = "RETADOR (tu)"
+    if args.opponent_type == "cpu":
+        config.P2_MODEL_NAME = f"CPU NIVEL {args.cpu_level}"
+    elif args.opponent_type == "model":
+        config.P2_MODEL_NAME = "LEIA - IA P2"
+    else:
+        config.P2_MODEL_NAME = "RETADOR (tu)"
     config.generate_lua_config()
 
     agent_state_path = os.path.join(config.PROJECT_ROOT, ".agent_state")
@@ -370,14 +433,31 @@ def main():
     # El JSONL se comparte entre testers: guardar la ruta relativa seleccionada,
     # no C:\Users\... ni otro dato personal de la máquina anfitriona.
     checkpoint_info["checkpoint_path"] = os.path.normpath(args.ckpt)
+    if args.opponent_type == "model" and not args.p2_ckpt:
+        raise SystemExit("[viewer] modo model requiere --p2-ckpt")
+    p2_ckpt_path = (
+        os.path.join(config.PROJECT_ROOT, args.p2_ckpt)
+        if args.p2_ckpt else None
+    )
+    p2_checkpoint_info = {}
+    if p2_ckpt_path:
+        p2_checkpoint_info = {
+            f"p2_{key}": value
+            for key, value in checkpoint_provenance(p2_ckpt_path).items()
+        }
+        p2_checkpoint_info["p2_checkpoint_path"] = os.path.normpath(
+            args.p2_ckpt)
     session_log = MatchSessionLog(
         os.path.join(config.LOG_DIR, "model_testing", "apex_viewer"),
         {
-            "mode": "apex_vs_human",
+            "mode": f"apex_vs_{args.opponent_type}",
             "device": args.device,
+            "opponent_type": args.opponent_type,
             "requested_opponent": args.opponent,
+            "cpu_level": args.cpu_level if args.opponent_type == "cpu" else None,
             "rematch_delay_seconds": args.rematch_delay,
             **checkpoint_info,
+            **p2_checkpoint_info,
         },
     )
     if session_log.path:
@@ -423,9 +503,16 @@ def main():
         def stop_requested() -> bool:
             return os.path.exists(stop_file_path)
 
-        choose_action, meta = load_champion(ckpt_path, args.device)
+        choose_action_p1, meta = load_champion(ckpt_path, args.device)
         print(f"[viewer] campeon: {os.path.basename(ckpt_path)} "
               f"({meta['in_dim']} in, {N_ACTIONS} acciones, macros)", flush=True)
+        choose_action_p2 = None
+        if args.opponent_type == "model":
+            p2_device = args.p2_device or args.device
+            choose_action_p2, p2_meta = load_champion(p2_ckpt_path, p2_device)
+            print(f"[viewer] modelo P2: {os.path.basename(p2_ckpt_path)} "
+                  f"({p2_meta['in_dim']} in, {N_ACTIONS} acciones, macros)",
+                  flush=True)
 
         lua_path = os.path.join(config.PROJECT_ROOT, "lua", "v2.0",
                                 "stand_env_client.lua")
@@ -451,6 +538,9 @@ def main():
     frames = deque(maxlen=NUM_FRAMES)
     track = RamTrack()
     player = MacroPlayer()
+    frames_p2 = deque(maxlen=NUM_FRAMES)
+    track_p2 = RamTrack()
+    player_p2 = MacroPlayer()
     p1_wins = p2_wins = 0
     match_count = 1
     completed_rounds = 0
@@ -462,7 +552,7 @@ def main():
 
     def reset_to(state_path: str, discard_pending_payload: bool = False):
         nonlocal track, round_started, round_started_at, ko_time, winner_msg
-        nonlocal current_opponent
+        nonlocal track_p2, current_opponent
         ram = request_round_reset(
             env, state_path, p1_wins, p2_wins,
             discard_pending_payload=discard_pending_payload,
@@ -473,6 +563,13 @@ def main():
         for _ in range(NUM_FRAMES):
             frames.append(frame)
         player.reset(np.concatenate(frames))
+        if choose_action_p2 is not None:
+            p2_frame, track_p2, _p2s1, _p2s2 = assemble_v4_frame(
+                ram_for_player(ram, 2), RamTrack(), is_reset=True)
+            frames_p2.clear()
+            for _ in range(NUM_FRAMES):
+                frames_p2.append(p2_frame)
+            player_p2.reset(np.concatenate(frames_p2))
         round_started = False
         round_started_at = time.time()
         ko_time = None
@@ -481,7 +578,9 @@ def main():
         session_log.write(
             "round_start",
             round=match_count,
+            opponent_type=args.opponent_type,
             opponent=current_opponent,
+            cpu_level=args.cpu_level if args.opponent_type == "cpu" else None,
             savestate=os.path.basename(state_path),
             ia_wins=p1_wins,
             retador_wins=p2_wins,
@@ -496,16 +595,25 @@ def main():
     try:
         # Solo el cold-start hereda el payload que Lua emitió al conectarse.
         reset_to(
-            pick_state(config.STATES_DIR, args.opponent),
+            pick_state(
+                config.STATES_DIR, args.opponent,
+                opponent_type=args.opponent_type,
+                cpu_level=args.cpu_level,
+            ),
             discard_pending_payload=True,
         )
         while True:
             if stop_requested():
                 raise KeyboardInterrupt
             stacked = np.concatenate(frames)
-            direction, button = player.next_step(stacked, choose_action)
-            env.send_command(bits_command(direction, button)
-                             + HUMAN_PASSTHROUGH + "\n")
+            direction, button = player.next_step(stacked, choose_action_p1)
+            p2_command = HUMAN_PASSTHROUGH
+            if choose_action_p2 is not None:
+                stacked_p2 = np.concatenate(frames_p2)
+                p2_direction, p2_button = player_p2.next_step(
+                    stacked_p2, choose_action_p2)
+                p2_command = bits_command(p2_direction, p2_button)
+            env.send_command(bits_command(direction, button) + p2_command + "\n")
 
             raw = env.receive_payload()
             if not raw:
@@ -516,6 +624,10 @@ def main():
                 continue  # frame ilegible transitorio: el deque conserva el ultimo bueno
             frame, track, _s1, _s2 = assemble_v4_frame(ram, track)
             frames.append(frame)
+            if choose_action_p2 is not None:
+                p2_frame, track_p2, _p2s1, _p2s2 = assemble_v4_frame(
+                    ram_for_player(ram, 2), track_p2)
+                frames_p2.append(p2_frame)
 
             p1_hp_f, p2_hp_f = float(frame[0]), float(frame[1])
             if not round_started and p1_hp_f > 0 and p2_hp_f > 0:
@@ -537,7 +649,11 @@ def main():
                     session_log.write(
                         "round_end",
                         round=match_count,
+                        opponent_type=args.opponent_type,
                         opponent=current_opponent,
+                        cpu_level=(
+                            args.cpu_level if args.opponent_type == "cpu" else None
+                        ),
                         winner=winner,
                         result=winner_msg,
                         ending="ko" if p1_ko or p2_ko else "time_over",
@@ -555,7 +671,11 @@ def main():
                 print(f"[round {match_count}] {winner_msg}  |  "
                       f"IA {p1_wins} - {p2_wins} Retador", flush=True)
                 match_count += 1
-                reset_to(pick_state(config.STATES_DIR, args.opponent))
+                reset_to(pick_state(
+                    config.STATES_DIR, args.opponent,
+                    opponent_type=args.opponent_type,
+                    cpu_level=args.cpu_level,
+                ))
     except KeyboardInterrupt:
         session_end_reason = "stopped"
         print(f"\n[viewer] sesion terminada. Marcador final: "

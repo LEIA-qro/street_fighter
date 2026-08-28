@@ -38,7 +38,7 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1592-logs-r5"
+DASHBOARD_BUILD_ID = "v1592-unified-r6"
 
 # Una pestaña Gradio abierta conserva el schema de componentes aunque el
 # proceso de Python se reinicie. Si el app_id cambia, navegar con una query
@@ -400,6 +400,17 @@ def refresh_stand_checkpoints(current=None):
     selected = current if current in choices else get_stand_default_checkpoint(choices)
     return gr.update(choices=choices, value=selected), get_stand_checkpoint_status(selected)
 
+
+def refresh_match_apex_checkpoints(p1_current=None, p2_current=None):
+    choices = get_stand_checkpoint_files()
+    fallback = get_stand_default_checkpoint(choices)
+    p1_selected = p1_current if p1_current in choices else fallback
+    p2_selected = p2_current if p2_current in choices else fallback
+    return (
+        gr.update(choices=choices, value=p1_selected),
+        gr.update(choices=choices, value=p2_selected),
+    )
+
 def get_all_state_files():
     """Scans STATES_DIR for all available .State or .state files dynamically."""
     states_dir = config.STATES_DIR
@@ -744,7 +755,44 @@ def launch_tb():
     webbrowser.open("http://localhost:6006")
     return "TensorBoard launched at http://localhost:6006"
 
-def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_zip, p2_pkl, p2_device, profile_enabled, infinite_match_enabled=False, rematch_delay=2.0, cpu_level_cap=5):
+def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
+                p2_algo, p2_env, p2_zip, p2_pkl, p2_device,
+                profile_enabled, infinite_match_enabled=False,
+                rematch_delay=2.0, cpu_level_cap=5,
+                p1_apex_checkpoint=None, p2_apex_checkpoint=None,
+                opponent_character="RANDOM"):
+    if p1_algo == "apex":
+        opponent_types = {
+            "Human Player": "human",
+            "CPU (Built-in AI)": "cpu",
+            "apex": "model",
+        }
+        if p2_algo not in opponent_types:
+            yield (
+                "Invalid Ape-X matchup: P2 debe ser Human Player, "
+                "CPU (Built-in AI) o Ape-X QR-DQN.")
+            return
+        opponent_type = opponent_types[p2_algo]
+        if opponent_type == "model":
+            opponent_character = "RYU"
+        for log in run_stand(
+            p1_apex_checkpoint,
+            opponent_type,
+            opponent_character,
+            cpu_level_cap,
+            rematch_delay,
+            p1_device,
+            p2_checkpoint=p2_apex_checkpoint,
+            p2_device=p2_device,
+        ):
+            yield log
+        return
+    if p2_algo == "apex":
+        yield (
+            "Invalid Ape-X matchup: selecciona Ape-X como P1. "
+            "Para modelo vs modelo selecciona Ape-X también como P2.")
+        return
+
     ai_algos = ["ppo", "sac", "dqn"]
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
@@ -787,23 +835,49 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
         yield log
 
 
-def run_stand(checkpoint, opponent, rematch_delay, device):
-    """Lanza humano-vs-QR-DQN sin pasar el .pt por el loader SB3."""
+def _resolve_apex_device(device):
+    device = str(device).lower()
+    if device == "auto":
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    if device not in ("cpu", "cuda"):
+        raise ValueError("el dispositivo Ape-X debe ser auto, cpu o cuda")
+    if device == "cuda":
+        import torch
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA no está disponible en esta máquina")
+    return device
+
+
+def run_stand(checkpoint, opponent_type, opponent, cpu_level,
+              rematch_delay, device, p2_checkpoint=None, p2_device="auto"):
+    """Lanza Ape-X vs humano, CPU integrada o un segundo Ape-X."""
     try:
         _path, relative, _meta = _resolve_stand_checkpoint(checkpoint)
+        opponent_type = str(opponent_type).lower()
+        if opponent_type not in ("human", "cpu", "model"):
+            raise ValueError(f"tipo de rival no válido: {opponent_type}")
         opponent = str(opponent).upper()
         if opponent not in ("RANDOM",) + tuple(STAND_OPPONENTS):
             raise ValueError(f"rival no válido: {opponent}")
+        cpu_level = int(cpu_level)
+        if cpu_level not in range(1, 9):
+            raise ValueError("el nivel de CPU debe estar entre 1 y 8")
+        p2_relative = None
+        if opponent_type == "model":
+            if opponent != "RYU":
+                raise ValueError(
+                    "Ape-X vs Ape-X usa RYU para P2; selecciona RYU")
+            _p2_path, p2_relative, _p2_meta = _resolve_stand_checkpoint(
+                p2_checkpoint)
         rematch_delay = float(rematch_delay)
         if rematch_delay < 0:
             raise ValueError("el rematch delay no puede ser negativo")
-        device = str(device).lower()
-        if device not in ("cpu", "cuda"):
-            raise ValueError("el dispositivo de inferencia debe ser cpu o cuda")
-        if device == "cuda":
-            import torch
-            if not torch.cuda.is_available():
-                raise ValueError("CUDA no está disponible en esta máquina")
+        device = _resolve_apex_device(device)
+        p2_device = (
+            _resolve_apex_device(p2_device)
+            if opponent_type == "model" else "cpu"
+        )
     except Exception as exc:
         yield f"Error de configuración del modelo Ape-X: {exc}"
         return
@@ -812,10 +886,14 @@ def run_stand(checkpoint, opponent, rematch_delay, device):
         VENV_PYTHON,
         os.path.join(config.SRC_DIR, "scripts", "stand_leia.py"),
         "--ckpt", relative,
+        "--opponent-type", opponent_type,
         "--opponent", opponent,
+        "--cpu-level", str(cpu_level),
         "--rematch-delay", str(rematch_delay),
         "--device", device,
     ]
+    if opponent_type == "model":
+        cmd += ["--p2-ckpt", p2_relative, "--p2-device", p2_device]
     for log in stream_logs(cmd):
         yield log
 
@@ -1794,7 +1872,15 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 with gr.Column():
                     gr.Markdown("### Player 1 (Ryu)")
                     with gr.Row():
-                        p1_algo = gr.Dropdown(label="P1 Algorithm", choices=["ppo", "sac", "dqn", "Human Player"], value="ppo")
+                        p1_algo = gr.Dropdown(
+                            label="P1 Algorithm",
+                            choices=[
+                                "ppo", "sac", "dqn",
+                                ("Ape-X QR-DQN (.pt)", "apex"),
+                                "Human Player",
+                            ],
+                            value="ppo",
+                        )
                         p1_env = gr.Dropdown(label="P1 Environment", choices=["v2", "v3"], value="v2")
                     p1_device = gr.Dropdown(label="P1 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
@@ -1802,13 +1888,27 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         with gr.Row():
                             p1_zip = gr.Dropdown(label="P1 Model (.zip)", choices=zips_init, value="None")
                             p1_pkl = gr.Dropdown(label="P1 Normalization (.pkl)", choices=pkls_init, value="None")
+                        p1_apex_checkpoint = gr.Dropdown(
+                            label="P1 Ape-X checkpoint (.pt)",
+                            choices=stand_checkpoints_init,
+                            value=stand_default_init,
+                            visible=False,
+                        )
                         with gr.Row():
                             p1_zip_upload = gr.File(label="Upload P1 Model (.zip)", file_types=[".zip"])
                             p1_pkl_upload = gr.File(label="Upload P1 Normalization (.pkl)", file_types=[".pkl"])
                     
                     gr.Markdown("### Player 2 (Opponent)")
                     with gr.Row():
-                        p2_algo = gr.Dropdown(label="P2 Algorithm", choices=["ppo", "sac", "dqn", "Human Player", "CPU (Built-in AI)"], value="ppo")
+                        p2_algo = gr.Dropdown(
+                            label="P2 Algorithm",
+                            choices=[
+                                "ppo", "sac", "dqn",
+                                ("Ape-X QR-DQN (.pt)", "apex"),
+                                "Human Player", "CPU (Built-in AI)",
+                            ],
+                            value="ppo",
+                        )
                         p2_env = gr.Dropdown(label="P2 Environment", choices=["v2", "v3"], value="v2")
                     p2_device = gr.Dropdown(label="P2 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
@@ -1816,9 +1916,27 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         with gr.Row():
                             p2_zip = gr.Dropdown(label="P2 Model (.zip)", choices=zips_init, value="None")
                             p2_pkl = gr.Dropdown(label="P2 Normalization (.pkl)", choices=pkls_init, value="None")
+                        p2_apex_checkpoint = gr.Dropdown(
+                            label="P2 Ape-X checkpoint (.pt)",
+                            choices=stand_checkpoints_init,
+                            value=stand_default_init,
+                            visible=False,
+                        )
                         with gr.Row():
                             p2_zip_upload = gr.File(label="Upload P2 Model (.zip)", file_types=[".zip"])
                             p2_pkl_upload = gr.File(label="Upload P2 Normalization (.pkl)", file_types=[".pkl"])
+
+                    with gr.Row():
+                        matchup_character = gr.Dropdown(
+                            label="P2 Character (Ape-X matches)",
+                            choices=["RANDOM"] + list(STAND_OPPONENTS),
+                            value="RANDOM",
+                            visible=False,
+                        )
+                        refresh_apex_btn = gr.Button(
+                            "🔄 Refresh Ape-X checkpoints",
+                            variant="secondary",
+                        )
                     
                     with gr.Row():
                         launch_match_btn = gr.Button("⚔️ Launch Match", variant="primary")
@@ -1828,12 +1946,16 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         match_profile_checkbox = gr.Checkbox(label="Enable Performance Profiling", value=False)
                         infinite_match_checkbox = gr.Checkbox(label="🔄 Infinite Matchups (Auto-Rematch)", value=False)
                         rematch_delay_slider = gr.Slider(label="Rematch Delay (seconds)", minimum=1.0, maximum=5.0, value=2.0, step=0.5)
-                        cpu_level_cap_slider = gr.Slider(label="CPU Max Level Cap (Infinite Match)", minimum=1, maximum=8, value=5, step=1)
+                        cpu_level_cap_slider = gr.Slider(label="CPU Level / Classic Max Cap", minimum=1, maximum=8, value=5, step=1)
                     
                     with gr.Row():
                         toggle_agent_btn = gr.Button("⏯️ Toggle Agent (Play/Pause)", variant="secondary")
                     
                     agent_state_status = gr.Markdown("Agent State: **PAUSED** (Default)")
+                    gr.Markdown(
+                        "Ape-X guarda cada sesión y round en "
+                        "`logs/model_testing/apex_viewer/`."
+                    )
                     
                     match_upload_status = gr.Markdown("")
                 
@@ -1841,75 +1963,78 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False, elem_id="terminal")
                     copy_match_btn = gr.Button("📋 Copy Match Logs", size="sm")
 
-            # El viewer QR-DQN es aditivo: vive dentro de Model Testing sin
-            # cambiar defaults, controles ni eventos del matchup clásico.
-            with gr.Accordion("Ape-X QR-DQN vs Human (Viewer)", open=False):
-                gr.Markdown(
-                    "Prueba el campeón `.pt` contra un retador con el control "
-                    "físico configurado como Player 2 en BizHawk. Cada sesión "
-                    "guarda resultados persistentes en "
-                    "`logs/model_testing/apex_viewer/`."
-                )
-                with gr.Row():
-                    apex_checkpoint = gr.Dropdown(
-                        label="Ape-X checkpoint (.pt)",
-                        choices=stand_checkpoints_init,
-                        value=stand_default_init,
-                        scale=3,
-                    )
-                    apex_device = gr.Dropdown(
-                        label="Compute Device",
-                        choices=["cpu", "cuda"],
-                        value="cpu",
-                        scale=1,
-                    )
-                    apex_human_character = gr.Dropdown(
-                        label="Human Character (P2)",
-                        choices=["RANDOM"] + list(STAND_OPPONENTS),
-                        value="RANDOM",
-                        scale=1,
-                    )
-                apex_checkpoint_status = gr.Markdown(
-                    get_stand_checkpoint_status(stand_default_init)
-                )
-                with gr.Row():
-                    apex_rematch_delay = gr.Slider(
-                        label="Rematch Delay (seconds)",
-                        minimum=1.0,
-                        maximum=5.0,
-                        value=2.0,
-                        step=0.5,
-                    )
-                    refresh_apex_btn = gr.Button(
-                        "🔄 Refresh Ape-X checkpoints", variant="secondary")
-                with gr.Row():
-                    launch_apex_btn = gr.Button(
-                        "🥊 Launch Ape-X vs Human", variant="primary")
-                    stop_apex_btn = gr.Button(
-                        "🛑 Terminate Ape-X Match", variant="stop")
-                apex_logs = gr.Textbox(
-                    label="Ape-X Viewer Console",
-                    lines=15,
-                    max_lines=25,
-                    interactive=False,
-                    elem_id="terminal",
-                )
-            
             # Interactive visibility and filtering toggles
             def update_match_ui(algo):
-                is_ai = algo in ["ppo", "sac", "dqn"]
-                if not is_ai:
-                    return gr.update(visible=False), gr.update(), gr.update()
-
-                z, p = get_model_files(algo)
+                is_sb3 = algo in ["ppo", "sac", "dqn"]
+                is_apex = algo == "apex"
+                z, p = get_model_files(algo) if is_sb3 else (["None"], ["None"])
                 return (
-                    gr.update(visible=True),
-                    gr.update(choices=z, value="None"),
-                    gr.update(choices=p, value="None")
+                    gr.update(visible=is_sb3 or is_apex),
+                    gr.update(choices=z, value="None", visible=is_sb3),
+                    gr.update(choices=p, value="None", visible=is_sb3),
+                    gr.update(visible=is_sb3),
+                    gr.update(visible=is_sb3),
+                    gr.update(visible=is_apex),
                 )
 
-            p1_algo.change(update_match_ui, inputs=[p1_algo], outputs=[p1_model_group, p1_zip, p1_pkl])
-            p2_algo.change(update_match_ui, inputs=[p2_algo], outputs=[p2_model_group, p2_zip, p2_pkl])
+            p1_algo.change(
+                update_match_ui,
+                inputs=[p1_algo],
+                outputs=[
+                    p1_model_group, p1_zip, p1_pkl,
+                    p1_zip_upload, p1_pkl_upload, p1_apex_checkpoint,
+                ],
+            )
+            p2_algo.change(
+                update_match_ui,
+                inputs=[p2_algo],
+                outputs=[
+                    p2_model_group, p2_zip, p2_pkl,
+                    p2_zip_upload, p2_pkl_upload, p2_apex_checkpoint,
+                ],
+            )
+
+            def update_apex_opponent_controls(p1_algorithm, p2_algorithm):
+                apex_match = p1_algorithm == "apex"
+                allowed_apex_opponents = (
+                    "Human Player", "CPU (Built-in AI)", "apex")
+                p2_update = gr.update()
+                if apex_match and p2_algorithm not in allowed_apex_opponents:
+                    p2_algorithm = "Human Player"
+                    p2_update = gr.update(value=p2_algorithm)
+
+                if apex_match and p2_algorithm == "apex":
+                    character = gr.update(
+                        visible=True, choices=["RYU"], value="RYU",
+                        label="P2 Character (Ape-X model)",
+                    )
+                elif apex_match and p2_algorithm in (
+                        "Human Player", "CPU (Built-in AI)"):
+                    character = gr.update(
+                        visible=True,
+                        choices=["RANDOM"] + list(STAND_OPPONENTS),
+                        value="RANDOM",
+                        label="P2 Character",
+                    )
+                else:
+                    character = gr.update(visible=False)
+                cpu_label = (
+                    "CPU Level (exact, 1-8)"
+                    if apex_match and p2_algorithm == "CPU (Built-in AI)"
+                    else "CPU Max Level Cap (Infinite Match)"
+                )
+                return p2_update, character, gr.update(label=cpu_label)
+
+            p1_algo.change(
+                update_apex_opponent_controls,
+                inputs=[p1_algo, p2_algo],
+                outputs=[p2_algo, matchup_character, cpu_level_cap_slider],
+            )
+            p2_algo.change(
+                update_apex_opponent_controls,
+                inputs=[p1_algo, p2_algo],
+                outputs=[p2_algo, matchup_character, cpu_level_cap_slider],
+            )
 
             def update_infinite_match_status(is_infinite):
                 if is_infinite:
@@ -1930,7 +2055,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     p1_algo, p1_env, p1_zip, p1_pkl, p1_device, 
                     p2_algo, p2_env, p2_zip, p2_pkl, p2_device, 
                     match_profile_checkbox, infinite_match_checkbox, rematch_delay_slider,
-                    cpu_level_cap_slider
+                    cpu_level_cap_slider,
+                    p1_apex_checkpoint, p2_apex_checkpoint, matchup_character,
                 ], 
                 outputs=[match_logs]
             )
@@ -1938,27 +2064,10 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
 
-            apex_checkpoint.change(
-                get_stand_checkpoint_status,
-                inputs=[apex_checkpoint],
-                outputs=[apex_checkpoint_status],
-            )
             refresh_apex_btn.click(
-                refresh_stand_checkpoints,
-                inputs=[apex_checkpoint],
-                outputs=[apex_checkpoint, apex_checkpoint_status],
-            )
-            launch_apex_btn.click(
-                run_stand,
-                inputs=[
-                    apex_checkpoint, apex_human_character,
-                    apex_rematch_delay, apex_device,
-                ],
-                outputs=[apex_logs],
-            )
-            stop_apex_btn.click(
-                stop_match_process,
-                outputs=[apex_logs, agent_state_status],
+                refresh_match_apex_checkpoints,
+                inputs=[p1_apex_checkpoint, p2_apex_checkpoint],
+                outputs=[p1_apex_checkpoint, p2_apex_checkpoint],
             )
 
         # --- TAB 2.5: TELEMETRY ---

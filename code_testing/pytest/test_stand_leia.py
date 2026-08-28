@@ -33,7 +33,7 @@ from envs.retro_env import V4_FRAME_DIM
 from stand_leia import (
     DEFAULT_CHECKPOINT, HUMAN_PASSTHROUGH, PAYLOAD_KEYS, MacroPlayer,
     MatchSessionLog, bits_command, checkpoint_provenance, opponent_from_state,
-    parse_payload, pick_state, request_round_reset, resolve_round,
+    parse_payload, pick_state, ram_for_player, request_round_reset, resolve_round,
 )
 
 
@@ -164,6 +164,63 @@ def test_random_opponent_only_chooses_an_available_savestate(tmp_path, monkeypat
 def test_random_opponent_without_savestates_fails_before_launch(tmp_path):
     with pytest.raises(SystemExit, match="no hay savestates"):
         pick_state(str(tmp_path), "RANDOM")
+
+
+def test_cpu_opponent_uses_exact_selected_level_and_hard_for_level_8(tmp_path):
+    level3 = tmp_path / "RYU_KEN_R1_lvl3.State"
+    hard = tmp_path / "RYU_KEN_R1_HARD.State"
+    level3.touch()
+    hard.touch()
+
+    assert Path(pick_state(
+        str(tmp_path), "KEN", opponent_type="cpu", cpu_level=3
+    )).name == level3.name
+    assert Path(pick_state(
+        str(tmp_path), "KEN", opponent_type="cpu", cpu_level=8
+    )).name == hard.name
+
+
+def test_cpu_random_filters_to_the_exact_selected_level(tmp_path, monkeypatch):
+    (tmp_path / "RYU_KEN_R1_lvl2.State").touch()
+    (tmp_path / "RYU_GUILE_R1_lvl3.State").touch()
+    (tmp_path / "RYU_KEN_R1_lvl3.State").touch()
+    seen = []
+
+    def choose_available(options):
+        seen.append(tuple(options))
+        return "GUILE"
+
+    monkeypatch.setattr("stand_leia.random.choice", choose_available)
+    selected = pick_state(
+        str(tmp_path), "RANDOM", opponent_type="cpu", cpu_level=3)
+
+    assert Path(selected).name == "RYU_GUILE_R1_lvl3.State"
+    assert seen == [("GUILE", "KEN")]
+
+
+def test_ram_for_player_two_swaps_fighters_and_air_conventions():
+    ram = {key: 0 for key in PAYLOAD_KEYS}
+    ram.update({
+        "p1_hp": 170, "p2_hp": 80,
+        "p1_x": 100, "p2_x": 350,
+        "p1_y": 20, "p2_y": 40,
+        "p1_state_word": 0x1234, "p2_state_word": 0x5678,
+        "p1_proj_x": 10, "p2_proj_x": 20,
+        "p1_char": 0, "p2_char": 4,
+        "p1_btn": 11, "p2_btn": 22,
+        "p1_air_raw": 0, "p2_air_raw": 13,
+        "p1_chest": 31, "p2_chest": 41,
+        "p1_head": 32, "p2_head": 42,
+        "matches_won": 2, "enemy_matches_won": 5,
+    })
+
+    p2 = ram_for_player(ram, 2)
+
+    assert (p2["p1_hp"], p2["p2_hp"]) == (80, 170)
+    assert (p2["p1_x"], p2["p2_x"]) == (350, 100)
+    assert (p2["p1_char"], p2["p2_char"]) == (4, 0)
+    assert (p2["p1_air_raw"], p2["p2_air_raw"]) == (257, 14)
+    assert (p2["matches_won"], p2["enemy_matches_won"]) == (5, 2)
 
 
 # --------------------------------------------------------------------------
@@ -334,3 +391,5 @@ def test_checkpoint_provenance_records_hash_and_sidecar(tmp_path):
 
 def test_opponent_from_state_reports_random_choice_character():
     assert opponent_from_state("C:/LEIA/states/RYU_CHUNLI_R1_PvP.State") == "CHUNLI"
+    assert opponent_from_state("C:/LEIA/states/RYU_KEN_R1_lvl7.State") == "KEN"
+    assert opponent_from_state("C:/LEIA/states/RYU_GUILE_R1_HARD.State") == "GUILE"

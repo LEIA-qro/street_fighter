@@ -43,22 +43,29 @@ los componentes anteriores aunque el backend haya reiniciado. Abrir una carga
 fresca y versionada:
 
 ```powershell
-Start-Process "http://127.0.0.1:7860/?build=v1592-logs-r5"
+Start-Process "http://127.0.0.1:7860/?build=v1592-unified-r6"
 ```
 
-Entrar a **🎮 Model Testing & Matchups**. La
-parte superior conserva el probador clásico P1-vs-P2 (PPO/SAC/DQN, Human y
-CPU). Para el campeón nuevo, abrir el acordeón **Ape-X QR-DQN vs Human
-(Viewer)** que está debajo. Ahí elegir checkpoint/personaje/delay y pulsar
-**Launch Ape-X vs Human**. **Terminate Ape-X Match** pausa el Lua y cierra
-BizHawk. Si se copia un checkpoint nuevo con el viewer ya abierto, pulsar
-**Refresh Ape-X checkpoints**.
+Entrar a **🎮 Model Testing & Matchups**. Ape-X ya vive en los mismos
+selectores P1/P2 del probador clásico; no hay una sección duplicada abajo:
+
+1. En **P1 Algorithm**, elegir **Ape-X QR-DQN (.pt)** y seleccionar el
+   checkpoint `.pt` que aparece.
+2. En **P2 Algorithm**, elegir:
+   - **Human Player**: aparece el personaje del retador.
+   - **CPU (Built-in AI)**: aparecen personaje y nivel exacto 1–8.
+   - **Ape-X QR-DQN (.pt)**: aparece el checkpoint de P2 para modelo vs
+     modelo; ambos usan Ryu para mantener la perspectiva entrenada.
+3. Pulsar **Launch Match**. **Terminate Match** registra el cierre, pausa el
+   Lua y cierra BizHawk. Si se copia otro `.pt` con la página abierta, usar
+   **Refresh Ape-X checkpoints**.
 
 - `RANDOM` rota el PERSONAJE del retador cada round (los 12
   estados `RYU_<PERSONAJE>_R1_PvP.State` — la IA siempre es Ryu, que es como
   entrenó); también se puede fijar, por ejemplo, `KEN`.
-- El dropdown permite elegir otro campeón compatible; el slider controla la
-  pausa de KO.
+- Contra CPU, el nivel seleccionado usa exactamente
+  `RYU_<PERSONAJE>_R1_lvlN.State`; nivel 8 usa `_HARD.State`.
+- El slider de rematch controla la pausa de KO.
 - BizHawk abre solo (ventana 4×, sonido ON) y el marcador vive en pantalla:
   IA abajo-izquierda, RETADOR abajo-derecha.
 
@@ -72,8 +79,20 @@ Para diagnosticar sin Gradio se puede llamar al driver interno directamente:
 
 Sin `--ckpt`, usa
 `benchmarks\apex_milestones\apex_v1592_benchmarked.pt`.
-Admite `--opponent KEN`, `--ckpt <ruta>` y `--rematch-delay 4.0`; se termina
-con **Ctrl+C**.
+CPU nivel 6:
+
+```powershell
+.venv\Scripts\python.exe src\scripts\stand_leia.py --opponent-type cpu --cpu-level 6 --opponent RANDOM
+```
+
+Modelo vs modelo:
+
+```powershell
+.venv\Scripts\python.exe src\scripts\stand_leia.py --opponent-type model --opponent RYU --p2-ckpt benchmarks\apex_milestones\apex_v1592_benchmarked.pt
+```
+
+También admite `--opponent KEN`, `--ckpt <ruta>` y `--rematch-delay 4.0`; se
+termina con **Ctrl+C**.
 
 ## 2. El flujo del visitante
 
@@ -89,8 +108,9 @@ con **Ctrl+C**.
 - La consola canta cada round: `[round N] GANA LA IA | IA 3 - 1 Retador`.
 - Cada lanzamiento crea un JSONL durable en
   `logs\model_testing\apex_viewer\`. Guarda identidad/hash del checkpoint,
-  rival real, inicio y resultado de cada round, marcador, errores y cierre de
-  sesión. Cada evento se fuerza a disco inmediatamente, así que los rounds ya
+  tipo de rival, nivel de CPU o modelo P2, inicio y resultado de cada round,
+  marcador, errores y cierre de sesión. Cada evento se fuerza a disco
+  inmediatamente, así que los rounds ya
   terminados sobreviven aunque se cierre la pestaña o falle el emulador.
   Para localizar el más reciente en PowerShell:
 

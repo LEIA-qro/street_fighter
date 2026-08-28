@@ -1,4 +1,4 @@
--- stand_env_client.lua -- cliente BizHawk del MODO STAND (humano vs IA).
+-- stand_env_client.lua -- cliente BizHawk del viewer Ape-X unificado.
 --
 -- Clon de match_test_env_client.lua con UNA diferencia de fondo: el payload
 -- manda las 25 variables de RAM del data.json de stable-retro, CRUDAS y en
@@ -7,11 +7,11 @@
 -- proyectiles y la mascara de p2_y los deriva Python, no este script).
 -- La inyeccion es la de siempre: 20 chars, 10 por jugador; ".........."
 -- significa NO inyectar a ese jugador -> su control fisico pasa directo.
--- El stand manda bits del modelo en P1 y puntos en P2: el visitante juega
--- con el control USB configurado como Player 2 en BizHawk.
+-- Python siempre manda bits del modelo en P1. En P2 puede mandar puntos
+-- (humano o CPU integrada) o los bits de un segundo modelo Ape-X.
 
 console.clear()
-console.log("Starting LEIA Stand Client (humano vs IA)...")
+console.log("Starting LEIA Ape-X Match Client...")
 
 emu.limitframerate(true)
 client.speedmode(100)
@@ -194,8 +194,8 @@ while true do
             emu.frameadvance()
         else
             -- Inyeccion 20 chars: 10 P1 + 10 P2; ".........." = passthrough
-            -- (el control fisico de ese puerto manda). El stand siempre manda
-            -- puntos en P2: ahi vive el humano.
+            -- (el control fisico de ese puerto manda). Para modelo vs modelo,
+            -- Python manda los diez bits del segundo Ape-X en P2.
             local p1_input = {}
             local p2_input = {}
             local p1_controlled = false
