@@ -184,7 +184,8 @@ class ApexLearner:
             rec["transitions"] += len(transitions)
             stats = body.get("stats")
             if isinstance(stats, dict):
-                rec.update({k: stats[k] for k in ("procs", "steps_per_s", "host")
+                rec.update({k: stats[k] for k in ("procs", "steps_per_s", "host",
+                                                  "difficulty")
                             if k in stats})
             eps = body.get("episodes")
             if isinstance(eps, dict):

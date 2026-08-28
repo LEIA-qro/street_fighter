@@ -98,6 +98,12 @@ def main():
     ap.add_argument("--per-alpha", type=float, default=0.5)
     ap.add_argument("--per-beta0", type=float, default=0.4)
     ap.add_argument("--beta-anneal-grads", type=int, default=200_000)
+    ap.add_argument("--resume-warmup", type=int, default=400_000,
+                    help="tras un --resume-ckpt, NO entrenar hasta que el "
+                         "buffer junte este minimo. Entrenar una red madura "
+                         "sobre un buffer recien nacido (20k, sesgadisimo a "
+                         "lo reciente) es lo que degradaba los tiers altos "
+                         "en cada reinicio. ~4 min de espera a 1.7k trans/s.")
     ap.add_argument("--learn-start", type=int, default=20_000,
                     help="transiciones en buffer antes del primer gradiente")
     ap.add_argument("--target-sync", type=int, default=2_500,
@@ -158,6 +164,16 @@ def main():
         # El tope de replay-ratio se mide RELATIVO al arranque (resume_grads):
         # el buffer empieza vacio y los grads viejos no re-masticaron NADA
         # de la ingesta de este proceso.
+        if "optimizer_state" in ckpt:
+            learner.optimizer.load_state_dict(ckpt["optimizer_state"])
+            print("[learner] optimizador RESTAURADO (momentos de Adam intactos)",
+                  flush=True)
+        else:
+            print("[learner] OJO: checkpoint viejo sin optimizador -- Adam "
+                  "arranca amnesico; el warmup de buffer amortigua el golpe",
+                  flush=True)
+        if "target_state" in ckpt:
+            learner.target.load_state_dict(ckpt["target_state"])
         resume_grads = int(ckpt.get("meta", {}).get("grad_steps", 0) or 0)
         with learner.lock:
             learner.grad_steps = resume_grads
@@ -217,7 +233,15 @@ def main():
 
     def save_ckpt(tag):
         path = os.path.join(args.out, f"apex_{tag}.pt")
+        # El optimizador y la target VAN en el checkpoint. Sin ellos, cada
+        # resume arrancaba con Adam amnesico (sus escalas por parametro,
+        # calibradas durante millones de pasos, a cero) mordiendo una red
+        # convergida sobre un buffer de 20k: por eso TODOS los reinicios
+        # degradaban los win rates (medido 2026-08-28: lvl8 .75 -> .615 tras
+        # el resume de 2.1M). El banco y el visor ignoran las claves extra.
         torch.save({"state_dict": learner.online.state_dict(),
+                    "optimizer_state": learner.optimizer.state_dict(),
+                    "target_state": learner.target.state_dict(),
                     "meta": {"in_dim": learner.in_dim,
                              "quantiles": args.quantiles, "hidden": args.hidden,
                              "onehot": not args.no_onehot,
@@ -232,7 +256,9 @@ def main():
             with learner.lock:
                 buffered = learner.buffer.size
                 ingested = learner.transitions_in
-            if buffered < args.learn_start:
+            piso = max(args.learn_start,
+                       args.resume_warmup if args.resume_ckpt else 0)
+            if buffered < piso:
                 time.sleep(0.5)
                 continue
             # tope de replay ratio: no re-masticar el buffer si los actores

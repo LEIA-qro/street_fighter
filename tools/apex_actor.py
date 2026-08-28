@@ -270,7 +270,13 @@ def main():
                 body = {"actor": name, "b64": encode_transitions(chunk),
                         "stats": {"procs": args.procs,
                                   "steps_per_s": round(rate, 1),
-                                  "host": socket.gethostname()},
+                                  "host": socket.gethostname(),
+                                  # C2: sin esto, la banda de dificultad de
+                                  # cada actor era INVISIBLE -- y un actor
+                                  # relanzado con la banda equivocada diluia
+                                  # la dieta de tiers altos sin que nadie
+                                  # pudiera verlo (sospecha del 2026-08-28).
+                                  "difficulty": args.difficulty},
                         "episodes": {"wins": ep_wins, "count": ep_count,
                                      "levels": ep_levels}}
                 resp = _http_json(f"{learner_url}/transitions", body=body)
