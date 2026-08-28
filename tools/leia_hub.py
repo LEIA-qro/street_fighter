@@ -147,7 +147,22 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         ruta = self.path.split("?")[0]
-        if ruta in ("/", "/index.html"):
+        # La app compilada (React+shadcn, build de consola-app/) es la consola
+        # principal; el HTML plano queda en /simple como respaldo sin build.
+        if ruta in ("/", "/index.html") and os.path.isdir(os.path.join(WEB, "app")):
+            self._archivo(os.path.join(WEB, "app", "index.html"), "text/html")
+        elif ruta.startswith("/app/"):
+            rel = os.path.normpath(ruta[len("/app/"):])
+            if rel.startswith(".."):
+                self._enviar("no", "text/plain", 400); return
+            destino = os.path.join(WEB, "app", rel or "index.html")
+            if os.path.isdir(destino):
+                destino = os.path.join(destino, "index.html")
+            tipo = {"js": "text/javascript", "css": "text/css", "html": "text/html",
+                    "svg": "image/svg+xml", "png": "image/png",
+                    "woff2": "font/woff2"}.get(destino.rsplit(".", 1)[-1], "application/octet-stream")
+            self._archivo(destino, tipo)
+        elif ruta == "/simple":
             self._archivo(os.path.join(WEB, "consola.html"), "text/html")
         elif ruta == "/champion-chrome.css":
             self._archivo(os.path.join(DESIGN, "champion-chrome.css"), "text/css")

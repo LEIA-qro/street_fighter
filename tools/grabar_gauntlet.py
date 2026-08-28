@@ -114,9 +114,11 @@ def main():
     ap.add_argument("--difficulty", type=int, default=8)
     ap.add_argument("--out", default=None)
     ap.add_argument("--target-mb", type=float, default=0.0,
-                    help="tamano objetivo en MB. 0 (default) = manda la CALIDAD: "
-                         "se codifica por CRF y el archivo pesa lo que pese. "
-                         "Poner un tope aqui recomprime y se nota.")
+                    help="tope de tamano en MB. 0 (default) = manda la CALIDAD: "
+                         "se codifica por CRF y pesa lo que pese. Referencia: "
+                         "WhatsApp admite ~100 MB, y las 12 peleas completas a "
+                         "CRF 20 caben debajo. Apretar mucho SI se nota: 17 min "
+                         "en 18 MB son 145 kbps.")
     ap.add_argument("--rounds-to-win", type=int, default=2, help="2 = al mejor de tres")
     ap.add_argument("--max-steps", type=int, default=6000, help="tope por pelea")
     ap.add_argument("--crf", type=int, default=17,
@@ -138,9 +140,9 @@ def main():
                          "interrumpan la ejecucion.")
     ap.add_argument("--rivales", default=None,
                     help="subconjunto separado por comas (ej. BALROG,EHONDA,GUILE). "
-                         "Para VIDEO importa: 12 peleas al mejor de 3 son ~17 min, "
-                         "y 17 min en 18 MB son 145 kbps, o sea una papa. Cuatro "
-                         "rivales caben en 18 MB a calidad decente.")
+                         "Las 12 peleas al mejor de 3 son ~17 min y caben enteras "
+                         "en el limite de WhatsApp (~100 MB) a buena calidad; usa "
+                         "esto solo si quieres un clip corto de rivales concretos.")
     ap.add_argument("--seed", type=int, default=None,
                     help="semilla del sorteo. Por defecto es el reloj, para que "
                          "dos corridas no se copien; fijala para reproducir.")
@@ -226,10 +228,17 @@ def main():
 
     ganadas = sum(1 for _r, _n, _s, g, _p in marcador if g)
 
-    # El acta por escrito, para que la consola pueda mostrar PELEAS COMPLETAS
-    # en vez del win rate de rounds -- que es el numero halagador y el que se
-    # presta a leerse como "le gana al juego" sin serlo.
-    acta = destino.replace(".mp4", ".json")
+    # El acta por escrito. SEMANTICA DE ARCHIVOS (aprendida por las malas: una
+    # corrida de video con n=12 piso la medicion de n=360 porque compartian
+    # nombre): la MEDICION DE REGISTRO (--sin-video) vive en
+    # benchmarks/gauntlet_lvlN.json y es lo que la consola muestra; una corrida
+    # CON video escribe su acta como sidecar del video (<video>.json) y no toca
+    # el registro -- un video es una ilustracion, no una medicion.
+    if args.sin_video:
+        acta = os.path.join(os.path.dirname(destino) or ".",
+                            f"gauntlet_lvl{args.difficulty}.json")
+    else:
+        acta = destino.replace(".mp4", ".video.json")
     with open(acta, "w", encoding="utf-8") as f:
         json.dump({
             "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),

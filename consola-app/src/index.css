@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* ============================================================
+   CHAMPION CHROME -- el contrato de color del proyecto, portado
+   1:1 de design/champion-chrome.css (la fuente de verdad, medida
+   por design/verificar-contraste.py). El lima #C8EC40 vive en
+   --champion, NO en --accent: en shadcn accent es hover/focus.
+   ============================================================ */
+:root {
+  --background: #EEF0F6; --foreground: #0F1424;
+  --card: #F8F9FC; --card-foreground: #0F1424;
+  --popover: #F8F9FC; --popover-foreground: #0F1424;
+  --muted: #E0E4EE; --muted-foreground: #4E5670;
+  --border: #C9CFDE; --input: #7B84A0; --ring: #206488;
+  --primary: #206488; --primary-foreground: #FFFFFF;
+  --secondary: #00688C; --secondary-foreground: #FFFFFF;
+  --destructive: #A81400; --destructive-foreground: #FFFFFF;
+  --success: #00684A; --success-foreground: #FFFFFF;
+  --warning: #886400; --warning-foreground: #FFFFFF;
+  --accent: #E0E4EE; --accent-foreground: #0F1424;
+  --champion: #4A6B00; --champion-foreground: #FFFFFF;
+  --destructive-fg: #A81400; --secondary-fg: #00688C; --warning-fg: #826000;
+  --state-running: #00684A; --state-running-subtle: #D7E7E0; --state-running-fg: #00684A;
+  --state-stopped: #4E5670; --state-stopped-subtle: #E2E5EC; --state-stopped-fg: #434B63;
+  --state-degraded: #886400; --state-degraded-subtle: #E8E4D9; --state-degraded-fg: #826000;
+  --state-alarm: #A81400; --state-alarm-subtle: #EDD9D9; --state-alarm-fg: #A81400;
+  --state-champion: #4A6B00; --state-champion-subtle: #E4EBD2; --state-champion-fg: #44620A;
+  --state-unknown: #7B84A0; --state-unknown-subtle: #E6E8EE; --state-unknown-fg: #5A6178;
+  --radius: 0.5rem;
+}
+.dark {
+  --background: #05070F; --foreground: #E8ECE8;
+  --card: #0D1020; --card-foreground: #E8ECE8;
+  --popover: #0D1020; --popover-foreground: #E8ECE8;
+  --muted: #161B30; --muted-foreground: #9AA3BE;
+  --border: #262C48; --input: #525E8C; --ring: #40A8C8;
+  --primary: #40A8C8; --primary-foreground: #05070F;
+  --secondary: #3E85C0; --secondary-foreground: #05070F;
+  --destructive: #E83A2A; --destructive-foreground: #05070F;
+  --success: #40CC88; --success-foreground: #05070F;
+  --warning: #E8CC00; --warning-foreground: #05070F;
+  --accent: #161B30; --accent-foreground: #E8ECE8;
+  --champion: #C8EC40; --champion-foreground: #05070F;
+  --destructive-fg: #EA4B3C; --secondary-fg: #4389C2; --warning-fg: #E8CC00;
+  --state-running: #40CC88; --state-running-subtle: #10241B; --state-running-fg: #40CC88;
+  --state-stopped: #9AA3BE; --state-stopped-subtle: #161B30; --state-stopped-fg: #9AA3BE;
+  --state-degraded: #E8CC00; --state-degraded-subtle: #241F08; --state-degraded-fg: #E8CC00;
+  --state-alarm: #E83A2A; --state-alarm-subtle: #2A100C; --state-alarm-fg: #EE5F51;
+  --state-champion: #C8EC40; --state-champion-subtle: #1E260C; --state-champion-fg: #C8EC40;
+  --state-unknown: #525E8C; --state-unknown-subtle: #14182A; --state-unknown-fg: #8C95B4;
+}
+
+/* Registro @theme: SIN esto, bg-<token> no genera clase (silencioso). */
+@theme inline {
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover); --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary); --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive); --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success); --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning); --color-warning-foreground: var(--warning-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
+  --color-champion: var(--champion); --color-champion-foreground: var(--champion-foreground);
+  --color-destructive-fg: var(--destructive-fg); --color-secondary-fg: var(--secondary-fg);
+  --color-warning-fg: var(--warning-fg);
+  --color-state-running: var(--state-running); --color-state-running-subtle: var(--state-running-subtle); --color-state-running-fg: var(--state-running-fg);
+  --color-state-stopped: var(--state-stopped); --color-state-stopped-subtle: var(--state-stopped-subtle); --color-state-stopped-fg: var(--state-stopped-fg);
+  --color-state-degraded: var(--state-degraded); --color-state-degraded-subtle: var(--state-degraded-subtle); --color-state-degraded-fg: var(--state-degraded-fg);
+  --color-state-alarm: var(--state-alarm); --color-state-alarm-subtle: var(--state-alarm-subtle); --color-state-alarm-fg: var(--state-alarm-fg);
+  --color-state-champion: var(--state-champion); --color-state-champion-subtle: var(--state-champion-subtle); --color-state-champion-fg: var(--state-champion-fg);
+  --color-state-unknown: var(--state-unknown); --color-state-unknown-subtle: var(--state-unknown-subtle); --color-state-unknown-fg: var(--state-unknown-fg);
+  --font-display: "Chakra Petch", sans-serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius-lg: var(--radius); --radius-md: calc(var(--radius) - 2px); --radius-sm: calc(var(--radius) - 4px);
+}
+
+body { background: var(--background); color: var(--foreground);
+       font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.tnum { font-variant-numeric: tabular-nums; }
