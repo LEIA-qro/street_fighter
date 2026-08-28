@@ -1,14 +1,34 @@
 import os
 import json
+import tempfile
+import time
 import unittest
 import numpy as np
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 # Set up paths
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from core import config
 from core.telemetry import write_telemetry, clean_telemetry
+
+
+def save_test_apex_checkpoint(path, broken=False):
+    import torch
+    from agents.rainbow import QRDuelingNet
+
+    meta = {
+        "in_dim": 212,
+        "hidden": 8,
+        "quantiles": 3,
+        "onehot": True,
+        "n_actions": 72,
+        "macros": True,
+    }
+    state_dict = {"probe": torch.zeros(1)} if broken else QRDuelingNet(
+        212, n_actions=72, n_quantiles=3, hidden=8).state_dict()
+    torch.save({"meta": meta, "state_dict": state_dict}, path)
 
 
 class TestTelemetryDashboard(unittest.TestCase):
@@ -272,6 +292,62 @@ class TestTelemetryDashboard(unittest.TestCase):
             state.active_process.poll()
             state.active_process = None
 
+    def test_stream_logs_pending_launch_can_be_cancelled(self):
+        from scripts.web_dashboard import (
+            VENV_PYTHON, graceful_stop_process, state, stream_logs,
+        )
+
+        generator = stream_logs([
+            VENV_PYTHON, "-c", "print('SHOULD_NOT_START')",
+        ])
+        self.assertIn("Executing:", next(generator))
+        with state.process_lock:
+            self.assertIsNotNone(state.launch_token)
+            self.assertIsNone(state.active_process)
+
+        message = graceful_stop_process()
+        self.assertIn("cancelled", message)
+        remaining = list(generator)
+        self.assertTrue(any("Launch cancelled" in item for item in remaining))
+        with state.process_lock:
+            self.assertIsNone(state.launch_token)
+            self.assertIsNone(state.active_process)
+
+    def test_stream_logs_disconnect_keeps_live_process_stoppable(self):
+        from scripts.web_dashboard import stream_logs, VENV_PYTHON, state
+
+        stop_file = Path(config.PROJECT_ROOT) / ".stop_training"
+        stop_file.write_text("STOP", encoding="utf-8")
+        generator = stream_logs([
+            VENV_PYTHON, "-u", "-c",
+            "import time; print('READY', flush=True); time.sleep(10)",
+        ])
+        self.assertIn("Executing:", next(generator))
+        child_output = next(generator)
+        self.assertIn("READY", child_output)
+        self.assertNotIn("[ERROR]", child_output)
+        self.assertFalse(stop_file.exists())
+
+        with state.process_lock:
+            proc = state.active_process
+        self.assertIsNotNone(proc)
+        self.assertIsNone(proc.poll())
+
+        generator.close()
+        with state.process_lock:
+            self.assertIs(state.active_process, proc)
+
+        proc.terminate()
+        proc.wait(timeout=5)
+        deadline = time.time() + 2.0
+        while time.time() < deadline:
+            with state.process_lock:
+                if state.active_process is None:
+                    break
+            time.sleep(0.01)
+        with state.process_lock:
+            self.assertIsNone(state.active_process)
+
     def test_match_testing_args_and_commands(self):
         from scripts.web_dashboard import run_matchup
         
@@ -281,6 +357,190 @@ class TestTelemetryDashboard(unittest.TestCase):
                           False, True, 3.0)
         msg = next(gen)
         self.assertIn("Invalid Matchup", msg)
+
+    def test_stand_checkpoint_discovery_filters_non_macro_models(self):
+        import torch
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            good = root / "good_macro.pt"
+            bad = root / "old_primitive.pt"
+            broken = root / "broken_weights.pt"
+            save_test_apex_checkpoint(good)
+            save_test_apex_checkpoint(broken, broken=True)
+            torch.save({
+                "meta": {"in_dim": 212, "n_actions": 63, "macros": False},
+                "state_dict": {"probe": torch.zeros(1)},
+            }, bad)
+
+            found = web_dashboard.get_stand_checkpoint_files([root])
+            self.assertEqual(found, [good.relative_to(config.PROJECT_ROOT).as_posix()])
+
+    def test_stand_default_fallback_prioritizes_full_ladder(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            four_levels = root / "four_levels.pt"
+            eight_levels = root / "eight_levels.pt"
+            four_levels.touch()
+            eight_levels.touch()
+            four_metrics = {"wr_media": 0.99}
+            eight_metrics = {"wr_media": 0.80}
+            for level in range(1, 5):
+                four_metrics[f"wr_lvl{level}"] = 0.99
+            for level in range(1, 9):
+                eight_metrics[f"wr_lvl{level}"] = 0.80
+            Path(str(four_levels) + ".json").write_text(
+                json.dumps(four_metrics), encoding="utf-8")
+            Path(str(eight_levels) + ".json").write_text(
+                json.dumps(eight_metrics), encoding="utf-8")
+
+            choices = [
+                four_levels.relative_to(config.PROJECT_ROOT).as_posix(),
+                eight_levels.relative_to(config.PROJECT_ROOT).as_posix(),
+            ]
+            selected = web_dashboard.get_stand_default_checkpoint(choices)
+            self.assertEqual(selected, choices[1])
+
+    def test_stand_status_does_not_label_four_levels_as_eight(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            ckpt = root / "four_levels.pt"
+            save_test_apex_checkpoint(ckpt)
+            metrics = {"wr_media": 0.90}
+            for level in range(1, 5):
+                metrics[f"wr_lvl{level}"] = 0.90
+            Path(str(ckpt) + ".json").write_text(
+                json.dumps(metrics), encoding="utf-8")
+            relative = ckpt.relative_to(config.PROJECT_ROOT).as_posix()
+
+            with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)):
+                status = web_dashboard.get_stand_checkpoint_status(relative)
+
+            self.assertIn("WR reportado en sidecar (4 niveles)", status)
+            self.assertNotIn("selector robusto (8 niveles", status)
+
+    def test_run_stand_builds_dedicated_apex_command(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            ckpt = root / "champion.pt"
+            save_test_apex_checkpoint(ckpt)
+            relative = ckpt.relative_to(config.PROJECT_ROOT).as_posix()
+            captured = []
+
+            def fake_stream(cmd):
+                captured.append(cmd)
+                yield "stand command ready"
+
+            with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)), \
+                 patch.object(web_dashboard, "stream_logs", fake_stream):
+                output = list(web_dashboard.run_stand(
+                    relative, "KEN", 3.5, "cpu"))
+
+            self.assertEqual(output, ["stand command ready"])
+            command = captured[0]
+            self.assertTrue(command[1].endswith(os.path.join("scripts", "stand_leia.py")))
+            self.assertIn(relative, command)
+            self.assertEqual(command[command.index("--opponent") + 1], "KEN")
+            self.assertEqual(command[command.index("--rematch-delay") + 1], "3.5")
+            self.assertNotIn("test_agent_v2.py", " ".join(command))
+
+    def test_run_stand_reports_corrupt_checkpoint_in_console(self):
+        from scripts import web_dashboard
+
+        with tempfile.TemporaryDirectory(dir=config.PROJECT_ROOT) as tmp:
+            root = Path(tmp)
+            ckpt = root / "corrupt.pt"
+            ckpt.write_bytes(b"not a torch checkpoint")
+            relative = ckpt.relative_to(config.PROJECT_ROOT).as_posix()
+
+            with patch.object(web_dashboard, "STAND_CHECKPOINT_DIRS", (root,)):
+                output = list(web_dashboard.run_stand(
+                    relative, "KEN", 3.5, "cpu"))
+
+            self.assertEqual(len(output), 1)
+            self.assertIn("Error de configuración del modelo Ape-X", output[0])
+
+    def test_model_testing_preserves_classic_ui_and_adds_apex_viewer(self):
+        from scripts import web_dashboard
+
+        dashboard = web_dashboard.demo.get_config_file()
+        components = dashboard["components"]
+
+        def by_label(label):
+            matches = [c for c in components if c.get("props", {}).get("label") == label]
+            self.assertEqual(len(matches), 1, label)
+            return matches[0]
+
+        def by_value(value):
+            matches = [c for c in components if c.get("props", {}).get("value") == value]
+            self.assertEqual(len(matches), 1, value)
+            return matches[0]
+
+        p1_algo = by_label("P1 Algorithm")
+        p2_algo = by_label("P2 Algorithm")
+        self.assertEqual(p1_algo["props"]["value"], "ppo")
+        self.assertEqual(p2_algo["props"]["value"], "ppo")
+        self.assertNotIn("apex", [choice[1] for choice in p1_algo["props"]["choices"]])
+        self.assertNotEqual(p2_algo["props"].get("interactive", True), False)
+
+        expected_defaults = {
+            "P1 Environment": "v2",
+            "P1 Compute Device": "auto",
+            "P1 Model (.zip)": "None",
+            "P2 Environment": "v2",
+            "P2 Compute Device": "auto",
+            "P2 Model (.zip)": "None",
+        }
+        for label, value in expected_defaults.items():
+            component = by_label(label)
+            self.assertEqual(component["props"]["value"], value)
+            self.assertTrue(component["props"]["visible"])
+
+        self.assertFalse(by_label(
+            "🔄 Infinite Matchups (Auto-Rematch)")["props"]["value"])
+        self.assertTrue(by_label(
+            "Enable Performance Profiling")["props"]["visible"])
+        self.assertTrue(by_label(
+            "CPU Max Level Cap (Infinite Match)")["props"]["visible"])
+        self.assertTrue(by_value(
+            "⏯️ Toggle Agent (Play/Pause)")["props"]["visible"])
+        by_value("Agent State: **PAUSED** (Default)")
+
+        model_tabs = [
+            c for c in components
+            if c["type"] == "tabitem"
+            and "Model Testing & Matchups" in c.get("props", {}).get("label", "")
+        ]
+        self.assertEqual(len(model_tabs), 1)
+        self.assertFalse(any(
+            c["type"] == "tabitem"
+            and "stand" in c.get("props", {}).get("label", "").lower()
+            for c in components
+        ))
+        accordion = by_label("Ape-X QR-DQN vs Human (Viewer)")
+        self.assertEqual(accordion["type"], "accordion")
+        self.assertFalse(accordion["props"]["open"])
+
+        classic_launch = by_value("⚔️ Launch Match")
+        apex_launch = by_value("🥊 Launch Ape-X vs Human")
+        dependencies = dashboard["dependencies"]
+        classic_event = next(
+            dep for dep in dependencies
+            if (classic_launch["id"], "click") in dep.get("targets", []))
+        apex_event = next(
+            dep for dep in dependencies
+            if (apex_launch["id"], "click") in dep.get("targets", []))
+        self.assertEqual(classic_event["api_name"], "run_matchup")
+        self.assertEqual(len(classic_event["inputs"]), 14)
+        self.assertEqual(apex_event["api_name"], "run_stand")
+        self.assertEqual(len(apex_event["inputs"]), 4)
 
     def test_ai_vs_ai_cli_args(self):
         import argparse
@@ -332,6 +592,35 @@ class TestTelemetryDashboard(unittest.TestCase):
         next(gen)
         with open(state_file, "r") as f:
             self.assertEqual(f.read().strip(), "PAUSE")
+
+    def test_busy_match_launch_does_not_rewrite_active_agent_state(self):
+        from scripts.web_dashboard import run_matchup, state
+
+        state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+        with open(state_file, "w") as f:
+            f.write("PLAY")
+
+        with state.process_lock:
+            previous_process = state.active_process
+            previous_token = state.launch_token
+            previous_cleanup = state.cleanup_in_progress
+            state.active_process = object()
+            state.launch_token = None
+            state.cleanup_in_progress = False
+        try:
+            output = list(run_matchup(
+                "ppo", "v2", "dummy.zip", "dummy.pkl", "auto",
+                "Human Player", "v2", "None", "None", "auto",
+                False, False, 2.0,
+            ))
+            self.assertEqual(output, ["Error: A process is already running!"])
+            with open(state_file, "r") as f:
+                self.assertEqual(f.read().strip(), "PLAY")
+        finally:
+            with state.process_lock:
+                state.active_process = previous_process
+                state.launch_token = previous_token
+                state.cleanup_in_progress = previous_cleanup
 
     def test_safe_banner_encoding(self):
         # Test that ASCII banners encode properly in cp1252 and UTF-8

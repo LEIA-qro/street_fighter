@@ -30,8 +30,8 @@ from envs.action_macros import MACROS, N_ACTIONS, N_PRIMITIVES
 from envs.macro_wrapper import MacroActionWrapper
 from envs.retro_env import V4_FRAME_DIM
 from stand_leia import (
-    HUMAN_PASSTHROUGH, PAYLOAD_KEYS, MacroPlayer, bits_command, parse_payload,
-    resolve_round,
+    DEFAULT_CHECKPOINT, HUMAN_PASSTHROUGH, PAYLOAD_KEYS, MacroPlayer,
+    bits_command, parse_payload, pick_state, request_round_reset, resolve_round,
 )
 
 
@@ -73,6 +73,95 @@ def test_resolve_round_time_over():
     assert winner == "retador"
     assert resolve_round(False, False, 0, 60.0, 60.0)[0] == "empate"
     assert resolve_round(False, False, 153, 60.0, 60.0) is None
+
+
+# --------------------------------------------------------------------------
+# 1c. Reset: cold-start tiene un payload pendiente; rematch no
+# --------------------------------------------------------------------------
+
+class ResetProtocolEnv:
+    def __init__(self, payloads):
+        self.payloads = list(payloads)
+        self.events = []
+
+    def send_command(self, command):
+        self.events.append(("send", command))
+
+    def receive_payload(self):
+        self.events.append(("receive", None))
+        return self.payloads.pop(0)
+
+
+def test_cold_start_discards_exactly_one_pre_reset_payload():
+    env = ResetProtocolEnv(["pre-reset", "post-reset"])
+
+    payload = request_round_reset(
+        env, "RYU_KEN_R1_PvP.State", 0, 0,
+        discard_pending_payload=True,
+        payload_parser=lambda raw: raw,
+    )
+
+    assert payload == "post-reset"
+    assert env.events == [
+        ("send", "RESET RYU_KEN_R1_PvP.State|0|0\n"),
+        ("receive", None),
+        ("receive", None),
+    ]
+
+
+def test_rematch_consumes_one_post_reset_payload_without_deadlock():
+    env = ResetProtocolEnv(["post-reset"])
+
+    payload = request_round_reset(
+        env, "RYU_GUILE_R1_PvP.State", 3, 2,
+        payload_parser=lambda raw: raw,
+    )
+
+    assert payload == "post-reset"
+    assert env.events == [
+        ("send", "RESET RYU_GUILE_R1_PvP.State|3|2\n"),
+        ("receive", None),
+    ]
+
+
+def test_invalid_post_reset_payload_fails_without_second_receive():
+    env = ResetProtocolEnv(["invalid"])
+
+    def reject_payload(_raw):
+        raise ValueError("bad payload")
+
+    with pytest.raises(RuntimeError, match="payload post-reset inválido"):
+        request_round_reset(
+            env, "RYU_GUILE_R1_PvP.State", 0, 0,
+            payload_parser=reject_payload,
+        )
+
+    assert env.events == [
+        ("send", "RESET RYU_GUILE_R1_PvP.State|0|0\n"),
+        ("receive", None),
+    ]
+
+
+def test_random_opponent_only_chooses_an_available_savestate(tmp_path, monkeypatch):
+    (tmp_path / "RYU_KEN_R1_PvP.State").touch()
+    (tmp_path / "RYU_GUILE_R1_PvP.State").touch()
+    seen = []
+
+    def choose_available(options):
+        seen.append(tuple(options))
+        return "GUILE"
+
+    monkeypatch.setattr("stand_leia.random.choice", choose_available)
+
+    state_path = pick_state(str(tmp_path), "RANDOM")
+
+    assert Path(state_path).name == "RYU_GUILE_R1_PvP.State"
+    assert seen == [("GUILE", "KEN")]
+
+
+def test_random_opponent_without_savestates_fails_before_launch(tmp_path):
+    with pytest.raises(SystemExit, match="no hay savestates"):
+        pick_state(str(tmp_path), "RANDOM")
 
 
 # --------------------------------------------------------------------------
@@ -198,3 +287,8 @@ def test_latest_frame_hp_indices():
 
 def test_n_actions_is_72():
     assert N_ACTIONS == 72  # el vocabulario del campeon con macros
+
+
+def test_default_checkpoint_tracks_full_ladder_champion():
+    assert Path(DEFAULT_CHECKPOINT).as_posix().endswith(
+        "benchmarks/apex_milestones/apex_escalera_best.pt")

@@ -14,6 +14,11 @@ from pathlib import Path
 # Add src directory to path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 from core import config
+from envs.action_macros import N_ACTIONS as STAND_N_ACTIONS
+from scripts.stand_leia import (
+    DEFAULT_CHECKPOINT as STAND_DEFAULT_CHECKPOINT,
+    OPPONENTS as STAND_OPPONENTS,
+)
 
 # Virtual Environment Detection / Setup
 VENV_PYTHON = os.path.join(config.PROJECT_ROOT, ".venv", "Scripts", "python.exe")
@@ -24,10 +29,104 @@ if not os.path.exists(VENV_PYTHON):
 
 # Global state for background processes
 class GlobalState:
-    active_process = None
-    stop_event = threading.Event()
+    def __init__(self):
+        self.active_process = None
+        self.launch_token = None
+        self.cleanup_in_progress = False
+        self.stop_event = threading.Event()
+        self.process_lock = threading.Lock()
 
 state = GlobalState()
+
+DASHBOARD_BUILD_ID = "v1404-additive-r3"
+
+# Una pestaña Gradio abierta conserva el schema de componentes aunque el
+# proceso de Python se reinicie. Si el app_id cambia, navegar con una query
+# nueva fuerza a descargar el frontend correspondiente al backend vigente.
+_DASHBOARD_RELOAD_HEAD = r'''<script>
+(() => {
+  const cfg = window.gradio_config || {};
+  let loadedAppId = cfg.app_id;
+  const root = (cfg.root || window.location.origin).replace(/\/$/, "");
+  const prefix = cfg.api_prefix || "/gradio_api";
+  const endpoint = `${root}${prefix}/app_id`;
+  document.documentElement.dataset.leiaWatcherApp = String(loadedAppId || "pending");
+  console.info(`[LEIA] reload watcher active for app ${loadedAppId || "pending"}`);
+  const timer = window.setInterval(async () => {
+    try {
+      const response = await fetch(`${endpoint}?_=${Date.now()}`, {
+        cache: "no-store"
+      });
+      if (!response.ok) return;
+      const {app_id: liveAppId} = await response.json();
+      if (!loadedAppId) {
+        loadedAppId = liveAppId;
+        document.documentElement.dataset.leiaWatcherApp = String(liveAppId);
+        return;
+      }
+      if (liveAppId && liveAppId !== loadedAppId) {
+        console.info(`[LEIA] app changed ${loadedAppId} -> ${liveAppId}; reloading`);
+        window.clearInterval(timer);
+        const fresh = new URL(window.location.href);
+        fresh.searchParams.set("_app", String(liveAppId));
+        window.location.replace(fresh.toString());
+      }
+    } catch (_) {
+      // Un restart breve puede rechazar una consulta; el siguiente tick reintenta.
+    }
+  }, 3000);
+})();
+</script>'''
+
+
+def _finish_emulator_cleanup(proc=None):
+    try:
+        from core.env_tools import failsafe_env
+        failsafe_env(ignore_gate=True)
+    except Exception:
+        pass
+    finally:
+        with state.process_lock:
+            if proc is not None and state.active_process is proc:
+                state.active_process = None
+            state.cleanup_in_progress = False
+
+
+def _drain_detached_process(proc):
+    """Reapea un hijo cuyo cliente Gradio cerró sin perder el botón Stop."""
+    try:
+        if proc.stdout:
+            for _line in iter(proc.stdout.readline, ""):
+                pass
+        proc.wait()
+    except Exception:
+        pass
+    finally:
+        if proc.stdout:
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
+        with state.process_lock:
+            if state.active_process is proc:
+                state.active_process = None
+
+
+def _clear_stale_stop_marker():
+    """Un lanzamiento nuevo no debe heredar el Stop de una sesión anterior."""
+    stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
+    try:
+        os.remove(stop_file)
+    except FileNotFoundError:
+        pass
+
+
+STAND_CHECKPOINT_DIRS = (
+    Path(config.PROJECT_ROOT) / "benchmarks" / "apex_milestones",
+    Path(config.PROJECT_ROOT) / "models" / "rainbow_apex",
+)
+_stand_checkpoint_meta_cache = {}
+_stand_checkpoint_meta_lock = threading.Lock()
 
 # --- Utility Functions ---
 
@@ -83,6 +182,224 @@ def get_model_files(algo=None):
     
     return ["None"] + zips, ["None"] + pkls
 
+
+def _load_stand_checkpoint_meta(file_path):
+    """Carga segura y valida arquitectura + pesos del QR-DQN de exhibición."""
+    from collections.abc import Mapping
+
+    import torch
+    from agents.rainbow import QRDuelingNet
+    from es.policy import OBS_DIM, ONEHOT_OBS_DIM
+
+    path = Path(file_path).resolve(strict=True)
+    stat = path.stat()
+    cache_key = (str(path), stat.st_mtime_ns, stat.st_size)
+    with _stand_checkpoint_meta_lock:
+        cached = _stand_checkpoint_meta_cache.get(cache_key)
+    if cached is not None:
+        return dict(cached)
+
+    ckpt = torch.load(path, map_location="cpu", weights_only=True)
+    if not isinstance(ckpt, dict) or not isinstance(ckpt.get("meta"), dict):
+        raise ValueError("checkpoint sin metadata")
+    if not isinstance(ckpt.get("state_dict"), Mapping):
+        raise ValueError("checkpoint sin state_dict")
+
+    meta = dict(ckpt["meta"])
+    try:
+        in_dim = int(meta["in_dim"])
+        n_actions = int(meta["n_actions"])
+        n_quantiles = int(meta["quantiles"])
+        hidden = int(meta["hidden"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"metadata arquitectónica incompleta: {exc}") from None
+
+    if not meta.get("macros", False) or n_actions != STAND_N_ACTIONS:
+        raise ValueError(
+            f"checkpoint incompatible: requiere macros y {STAND_N_ACTIONS} acciones")
+    expected_in_dim = ONEHOT_OBS_DIM if bool(meta.get("onehot", True)) else OBS_DIM
+    if in_dim != expected_in_dim:
+        raise ValueError(
+            f"entrada incompatible: {in_dim}; esperaba {expected_in_dim}")
+    if n_quantiles <= 0 or hidden <= 0:
+        raise ValueError("quantiles y hidden deben ser positivos")
+
+    net = QRDuelingNet(
+        in_dim,
+        n_actions=n_actions,
+        n_quantiles=n_quantiles,
+        hidden=hidden,
+    )
+    try:
+        net.load_state_dict(ckpt["state_dict"], strict=True)
+    except RuntimeError as exc:
+        raise ValueError(f"pesos incompatibles con QRDuelingNet: {exc}") from None
+
+    with _stand_checkpoint_meta_lock:
+        for old_key in list(_stand_checkpoint_meta_cache):
+            if old_key[0] == str(path) and old_key != cache_key:
+                del _stand_checkpoint_meta_cache[old_key]
+        _stand_checkpoint_meta_cache[cache_key] = dict(meta)
+    return meta
+
+
+def _stand_sidecar_metrics(checkpoint_path):
+    import json
+
+    sidecar = Path(str(checkpoint_path) + ".json")
+    if not sidecar.is_file():
+        return {}
+    try:
+        with sidecar.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def get_stand_checkpoint_files(search_roots=None):
+    """Descubre solo checkpoints QR-DQN compatibles con el stand.
+
+    Es un inventario separado del flujo SB3 (.zip/.pkl): estos modelos son
+    QRDuelingNet de Ape-X/Rainbow en .pt, con observacion v4 y macro-acciones.
+    """
+    project_root = Path(config.PROJECT_ROOT).resolve()
+    roots = STAND_CHECKPOINT_DIRS if search_roots is None else search_roots
+    compatible = []
+    seen = set()
+
+    for root in roots:
+        root_path = Path(root)
+        if not root_path.exists():
+            continue
+        candidates = [root_path] if root_path.is_file() else root_path.rglob("*.pt")
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+                relative = resolved.relative_to(project_root).as_posix()
+            except (OSError, ValueError):
+                continue
+            if relative in seen:
+                continue
+            seen.add(relative)
+            try:
+                _load_stand_checkpoint_meta(resolved)
+            except Exception:
+                continue
+            compatible.append(relative)
+
+    return sorted(compatible)
+
+
+def get_stand_default_checkpoint(checkpoints=None):
+    """Elige el alias vigente; si falta, prioriza cobertura y WR del sidecar."""
+    choices = list(get_stand_checkpoint_files() if checkpoints is None else checkpoints)
+    default_rel = Path(STAND_DEFAULT_CHECKPOINT).as_posix()
+    if default_rel in choices:
+        return default_rel
+    if not choices:
+        return None
+
+    def score(relative):
+        path = Path(config.PROJECT_ROOT) / relative
+        metrics = _stand_sidecar_metrics(path)
+        levels = sum(1 for key in metrics if re.fullmatch(r"wr_lvl[1-8]", key))
+        try:
+            win_rate = float(metrics.get("wr_media", -1.0))
+        except (TypeError, ValueError):
+            win_rate = -1.0
+        try:
+            modified = path.stat().st_mtime_ns
+        except OSError:
+            modified = 0
+        return levels, win_rate, modified
+
+    return max(choices, key=score)
+
+
+def _resolve_stand_checkpoint(checkpoint):
+    if checkpoint in (None, "", "None"):
+        raise ValueError("selecciona un checkpoint .pt")
+
+    project_root = Path(config.PROJECT_ROOT).resolve()
+    candidate = Path(checkpoint)
+    if not candidate.is_absolute():
+        candidate = project_root / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+        relative = resolved.relative_to(project_root).as_posix()
+    except (OSError, ValueError):
+        raise ValueError("el checkpoint debe existir dentro del proyecto") from None
+    if resolved.suffix.lower() != ".pt":
+        raise ValueError("el checkpoint Ape-X debe terminar en .pt")
+    allowed = False
+    for root in STAND_CHECKPOINT_DIRS:
+        try:
+            resolved.relative_to(Path(root).resolve())
+            allowed = True
+            break
+        except ValueError:
+            continue
+    if not allowed:
+        raise ValueError("el checkpoint no pertenece al inventario QR-DQN permitido")
+    meta = _load_stand_checkpoint_meta(resolved)
+    return resolved, relative, meta
+
+
+def get_stand_checkpoint_status(checkpoint):
+    """Resumen legible de arquitectura y banco para la tarjeta del dashboard."""
+    try:
+        path, relative, meta = _resolve_stand_checkpoint(checkpoint)
+    except Exception as exc:
+        return f"⚠️ **Checkpoint no disponible:** {exc}"
+
+    metrics = _stand_sidecar_metrics(path)
+    title = "Campeón vigente de la escalera" if (
+        relative == Path(STAND_DEFAULT_CHECKPOINT).as_posix()
+    ) else "Checkpoint compatible"
+    lines = [
+        f"✅ **{title}:** `{relative}`",
+        (f"QR-DQN Ape-X · entrada `{meta.get('in_dim', '?')}` · "
+         f"`{meta.get('n_actions', '?')}` acciones (63 primitivas + 9 macros) · "
+         f"`{meta.get('quantiles', '?')}` cuantiles"),
+    ]
+
+    reported_levels = [
+        level for level in range(1, 9) if f"wr_lvl{level}" in metrics]
+    if "wr_media" in metrics:
+        try:
+            wr_label = (
+                "WR del selector robusto (8 niveles, desfase ≤30)"
+                if len(reported_levels) == 8 else
+                f"WR reportado en sidecar ({len(reported_levels)} niveles)"
+                if reported_levels else
+                "WR reportado en sidecar"
+            )
+            lines.append(
+                f"**{wr_label}:** "
+                f"{100.0 * float(metrics['wr_media']):.1f}%")
+        except (TypeError, ValueError):
+            pass
+    if "weights_version" in metrics:
+        lines.append(f"**Versión de pesos:** {metrics['weights_version']}")
+    level_rates = []
+    for level in reported_levels:
+        key = f"wr_lvl{level}"
+        if key in metrics:
+            try:
+                level_rates.append(f"L{level} {100.0 * float(metrics[key]):.1f}%")
+            except (TypeError, ValueError):
+                pass
+    if level_rates:
+        lines.append("**Escalera:** " + " · ".join(level_rates))
+    return "  \n".join(lines)
+
+
+def refresh_stand_checkpoints(current=None):
+    choices = get_stand_checkpoint_files()
+    selected = current if current in choices else get_stand_default_checkpoint(choices)
+    return gr.update(choices=choices, value=selected), get_stand_checkpoint_status(selected)
+
 def get_all_state_files():
     """Scans STATES_DIR for all available .State or .state files dynamically."""
     states_dir = config.STATES_DIR
@@ -93,38 +410,82 @@ def get_all_state_files():
     names = sorted(list(set([os.path.basename(f) for f in state_files])))
     return ["None"] + names
 
-def stream_logs(cmd):
+def stream_logs(cmd, before_start=None):
     """Executes a command and yields output live for Gradio with unbuffered I/O."""
-    if state.active_process:
+    launch_token = object()
+    proc = None
+    preparation_error = None
+    with state.process_lock:
+        busy = (state.active_process is not None
+                or state.launch_token is not None
+                or state.cleanup_in_progress)
+        if not busy:
+            # Reservar antes del primer yield cierra la carrera entre dos
+            # botones Launch y permite que Stop cancele un arranque pendiente.
+            state.launch_token = launch_token
+            state.stop_event.clear()
+            if before_start is not None:
+                try:
+                    # Efectos de preparación (p. ej. .agent_state) ocurren
+                    # solo después de reservar el slot. Un segundo Launch
+                    # rechazado nunca debe alterar el combate ya activo.
+                    before_start()
+                except Exception as exc:
+                    state.launch_token = None
+                    preparation_error = exc
+
+    if busy:
         yield "Error: A process is already running!"
         return
-
-    state.stop_event.clear()
+    if preparation_error is not None:
+        yield f"Error preparing process: {preparation_error}"
+        return
 
     # Ensure -u unbuffered flag is present if python command
     if len(cmd) > 0 and "python" in os.path.basename(cmd[0]).lower() and "-u" not in cmd:
         cmd = [cmd[0], "-u"] + cmd[1:]
 
     full_output = f"Executing: {' '.join(cmd)}\n{'-'*50}\n"
-    yield full_output
-
     try:
+        yield full_output
+
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
-
-        state.active_process = subprocess.Popen(
-            cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT, 
-            text=True, 
-            bufsize=1, 
-            shell=False,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            env=env
+        process_group_args = (
+            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if os.name == "nt" else
+            {"start_new_session": True}
         )
-        
-        proc = state.active_process
+
+        with state.process_lock:
+            if state.launch_token is not launch_token or state.stop_event.is_set():
+                if state.launch_token is launch_token:
+                    state.launch_token = None
+                cancelled = True
+            else:
+                # Se hace inmediatamente antes de Popen y bajo el mismo lock:
+                # cualquier Stop posterior pertenece inequívocamente al hijo.
+                _clear_stale_stop_marker()
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    shell=False,
+                    env=env,
+                    **process_group_args,
+                )
+                state.active_process = proc
+                state.launch_token = None
+                cancelled = False
+
+        if cancelled:
+            yield full_output + "\n🛑 Launch cancelled before the process started."
+            return
         
         for line in iter(proc.stdout.readline, ''):
             if not line:
@@ -141,22 +502,46 @@ def stream_logs(cmd):
     except Exception as e:
         yield full_output + f"\n[ERROR] {str(e)}"
     finally:
-        if 'proc' in locals() and proc and proc.stdout:
-            try:
-                proc.stdout.close()
-            except Exception:
-                pass
-        state.active_process = None
+        detached_live_process = proc is not None and proc.poll() is None
+        if detached_live_process:
+            # Un reload/desconexión cierra el generador, no necesariamente el
+            # combate. Drenar evita bloquear el pipe y conservar active_process
+            # permite que el siguiente cliente todavía use Terminate Match.
+            threading.Thread(
+                target=_drain_detached_process, args=(proc,), daemon=True).start()
+        else:
+            if proc and proc.stdout:
+                try:
+                    proc.stdout.close()
+                except Exception:
+                    pass
+            with state.process_lock:
+                if proc is not None and state.active_process is proc:
+                    state.active_process = None
+        with state.process_lock:
+            if state.launch_token is launch_token:
+                state.launch_token = None
 
 def graceful_stop_process():
     """Gracefully stops the active process by writing .stop_training and waiting for emergency model save."""
-    if not state.active_process:
-        from core.env_tools import failsafe_env
-        threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
+    with state.process_lock:
+        if state.cleanup_in_progress:
+            return "Emulator cleanup is already in progress."
+        state.stop_event.set()
+        proc = state.active_process
+        launch_pending = proc is None and state.launch_token is not None
+        if launch_pending:
+            # Invalida solamente esa reserva; un launch posterior tendrá otro
+            # token y el finally viejo no podrá borrar su proceso.
+            state.launch_token = None
+        else:
+            state.cleanup_in_progress = True
+
+    if launch_pending:
+        return "🛑 Pending process launch cancelled before startup."
+    if proc is None:
+        threading.Thread(target=_finish_emulator_cleanup, daemon=True).start()
         return "No active process was running. Cleaned up any lingering emulator instances."
-        
-    proc = state.active_process
-    state.stop_event.set()
     
     # 1. Write the file-based stop trigger to the project root
     stop_file = os.path.join(config.PROJECT_ROOT, ".stop_training")
@@ -190,7 +575,8 @@ def graceful_stop_process():
         
     # Check if this process was a match evaluation or model test (inference only)
     cmd_str = " ".join(proc.args) if hasattr(proc, "args") and proc.args else ""
-    is_match_evaluation = "test_agent" in cmd_str or "test_ai_vs_ai" in cmd_str
+    is_match_evaluation = any(marker in cmd_str for marker in (
+        "test_agent", "test_ai_vs_ai", "stand_leia"))
 
     # Check if emergency files exist on disk in candidate production directories (training runs only)
     model_name = getattr(config, "MODEL_NAME", "model")
@@ -227,38 +613,35 @@ def graceful_stop_process():
         else:
             msg = f"🛑 **Process Stopped**: Process {proc.pid} exited. Check terminal output for checkpoint details."
         
-    state.active_process = None
-    
-    # Trigger project process sniper to kill orphaned EmuHawk.exe grandchildren
-    try:
-        from core.env_tools import failsafe_env
-        failsafe_env(ignore_gate=True)
-    except Exception:
-        pass
+    # El slot sigue reservado durante el sniper: un relanzamiento no puede ser
+    # eliminado por el cleanup del proceso anterior.
+    _finish_emulator_cleanup(proc)
         
     return msg
 
 def force_kill_process():
     """Immediately force-kills all active Python and BizHawk processes without saving."""
-    state.stop_event.set()
+    with state.process_lock:
+        if state.cleanup_in_progress:
+            return "Emulator cleanup is already in progress."
+        state.stop_event.set()
+        proc = state.active_process
+        launch_pending = proc is None and state.launch_token is not None
+        if launch_pending:
+            state.launch_token = None
+        state.cleanup_in_progress = True
     pid_str = "None"
     
-    if state.active_process:
-        proc = state.active_process
+    if proc is not None:
         pid_str = str(proc.pid)
         try:
             print(f"[Dashboard] Force killing process tree for PID {proc.pid}...")
             subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
         except Exception as e:
             print(f"[Dashboard] Error force-killing PID {proc.pid}: {e}")
-        state.active_process = None
-        
-    # Trigger global process sniper to terminate all BizHawk/EmuHawk processes and purge VRAM
-    try:
-        from core.env_tools import failsafe_env
-        threading.Thread(target=lambda: failsafe_env(ignore_gate=True)).start()
-    except Exception:
-        pass
+    # Trigger global process sniper; mantiene bloqueado Launch hasta terminar.
+    threading.Thread(
+        target=_finish_emulator_cleanup, args=(proc,), daemon=True).start()
         
     return f"⚡ **Force Kill Executed**: Terminated process (PID: {pid_str}) and all BizHawk emulator instances immediately without saving."
 
@@ -366,13 +749,6 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
 
-    if p1_is_ai or p2_is_ai:
-        # Initialize the agent state: PLAY if infinite matchup, PAUSE for interactive menu navigation
-        state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
-        initial_mode = "PLAY" if infinite_match_enabled else "PAUSE"
-        with open(state_file, "w") as f:
-            f.write(initial_mode)
-
     if p1_is_ai and p2_is_ai:
         cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "test_ai_vs_ai_v2.py"),
                "--algo_p1", p1_algo, "--env_p1", p1_env, "--load_zip_p1", p1_zip, "--load_pkl_p1", p1_pkl, "--device_p1", p1_device,
@@ -400,8 +776,49 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device, p2_algo, p2_env, p2_
         if (p1_is_ai and not p2_is_ai and p2_algo == "CPU (Built-in AI)") or (p2_is_ai and not p1_is_ai and p1_algo == "CPU (Built-in AI)"):
             cmd += ["--cpu_level_cap", str(int(cpu_level_cap))]
         
+    def initialize_agent_state():
+        # PLAY para rematch automático; PAUSE para navegar el menú manual.
+        state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+        initial_mode = "PLAY" if infinite_match_enabled else "PAUSE"
+        with open(state_file, "w") as f:
+            f.write(initial_mode)
+
+    for log in stream_logs(cmd, before_start=initialize_agent_state):
+        yield log
+
+
+def run_stand(checkpoint, opponent, rematch_delay, device):
+    """Lanza humano-vs-QR-DQN sin pasar el .pt por el loader SB3."""
+    try:
+        _path, relative, _meta = _resolve_stand_checkpoint(checkpoint)
+        opponent = str(opponent).upper()
+        if opponent not in ("RANDOM",) + tuple(STAND_OPPONENTS):
+            raise ValueError(f"rival no válido: {opponent}")
+        rematch_delay = float(rematch_delay)
+        if rematch_delay < 0:
+            raise ValueError("el rematch delay no puede ser negativo")
+        device = str(device).lower()
+        if device not in ("cpu", "cuda"):
+            raise ValueError("el dispositivo de inferencia debe ser cpu o cuda")
+        if device == "cuda":
+            import torch
+            if not torch.cuda.is_available():
+                raise ValueError("CUDA no está disponible en esta máquina")
+    except Exception as exc:
+        yield f"Error de configuración del modelo Ape-X: {exc}"
+        return
+
+    cmd = [
+        VENV_PYTHON,
+        os.path.join(config.SRC_DIR, "scripts", "stand_leia.py"),
+        "--ckpt", relative,
+        "--opponent", opponent,
+        "--rematch-delay", str(rematch_delay),
+        "--device", device,
+    ]
     for log in stream_logs(cmd):
         yield log
+
 
 def toggle_agent_state():
     state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
@@ -1169,6 +1586,8 @@ def get_live_telemetry_html():
 # --- UI Construction ---
 
 zips_init, pkls_init = get_model_files("ppo")
+stand_checkpoints_init = get_stand_checkpoint_files()
+stand_default_init = get_stand_default_checkpoint(stand_checkpoints_init)
 
 with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
     gr.Markdown("# 🕹️ Street Fighter II RL Control Center")
@@ -1421,13 +1840,65 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 with gr.Column():
                     match_logs = gr.Textbox(label="Match Console", lines=25, max_lines=35, interactive=False, elem_id="terminal")
                     copy_match_btn = gr.Button("📋 Copy Match Logs", size="sm")
+
+            # El viewer QR-DQN es aditivo: vive dentro de Model Testing sin
+            # cambiar defaults, controles ni eventos del matchup clásico.
+            with gr.Accordion("Ape-X QR-DQN vs Human (Viewer)", open=False):
+                gr.Markdown(
+                    "Prueba el campeón `.pt` contra un retador con el control "
+                    "físico configurado como Player 2 en BizHawk."
+                )
+                with gr.Row():
+                    apex_checkpoint = gr.Dropdown(
+                        label="Ape-X checkpoint (.pt)",
+                        choices=stand_checkpoints_init,
+                        value=stand_default_init,
+                        scale=3,
+                    )
+                    apex_device = gr.Dropdown(
+                        label="Compute Device",
+                        choices=["cpu", "cuda"],
+                        value="cpu",
+                        scale=1,
+                    )
+                    apex_human_character = gr.Dropdown(
+                        label="Human Character (P2)",
+                        choices=["RANDOM"] + list(STAND_OPPONENTS),
+                        value="RANDOM",
+                        scale=1,
+                    )
+                apex_checkpoint_status = gr.Markdown(
+                    get_stand_checkpoint_status(stand_default_init)
+                )
+                with gr.Row():
+                    apex_rematch_delay = gr.Slider(
+                        label="Rematch Delay (seconds)",
+                        minimum=1.0,
+                        maximum=5.0,
+                        value=2.0,
+                        step=0.5,
+                    )
+                    refresh_apex_btn = gr.Button(
+                        "🔄 Refresh Ape-X checkpoints", variant="secondary")
+                with gr.Row():
+                    launch_apex_btn = gr.Button(
+                        "🥊 Launch Ape-X vs Human", variant="primary")
+                    stop_apex_btn = gr.Button(
+                        "🛑 Terminate Ape-X Match", variant="stop")
+                apex_logs = gr.Textbox(
+                    label="Ape-X Viewer Console",
+                    lines=15,
+                    max_lines=25,
+                    interactive=False,
+                    elem_id="terminal",
+                )
             
             # Interactive visibility and filtering toggles
             def update_match_ui(algo):
                 is_ai = algo in ["ppo", "sac", "dqn"]
                 if not is_ai:
                     return gr.update(visible=False), gr.update(), gr.update()
-                
+
                 z, p = get_model_files(algo)
                 return (
                     gr.update(visible=True),
@@ -1464,6 +1935,29 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 
             stop_match_btn.click(stop_match_process, outputs=[match_logs, agent_state_status])
             toggle_agent_btn.click(toggle_agent_state, outputs=[agent_state_status])
+
+            apex_checkpoint.change(
+                get_stand_checkpoint_status,
+                inputs=[apex_checkpoint],
+                outputs=[apex_checkpoint_status],
+            )
+            refresh_apex_btn.click(
+                refresh_stand_checkpoints,
+                inputs=[apex_checkpoint],
+                outputs=[apex_checkpoint, apex_checkpoint_status],
+            )
+            launch_apex_btn.click(
+                run_stand,
+                inputs=[
+                    apex_checkpoint, apex_human_character,
+                    apex_rematch_delay, apex_device,
+                ],
+                outputs=[apex_logs],
+            )
+            stop_apex_btn.click(
+                stop_match_process,
+                outputs=[apex_logs, agent_state_status],
+            )
 
         # --- TAB 2.5: TELEMETRY ---
         with gr.Tab("🔮 Observation Telemetry"):
@@ -1655,12 +2149,14 @@ def main():
     parser.add_argument("--share", action="store_true", help="Generate public shareable Gradio link")
     args = parser.parse_args()
 
+    print(f"[Dashboard] build {DASHBOARD_BUILD_ID}", flush=True)
     demo.queue().launch(
         server_name=args.server_name, 
         server_port=args.server_port, 
         share=args.share,
         theme=gr.themes.Soft(primary_hue="blue"), 
-        css="#terminal textarea { font-family: monospace; }"
+        css="#terminal textarea { font-family: monospace; }",
+        head=_DASHBOARD_RELOAD_HEAD,
     )
 
 if __name__ == "__main__":

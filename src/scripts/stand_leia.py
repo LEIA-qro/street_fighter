@@ -1,6 +1,6 @@
 # stand_leia.py -- HUMANO vs el campeon DQN, en BizHawk (modo stand LEIA).
 #
-#   .venv\Scripts\python.exe src\scripts\stand_leia.py --ckpt benchmarks\apex_milestones\apex_v781_escalera831.pt
+#   .venv\Scripts\python.exe src\scripts\stand_leia.py --ckpt benchmarks\apex_milestones\apex_escalera_best.pt
 #
 # P1 = la IA (Ryu, el campeon Ape-X con macros). P2 = el visitante, con el
 # control fisico configurado como Player 2 en BizHawk (este script manda
@@ -13,10 +13,11 @@
 #
 # Cadencia del socket (revisada adversarialmente 2026-08-27): el Lua manda su
 # payload al tope del loop y BizHawk lo enmarca como "<len> 0 v1,...". Al
-# resetear siempre hay UN payload pre-reset en vuelo: reset_to lo descarta y
-# prima del primer payload post-reset -- con eso cada receive posterior trae
-# el estado GENERADO POR la accion recien mandada (cero lag, mejor paridad
-# con el rig retro que el match test).
+# conectar hay UN payload inicial pre-reset en vuelo, que el cold-start drena.
+# Los rematches ya estan sincronizados y consumen un solo payload post-reset;
+# un segundo receive sin comando bloquearia Lua hasta su dead-man switch. Con
+# esa fase, cada receive del combate trae el estado generado por la accion
+# recien mandada (cero lag extra).
 #
 # Rondas: KO por el signo del word de HP (hp_to_signed, la misma
 # discriminacion del entrenamiento; el HP del frame va con piso en 0 y no
@@ -30,8 +31,10 @@
 # con emulador se prueba corriendo esto en la maquina del stand.
 
 import argparse
+import atexit
 import os
 import random
+import signal
 import sys
 import time
 from collections import deque
@@ -72,7 +75,12 @@ OPPONENTS = ("RYU", "EHONDA", "BLANKA", "GUILE", "KEN", "CHUNLI",
 
 HUMAN_PASSTHROUGH = ".........."   # 10 puntos: el Lua no toca ese pad
 
-MAX_BAD_PAYLOADS = 120  # ~2 s de basura consistente = cliente equivocado
+# Alias que mantiene el selector de la escalera completa (niveles 1-8).  A
+# diferencia de un checkpoint versionado, este nombre sigue apuntando al
+# campeon vigente sin tener que editar el stand cada vez que aparece uno
+# mejor.
+DEFAULT_CHECKPOINT = os.path.join(
+    "benchmarks", "apex_milestones", "apex_escalera_best.pt")
 
 
 def parse_payload(raw: str) -> dict:
@@ -154,10 +162,13 @@ def load_champion(ckpt_path: str, device: str):
     torch.set_num_threads(1)
     from agents.rainbow import QRDuelingNet
 
-    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    # Los checkpoints del proyecto solo contienen tensores + metadata simple;
+    # weights_only evita ejecutar pickles arbitrarios al seleccionarlos desde
+    # el dashboard.
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     meta = ckpt["meta"]
     if not meta.get("macros", False) or int(meta.get("n_actions", 0)) != N_ACTIONS:
-        raise SystemExit(f"[stand] el checkpoint no es del campeon con macros "
+        raise SystemExit(f"[viewer] el checkpoint no es del campeon con macros "
                          f"(meta: {meta}) -- este driver reproduce macros")
     net = QRDuelingNet(meta["in_dim"], n_actions=N_ACTIONS,
                        n_quantiles=meta["quantiles"], hidden=meta["hidden"])
@@ -177,18 +188,53 @@ def load_champion(ckpt_path: str, device: str):
 
 def pick_state(states_dir: str, opponent: str) -> str:
     if opponent == "RANDOM":
-        opponent = random.choice(OPPONENTS)
+        available = [
+            name for name in OPPONENTS
+            if os.path.isfile(os.path.join(
+                states_dir, f"RYU_{name}_R1_PvP.State"))
+        ]
+        if not available:
+            raise SystemExit(
+                f"[viewer] no hay savestates RYU_*_R1_PvP.State en "
+                f"{states_dir}")
+        opponent = random.choice(available)
     path = os.path.join(states_dir, f"RYU_{opponent}_R1_PvP.State")
     if not os.path.exists(path):
-        raise SystemExit(f"[stand] no existe {path}")
+        raise SystemExit(f"[viewer] no existe {path}")
     return path
 
 
+def request_round_reset(env, state_path: str, p1_wins: int, p2_wins: int,
+                        discard_pending_payload: bool = False,
+                        payload_parser=parse_payload):
+    """Carga un savestate y devuelve el primer RAM válido posterior al reset.
+
+    Al conectar por primera vez, Lua ya dejó un payload inicial en el socket;
+    ese único frame sí debe drenarse. Durante un rematch, en cambio, el loop
+    acabó de consumir el payload anterior: hacer dos receive() seguidos deja a
+    Lua esperando un comando y activa su dead-man switch, que cierra BizHawk.
+    """
+    env.send_command(f"RESET {state_path}|{p1_wins}|{p2_wins}\n")
+    if discard_pending_payload:
+        env.receive_payload()
+    raw = env.receive_payload()
+    if not raw:
+        raise RuntimeError(
+            "[viewer] el socket se cerró durante RESET; no hay estado "
+            "post-reset")
+    try:
+        return payload_parser(raw)
+    except ValueError as exc:
+        # Lua ya espera el siguiente comando. Reintentar receive() aquí
+        # recrearía el deadlock de 120 s; abortamos con diagnóstico explícito.
+        raise RuntimeError(
+            "[viewer] payload post-reset inválido; sesión abortada para no "
+            "bloquear BizHawk") from exc
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Stand LEIA: humano vs el campeon DQN")
-    ap.add_argument("--ckpt",
-                    default=os.path.join("benchmarks", "apex_milestones",
-                                         "apex_v781_escalera831.pt"))
+    ap = argparse.ArgumentParser(description="Viewer humano vs el campeon DQN")
+    ap.add_argument("--ckpt", default=DEFAULT_CHECKPOINT)
     ap.add_argument("--opponent", default="RANDOM",
                     choices=("RANDOM",) + OPPONENTS,
                     help="personaje DEL RETADOR (el rival de la IA; la IA "
@@ -210,22 +256,62 @@ def main():
     config.P2_MODEL_NAME = "RETADOR (tu)"
     config.generate_lua_config()
 
-    # El Lua arranca PAUSADO y solo corre cuando .agent_state dice PLAY; el
-    # unico que escribe ese archivo es el web dashboard, asi que en una
-    # maquina fresca (el stand) nadie lo pondria jamas: lo escribimos aqui.
     agent_state_path = os.path.join(config.PROJECT_ROOT, ".agent_state")
-    with open(agent_state_path, "w") as f:
-        f.write("PLAY")
+    env = None
+    cleanup_done = False
 
-    ckpt_path = os.path.join(config.PROJECT_ROOT, args.ckpt)
-    choose_action, meta = load_champion(ckpt_path, args.device)
-    print(f"[stand] campeon: {os.path.basename(ckpt_path)} "
-          f"({meta['in_dim']} in, {N_ACTIONS} acciones, macros)", flush=True)
+    def cleanup_session():
+        nonlocal cleanup_done
+        if cleanup_done:
+            return
+        cleanup_done = True
+        # Un CTRL_BREAK tardio no debe interrumpir el propio cierre.
+        if hasattr(signal, "SIGBREAK"):
+            try:
+                signal.signal(signal.SIGBREAK, signal.SIG_IGN)
+            except (OSError, ValueError):
+                pass
+        try:
+            with open(agent_state_path, "w") as f:
+                f.write("PAUSE")
+        except OSError:
+            pass
+        failsafe_env(env=env)
 
-    lua_path = os.path.join(config.PROJECT_ROOT, "lua", "v2.0",
-                            "stand_env_client.lua")
-    env = StreetFighterEnvV2(lua_path=lua_path, trainable=False, rank=0,
-                             player=1)
+    # Cubre tambien errores durante carga del modelo o arranque de BizHawk,
+    # antes de que el loop principal alcance su finally.
+    atexit.register(cleanup_session)
+
+    try:
+        # El Lua arranca PAUSADO y solo corre cuando .agent_state dice PLAY.
+        with open(agent_state_path, "w") as f:
+            f.write("PLAY")
+
+        # El dashboard manda CTRL_BREAK al grupo del subprocess para detener
+        # una evaluacion con limpieza. Ctrl+C conserva la misma ruta.
+        if hasattr(signal, "SIGBREAK"):
+            def interrupt_stand(_signum, _frame):
+                raise KeyboardInterrupt
+
+            signal.signal(signal.SIGBREAK, interrupt_stand)
+
+        stop_file_path = os.path.join(config.PROJECT_ROOT, ".stop_training")
+
+        def stop_requested() -> bool:
+            return os.path.exists(stop_file_path)
+
+        ckpt_path = os.path.join(config.PROJECT_ROOT, args.ckpt)
+        choose_action, meta = load_champion(ckpt_path, args.device)
+        print(f"[viewer] campeon: {os.path.basename(ckpt_path)} "
+              f"({meta['in_dim']} in, {N_ACTIONS} acciones, macros)", flush=True)
+
+        lua_path = os.path.join(config.PROJECT_ROOT, "lua", "v2.0",
+                                "stand_env_client.lua")
+        env = StreetFighterEnvV2(lua_path=lua_path, trainable=False, rank=0,
+                                 player=1)
+    except BaseException:
+        cleanup_session()
+        raise
 
     frames = deque(maxlen=NUM_FRAMES)
     track = RamTrack()
@@ -236,29 +322,12 @@ def main():
     ko_time = None
     winner_msg = None
 
-    def receive_valid_ram() -> dict:
-        """Recibe hasta parsear un payload valido; basura transitoria se
-        tira (el socket interactivo la emite a proposito al reconectar),
-        basura CONSISTENTE truena con el diagnostico del Lua equivocado."""
-        bad = 0
-        while True:
-            raw = env.receive_payload()
-            if not raw:
-                continue
-            try:
-                return parse_payload(raw)
-            except ValueError:
-                bad += 1
-                if bad >= MAX_BAD_PAYLOADS:
-                    raise
-
-    def reset_to(state_path: str):
+    def reset_to(state_path: str, discard_pending_payload: bool = False):
         nonlocal track, round_started, ko_time, winner_msg
-        env.send_command(f"RESET {state_path}|{p1_wins}|{p2_wins}\n")
-        # Siempre hay UN payload pre-reset en vuelo (generado antes del
-        # savestate.load): descartarlo y primar del primero post-reset.
-        env.receive_payload()
-        ram = receive_valid_ram()
+        ram = request_round_reset(
+            env, state_path, p1_wins, p2_wins,
+            discard_pending_payload=discard_pending_payload,
+        )
         track = RamTrack()
         frame, track, _s1, _s2 = assemble_v4_frame(ram, track, is_reset=True)
         frames.clear()
@@ -270,13 +339,19 @@ def main():
         winner_msg = None
 
     print("\n" + "=" * 50)
-    print("  STAND LEIA -- reta a la IA (control = Player 2)")
+    print("  MODEL TESTING -- reta a la IA (control = Player 2)")
     print("  Ctrl+C termina la sesion y cierra el emulador")
     print("=" * 50 + "\n", flush=True)
 
     try:
-        reset_to(pick_state(config.STATES_DIR, args.opponent))
+        # Solo el cold-start hereda el payload que Lua emitió al conectarse.
+        reset_to(
+            pick_state(config.STATES_DIR, args.opponent),
+            discard_pending_payload=True,
+        )
         while True:
+            if stop_requested():
+                raise KeyboardInterrupt
             stacked = np.concatenate(frames)
             direction, button = player.next_step(stacked, choose_action)
             env.send_command(bits_command(direction, button)
@@ -313,15 +388,10 @@ def main():
                 match_count += 1
                 reset_to(pick_state(config.STATES_DIR, args.opponent))
     except KeyboardInterrupt:
-        print(f"\n[stand] sesion terminada. Marcador final: "
+        print(f"\n[viewer] sesion terminada. Marcador final: "
               f"IA {p1_wins} - {p2_wins} Retador", flush=True)
     finally:
-        try:
-            with open(agent_state_path, "w") as f:
-                f.write("PAUSE")
-        except OSError:
-            pass
-        failsafe_env(env=env)
+        cleanup_session()
 
 
 if __name__ == "__main__":
