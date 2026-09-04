@@ -90,7 +90,9 @@ una VPS recien nacida **no tiene con que autenticarse** a GitHub. Dos opciones:
 - **Token https (la facil, recomendada):** en GitHub → Settings → Developer settings →
   Fine-grained tokens, crea un token con acceso de **solo lectura a Contents** del repo
   `LEIA-qro/street_fighter`, y pasa:
-  `repo_url = "https://oauth2:github_pat_XXXX@github.com/LEIA-qro/street_fighter.git"`.
+  `repo_url = "<URL HTTPS autenticada construida fuera del repo>"`.
+  No escribas el formato `usuario:token` en archivos versionados: construye la URL al
+  invocar Terraform y pásala como variable sensible.
   El token queda en el user_data (visible para admins de la cuenta AWS) — por eso
   solo-lectura y de un solo repo.
 - **Deploy key (la pro):** genera un par `ssh-keygen -t ed25519`, sube la publica en
