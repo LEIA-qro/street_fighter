@@ -14,5 +14,5 @@ owner              = "tu-usuario-github"
 
 # El default de repo_url es SSH y exige deploy key en la VPS. Sin deploy key, usa la
 # variante https con un fine-grained token de solo lectura (ver README, seccion clonado):
-# repo_url    = "https://oauth2:github_pat_XXXXXXXX@github.com/LEIA-qro/street_fighter.git"
+# repo_url    = "<URL HTTPS autenticada construida fuera del repo>"
 # repo_branch = "stage0-metrics-and-semantics"
