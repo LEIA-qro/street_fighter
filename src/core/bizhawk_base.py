@@ -1,3 +1,4 @@
+import os
 import gymnasium as gym
 import socket
 import subprocess
@@ -70,6 +71,19 @@ class BizHawkBaseEnv(gym.Env):
             if self.verbose: print(f"Auto-loading Lua script: {self.lua_path}")
             launch_args.append(f"--lua={self.lua_path}")
             
+        # Aqui SI hace falta el ejecutable, y aqui se comprueba (antes vivia
+        # como un raise al importar core/config.py, que rompia el import en
+        # toda maquina sin BizHawk aunque no fuera a lanzarlo nunca).
+        if not os.path.exists(self.bizhawk_path):
+            raise FileNotFoundError(
+                f"No encuentro EmuHawk.exe en {self.bizhawk_path}.\n"
+                "El backend BizHawk espera que este repo viva DENTRO de la "
+                "carpeta de BizHawk 2.8 (ver README, 'Isolated Workspace "
+                "Setup'), y solo corre en Windows.\n"
+                "Si lo que quieres es entrenar o medir, el backend headless es "
+                "stable-retro (src/envs/retro_env.py) y no necesita nada de "
+                "esto: ver HANDOFF.md.")
+
         self.emulator_process = subprocess.Popen(launch_args)
         
         if not self.trainable:

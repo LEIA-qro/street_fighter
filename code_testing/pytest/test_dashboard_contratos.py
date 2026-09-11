@@ -143,3 +143,35 @@ def test_la_tarjeta_del_campeon_esta_enlazada(dashboard):
     for tarjeta in tarjetas:
         assert "99.0%" in tarjeta["props"]["value"]
         assert "L8" in tarjeta["props"]["value"]
+
+
+def test_importar_config_no_exige_bizhawk():
+    """`import core.config` tiene que funcionar en una maquina sin BizHawk.
+
+    Estuvo haciendo `raise FileNotFoundError` a nivel de MODULO si no encontraba
+    EmuHawk.exe en el directorio padre. Medido el 2026-09-11 sobre un clon recien
+    hecho: `pytest code_testing/pytest` moria en la recoleccion de NUEVE modulos
+    de test, ninguno de los cuales toca BizHawk. El remedio que circulaba era
+    crear un EmuHawk.exe VACIO al lado del repo -- un archivo falso para enganiar
+    a un guard es la señal de que el guard esta en el lugar equivocado.
+
+    La comprobacion vive ahora donde se lanza el emulador. BizHawk solo corre en
+    Windows y el backend de entrenamiento es stable-retro: exigirlo para importar
+    una constante cerraba el repo a las tres plataformas de la flota.
+    """
+    config_src = (REPO / "src" / "core" / "config.py").read_text(encoding="utf-8")
+    arbol = ast.parse(config_src)
+    for nodo in arbol.body:                      # solo nivel de modulo
+        for hijo in ast.walk(nodo):
+            if isinstance(hijo, ast.Raise):
+                pytest.fail(
+                    "core/config.py vuelve a lanzar una excepcion al importarse; "
+                    "eso rompe el import en cualquier maquina sin BizHawk")
+
+    base_src = (REPO / "src" / "core" / "bizhawk_base.py").read_text(encoding="utf-8")
+    assert "os.path.exists(self.bizhawk_path)" in base_src, (
+        "la comprobacion de EmuHawk.exe tiene que seguir existiendo, en el sitio "
+        "donde de verdad se lanza el emulador")
+    assert base_src.index("os.path.exists(self.bizhawk_path)") < \
+        base_src.index("subprocess.Popen(launch_args)"), (
+        "la comprobacion va ANTES del Popen, no despues")

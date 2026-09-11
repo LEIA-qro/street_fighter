@@ -52,3 +52,13 @@
     usaba el valor del dropdown como nombre de directorio, asi que "Human Player" o
     "CPU (Built-in AI)" creaban `models/production/v2/Human Player/` al primer clic.
     Fix: guarda que solo acepta algoritmos SB3 reales.
+20. **`import core.config` exigia BizHawk, y cerraba el repo a quien llegaba.** Un
+    `raise FileNotFoundError` a nivel de MODULO si no habia `EmuHawk.exe` en el
+    directorio padre. Medido sobre un clon recien hecho: `pytest code_testing/pytest`
+    moria en la recoleccion de NUEVE modulos, ninguno de los cuales toca BizHawk
+    (reward, extractor, contratos, dashboard). El remedio que circulaba era crear un
+    EmuHawk.exe VACIO al lado del repo -- un archivo falso para enganiar a un guard es
+    la señal de que el guard esta mal puesto. Fix: la comprobacion vive donde se lanza
+    el emulador (`core/bizhawk_base.py`, antes del Popen) y con un mensaje que dice que
+    el backend headless no necesita nada de esto. Verificado: 630 tests en un clon sin
+    BizHawk. Regresion en `test_dashboard_contratos.py`.

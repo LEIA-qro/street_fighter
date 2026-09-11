@@ -4,7 +4,7 @@
 - Import del ROM: `python -m stable_retro.import roms/` (es stable_retro, NO retro; el ROM SÍ viene en el repo).
 - stable-retro NO tiene wheels Windows → workers Windows viven en WSL2 (velocidad casi nativa). Tailscale DENTRO de WSL como nodo propio (omen-wsl...).
 - .gitignore tiene `*.State` case-insensitive en mac/win → los .state de retro_integration viven bajo excepción `!retro_integration/**/*.state`.
-- core.config revienta al importar sin EmuHawk.exe en el dir padre — en la M4 hay stub en ~/TEC/LEIA/EmuHawk.exe. retro_env/es NO importan core.config a propósito.
+- **[OBSOLETO 2026-09-11: arreglado en la fuente]** core.config revienta al importar sin EmuHawk.exe en el dir padre — en la M4 hay stub en ~/TEC/LEIA/EmuHawk.exe. El `raise` a nivel de módulo se movió a donde se lanza el emulador (core/bizhawk_base.py, antes del Popen): un clon recién hecho, sin BizHawk en ninguna parte, ya corre los 630 tests (antes morían 9 módulos en la recolección). El stub de la M4 ya no hace falta. retro_env/es siguen sin importar core.config a propósito.
 - Consola Tailscale: los toggles del form de keys se resetean al editar otros campos. El unit de systemd de la madre es 0600 (sudo para leerlo). /opt/leia es de root (sudo git).
 - Windows: `time.monotonic` puede dar ticks gruesos — tests de timing con relojes inyectados, jamás contra el reloj real (ya mordió una vez).
 - SF2: primeros ~12 agent steps del episodio los inputs NO hacen nada (freeze de "FIGHT!"). Spawns 205/307. Walk ~2.8px/step; salto NO es más rápido que caminar (+129 vs +139px/50 steps).

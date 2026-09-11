@@ -77,8 +77,13 @@ python3.12 -m venv .venv
 # (https://pytorch.org/get-started/locally/). CPU basta para actores y bancos.
 .venv/bin/pip install torch
 .venv/bin/pip install -r requirements.txt -r requirements-retro.txt
-.venv/bin/python -m pytest code_testing/pytest -q     # deben pasar 629
+.venv/bin/python -m pytest code_testing/pytest -q     # deben pasar 630
 ```
+
+Verificado el 2026-09-11 sobre un clon recién hecho, en una máquina **sin BizHawk en
+ninguna parte**: los 630 pasan. Antes de esta limpieza no era así — `core/config.py`
+lanzaba una excepción al importarse si no encontraba `EmuHawk.exe` en el directorio
+padre, y nueve módulos de test morían en la recolección sin tocar BizHawk siquiera.
 
 En Windows nativo **no** se puede instalar stable-retro (no publica wheels para
 `win_amd64`): las dos laptops y la desktop lo corren dentro de WSL2. macOS y Linux

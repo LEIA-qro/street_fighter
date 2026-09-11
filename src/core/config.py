@@ -27,7 +27,20 @@ LUA_DIR = os.path.join(PROJECT_ROOT, "lua")
 # Executables & Files
 BIZHAWK_PATH = os.path.join(BIZHAWK_FOLDER_DIR, "EmuHawk.exe")
 
-if not os.path.exists(BIZHAWK_PATH): raise FileNotFoundError(f"ERROR: BizHawk executable not found at {BIZHAWK_PATH}. Please check the path and try again.")
+# La comprobacion de que EmuHawk.exe EXISTE vive donde se lanza el emulador
+# (core/bizhawk_base.py, justo antes del Popen), no aqui.
+#
+# Estaba en este punto, como un `raise` a nivel de modulo, y eso hacia que
+# IMPORTAR config fallara en cualquier maquina sin BizHawk -- o sea en las tres
+# plataformas donde corre la flota. Consecuencia medida el 2026-09-11 sobre un
+# clon recien hecho: `pytest code_testing/pytest` moria en la recoleccion de
+# NUEVE modulos de test, ninguno de los cuales toca BizHawk (reward, extractor,
+# contratos, dashboard...). El remedio que circulaba era crear un EmuHawk.exe
+# vacio en el directorio padre; un archivo falso para enganiar a un guard es la
+# señal de que el guard esta en el lugar equivocado.
+#
+# BIZHAWK_PATH sigue siendo la unica definicion de donde vive el ejecutable, y
+# el backend stable-retro (retro_env.py) no importa este modulo a proposito.
 
 ROM_PATH = os.path.join(ROMS_DIR, "Street Fighter II' - Special Champion Edition (USA).md")
 TRAINING_ENV_CLIENT_LUA_PATH = os.path.join(LUA_DIR, str("v" + VERSION), "training_env_client.lua")

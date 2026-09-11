@@ -24,7 +24,7 @@ Sistema de memoria compartida del proyecto, versionado en git. Convención:
   el handoff es el mapa. El README de la raiz es de la era BizHawk/SB3 y lo dice.
 - **Rama: `main`.** Hasta el 2026-09-11 la verdad vivia en `stage0-metrics-and-semantics`
   (128 commits de ventaja) y `main` todavia cargaba el bug de reward de 6 meses: quien
-  clonara se llevaba la version rota. Ya se integro. Suite: **629 tests**.
+  clonara se llevaba la version rota. Ya se integro. Suite: **630 tests**.
 - **El juego esta resuelto.** Campeon: `benchmarks/apex_milestones/apex_v3291_media990.pt`
   (Ape-X DQN, 72 acciones con macros). ~99% de rounds de apertura sobre los 8 tiers y
   **~90% de peleas COMPLETAS al mejor de 3 en lvl8** (n=360 x2 semillas, el banco
