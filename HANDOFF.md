@@ -131,7 +131,7 @@ Necesitas el ROM en `roms/` con sha1 `a5aad1d108046d9388e33247610dafb4c6516e0b`
 | `retro_integration/` | La integración custom de stable-retro: 25 variables de RAM y **96 savestates** verificados (12 rivales × 8 niveles). |
 | `fleet/` | `fleet.json` = el censo de qué DEBERÍA estar corriendo. `history/` = lo que pasó. |
 | `agent/memory/` | **La memoria del proyecto. Ocho archivos densos. Léelos.** |
-| `code_testing/pytest/` | 629 tests. Cada bug histórico tiene su regresión. |
+| `code_testing/pytest/` | 630 tests. Cada bug histórico tiene su regresión. |
 | `infra/` | Terraform de la "madre" (EC2 coordinador del ES). |
 | `doc/reconstruccion/`, `agent/dashboard/` | Análisis de la interfaz. **Planes CANCELADOS**, conservados como radiografía. Ver §6. |
 
