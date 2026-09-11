@@ -7,7 +7,6 @@ import re
 import importlib
 import importlib.util
 import glob
-import webbrowser
 import time
 import signal
 from pathlib import Path
@@ -688,7 +687,7 @@ def update_config_var(key, value):
 
 def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials, device):
     # El selector de environment es compartido con Training, que SI entrena v4
-    # (train.py:22). tune.py:16 no: elegir v4 y darle a tunear moria en el
+    # (train.py). tune.py no: elegir v4 y darle a tunear moria en el
     # argparse del hijo, con un traceback que no dice cual de los dos manda.
     if env not in TUNE_ENV_CHOICES:
         yield (f"Optuna todavia no soporta el environment '{env}'. "
@@ -920,7 +919,8 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
                 raise ValueError("el rival SB3 debe ser PPO o DQN")
             if p2_env not in SB3_ENV_CHOICES:
                 raise ValueError(
-                    "el rival SB3 corre en v2 o v3 (stand_leia.py:551). Para un "
+                    "el rival SB3 corre en v2 o v3 (choices de --p2-env en "
+                    "stand_leia.py). Para un "
                     "rival con obs v4 elige Ape-X, no un modelo SB3")
             for label, selected in (("modelo .zip", p2_zip),
                                     ("normalización .pkl", p2_pkl)):
@@ -1513,7 +1513,8 @@ def get_live_telemetry_html():
         return """
         <div style='background: #101626; border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 16px; padding: 48px; text-align: center; font-family: system-ui, sans-serif; color: #fff;'>
             <h3 style='margin: 0 0 8px 0; color: #3b82f6; font-size: 1.4rem;'>🔮 Standby Mode: Telemetry Offline</h3>
-            <p style='color: #94a3b8; font-size: 0.95rem; margin: 0;'>Launch an interactive <strong>Match Test</strong> from the matchup panel to stream live agent observations and network activations.</p>
+            <p style='color: #94a3b8; font-size: 0.95rem; margin: 0 0 12px 0;'>La telemetr&iacute;a la escriben <strong>dos</strong> flujos, ambos SB3 sobre BizHawk: un Match Test con P1 = <code>ppo</code> o <code>dqn</code> (<code>test_agent_v2.py</code>) y un AI vs AI cl&aacute;sico (<code>test_ai_vs_ai_v2.py</code>).</p>
+            <p style='color: #64748b; font-size: 0.85rem; margin: 0;'>Un match con <strong>Ape-X</strong> NO enciende esta pesta&ntilde;a: <code>stand_leia.py</code> no llama a <code>write_telemetry</code>. No es que falte se&ntilde;al &mdash; ese flujo no la produce. Su equivalente es la bit&aacute;cora durable en <code>logs/model_testing/apex_viewer/</code>.</p>
         </div>
         """
         
@@ -1893,7 +1894,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             with gr.Row():
                                 league_model_name = gr.Textbox(label="League Model Name", value="league")
                                 league_steps = gr.Number(label="Total Timesteps", value=5000000, precision=0)
-                                # train_league.py:156 declara choices=["v2","v3"]: v4 aqui reventaba en el hijo.
+                                # train_league.py declara choices=["v2","v3"]: v4 aqui reventaba en el hijo.
                                 league_env = gr.Dropdown(label="Environment Version", choices=SB3_ENV_CHOICES, value="v2")
                                 league_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 
@@ -1932,7 +1933,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 exploiter_steps = gr.Number(label="Timesteps", value=1000000, precision=0)
                                 
                             with gr.Row():
-                                # train_exploiter.py:156 tambien es {v2,v3}.
+                                # train_exploiter.py tambien es {v2,v3}.
                                 exploiter_env = gr.Dropdown(label="Environment Version", choices=SB3_ENV_CHOICES, value="v2")
                                 exploiter_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 exploiter_matchup_mode = gr.Dropdown(
@@ -2245,7 +2246,28 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             with gr.Row():
                 with gr.Column():
                     cfg_n_envs = gr.Number(label="N_ENVS (Parallel Instances)", value=config.N_ENVS, precision=0)
-                    cfg_win_rate = gr.Slider(label="WIN_RATE_THRESHOLD (Phase Advance)", minimum=0.5, maximum=0.95, value=config.WIN_RATE_THRESHOLD, step=0.01)
+                    # Este control MIENTE si no se dice lo que dice abajo.
+                    # AutoCurriculumCallback recibe win_rate_threshold por
+                    # PARAMETRO con default 0.75 y nunca lee config; verificado:
+                    # `grep -rn "win_rate_threshold=" src/` no devuelve ni un
+                    # sitio de construccion que lo pase. El unico consumidor de
+                    # config.WIN_RATE_THRESHOLD es manual_curriculum_callback.
+                    # Importa porque agent/memory/02-decisiones.md dice
+                    # literalmente "Plan B si estanca: bajarlo a 65%": alguien
+                    # podria ejecutar ese plan aqui y no pasaria NADA, sin aviso.
+                    cfg_win_rate = gr.Slider(
+                        label="WIN_RATE_THRESHOLD — solo curriculum MANUAL",
+                        minimum=0.5, maximum=0.95,
+                        value=config.WIN_RATE_THRESHOLD, step=0.01)
+                    gr.Markdown(
+                        "⚠️ Este umbral **no afecta al Auto-Curriculum**. "
+                        "`AutoCurriculumCallback` lo recibe por parámetro (default "
+                        "0.75) y nadie se lo pasa, así que nunca lee esta variable. "
+                        "Solo lo consume `manual_curriculum_callback.py`, la rama "
+                        "del checkbox desactivado. Para cambiar el umbral de una "
+                        "run con Auto-Curriculum hay que cablearlo en el "
+                        "lanzamiento, no aquí."
+                    )
                     cfg_steps = gr.Number(label="Default Training Steps", value=config.STARTING_TOTAL_TIMESTEPS, precision=0)
                     cfg_port = gr.Number(label="Base Socket Port", value=config.PORT, precision=0)
                     cfg_input_display = gr.Checkbox(label="Enable Input Display in Match Tests", value=getattr(config, 'ENABLE_INPUT_DISPLAY', True))
