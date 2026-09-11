@@ -40,3 +40,22 @@ gha-creds-*.json
 # Videos del gauntlet: se regeneran en 80s con tools/grabar_gauntlet.py.
 # El acta .json SI se versiona (es el dato); el video no (son 15 MB).
 benchmarks/*.mp4
+
+# --- Limpieza 2026-09-11 (handoff) ---
+# Alias MOVILES que escribe el selector mientras hay una run viva. El modelo al
+# que apuntan SI se versiona, con su nombre de version (apex_vNNNN_*.pt): el
+# alias cambia de contenido solo y ensuciaria el historial de git.
+benchmarks/apex_milestones/apex_escalera_best.pt*
+benchmarks/apex_milestones/apex_curriculum_best.pt*
+benchmarks/apex_milestones/apex_best_desync.pt*
+benchmarks/apex_milestones/apex_grads_00090000.pt
+benchmarks/apex_milestones/apex_rescate_congelado_*.pt
+
+# Directorios de trabajo de las herramientas de estados: reproducibles con
+# tools/menu_probe.py y tools/farm_states.py, 25 MB de intermedios.
+benchmarks/menu_probe_work/
+benchmarks/state_farm_work/
+
+# Respaldos y locks que generan el hub y el manifiesto en caliente.
+fleet/fleet.json.bak
+retro_integration/states_manifest.json.lock
