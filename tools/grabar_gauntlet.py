@@ -148,6 +148,10 @@ def main():
                          "dos corridas no se copien; fijala para reproducir.")
     ap.add_argument("--sin-video", action="store_true",
                     help="solo medir (rapido): no graba ni codifica")
+    ap.add_argument("--forzar-registro", action="store_true",
+                    help="escribe el acta de registro aunque tenga MENOS peleas "
+                         "que la que ya esta en disco. Sin esto, una corrida "
+                         "chica no puede pisar una medicion grande.")
     args = ap.parse_args()
 
     destino = args.out or os.path.join(
@@ -234,11 +238,37 @@ def main():
     # benchmarks/gauntlet_lvlN.json y es lo que la consola muestra; una corrida
     # CON video escribe su acta como sidecar del video (<video>.json) y no toca
     # el registro -- un video es una ilustracion, no una medicion.
-    if args.sin_video:
-        acta = os.path.join(os.path.dirname(destino) or ".",
-                            f"gauntlet_lvl{args.difficulty}.json")
-    else:
+    # Y la segunda mitad de la leccion, que la primera no cubrio: una corrida
+    # --sin-video de UN SUBCONJUNTO de rivales, o con menos peleas que la que ya
+    # esta en disco, tambien pisaba el registro -- con el nombre correcto y todo.
+    # El registro es lo que la consola muestra como "asi de bueno es el modelo":
+    # solo lo escribe una medicion COMPLETA, y solo si no encoge la muestra.
+    if not args.sin_video:
         acta = destino.replace(".mp4", ".video.json")
+    else:
+        carpeta = os.path.dirname(destino) or "."
+        registro = os.path.join(carpeta, f"gauntlet_lvl{args.difficulty}.json")
+        acta = registro
+        if args.rivales:
+            acta = os.path.join(
+                carpeta,
+                f"gauntlet_lvl{args.difficulty}_parcial_{int(time.time())}.json")
+            print(f"[gauntlet] corrida de {n_riv}/{len(RIVALES)} rivales: NO es "
+                  f"una medicion de registro. Acta aparte.", flush=True)
+        elif not args.forzar_registro:
+            try:
+                with open(registro, encoding="utf-8") as f:
+                    previas = int(json.load(f).get("peleas_totales", 0))
+            except (OSError, ValueError, TypeError):
+                previas = 0
+            if previas > len(marcador):
+                acta = os.path.join(
+                    carpeta,
+                    f"gauntlet_lvl{args.difficulty}_parcial_{int(time.time())}.json")
+                print(f"[gauntlet] el registro en disco tiene {previas} peleas y "
+                      f"esta corrida {len(marcador)}: no lo piso. Acta aparte "
+                      f"(--forzar-registro si de verdad quieres reemplazarlo).",
+                      flush=True)
     with open(acta, "w", encoding="utf-8") as f:
         json.dump({
             "fecha": time.strftime("%Y-%m-%dT%H:%M:%S"),

@@ -1,4 +1,32 @@
-# Street Fighter II Reinforcement Learning (RL) Pipeline
+# Street Fighter II — Reinforcement Learning (LEIA)
+
+> ## 👉 Empieza por [`HANDOFF.md`](HANDOFF.md)
+>
+> **Este README describe la era BizHawk + Stable-Baselines3, de antes de agosto de
+> 2026.** Sigue siendo cierto para ese backend, que se conserva y se usa para
+> evaluación visual, PvP y humano-contra-IA. Pero ya no es el retrato del proyecto.
+>
+> Lo que pasó después, en corto:
+>
+> * El backend de entrenamiento es **stable-retro** (headless, ~3,700 fps por
+>   proceso), no BizHawk. Los dos hablan el mismo contrato de observación, con
+>   paridad validada bit a bit.
+> * El algoritmo ganador es un **Ape-X DQN distribuido**, no PPO. El campeón,
+>   `benchmarks/apex_milestones/apex_v3291_media990.pt`, hace **~99% de los rounds
+>   de apertura sobre los ocho niveles** de dificultad y **~90% de peleas completas
+>   al mejor de tres en el nivel 8**.
+> * Hay una segunda pista, de **evolución (OpenES) en flota**, en `src/es/`.
+> * Se cazó un bug que vivió **seis meses**: perder pagaba más reward que ganar.
+>   Todo número anterior al 2026-08-26 se midió bajo ese régimen roto.
+> * `sac/` está deliberadamente muerto; `ray`/PBT está deliberadamente fuera de
+>   `requirements.txt`; la interfaz que se mantiene es el dashboard Gradio.
+>
+> `HANDOFF.md` tiene el estado completo, los comandos que funcionan y la cola de
+> trabajo. `agent/memory/` tiene la memoria viva del proyecto.
+
+---
+
+## El pipeline BizHawk + SB3 (documentación histórica)
 
 [![Python 3.13.12](https://img.shields.io/badge/python-3.13.12-blue.svg)](https://www.python.org/downloads/release/python-31312/)
 [![Lua 5.4.6](https://img.shields.io/badge/lua-5.4.6-orange.svg)](https://www.lua.org/)

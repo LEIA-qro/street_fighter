@@ -59,3 +59,8 @@ benchmarks/state_farm_work/
 # Respaldos y locks que generan el hub y el manifiesto en caliente.
 fleet/fleet.json.bak
 retro_integration/states_manifest.json.lock
+
+# Actas de corridas PARCIALES del gauntlet (subconjunto de rivales o n menor que
+# el registro). Son diagnostico de "contra quien pierde", no mediciones: se
+# escriben aparte a proposito para no pisar benchmarks/gauntlet_lvlN.json.
+benchmarks/gauntlet_lvl*_parcial_*.json

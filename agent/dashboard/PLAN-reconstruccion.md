@@ -1,3 +1,27 @@
+> # ⛔ CANCELADO — 2026-09-11
+>
+> **Este documento es HISTORICO. No lo ejecutes.**
+>
+> La reconstruccion de la interfaz se cancelo por decision de Felipe: la
+> consola nueva (React + shadcn, `consola-app/`) salio del arbol y la UI que el
+> proyecto mantiene es el dashboard Gradio, `src/scripts/web_dashboard.py`.
+> El codigo borrado sigue en la historia de git bajo el tag
+> `consola-react-cancelada`.
+>
+> Lo que SI sobrevivio de este trabajo y sigue vigente:
+>
+> * Los arreglos de higiene al Gradio, ya aplicados (commits `6955cafa` y
+>   `3575547c`) — la lista de trampas que este analisis encontro es real y se
+>   uso para arreglarlas.
+> * `tools/leia_hub.py` + `fleet/fleet.json` + `web/consola.html`: los ojos de
+>   la flota. Eso no era interfaz, era observabilidad, y se queda.
+> * `design/champion-chrome.css` y `agent/dashboard/paletas-sf2-medidas.md`:
+>   la paleta medida de pixeles del juego, que usa la consola del hub.
+>
+> Se conserva porque el analisis (que controles mienten, que ramas no se
+> alcanzan, que pestañas no pueden funcionar) es la mejor radiografia que
+> existe del dashboard, y quien lo retome la va a querer. Ver `HANDOFF.md`.
+
 # Reconstrucción del Control Center de LEIA
 
 > Documento final del arquitecto (PLAN-final). Sintetiza el Discover (D1/D2/D3), las siete
@@ -5,7 +29,7 @@
 > Donde una propuesta y el panel se contradicen, **gana el panel por mayoría 2-de-3**; los injertos
 > rescatados se incorporan aunque su propuesta madre haya perdido.
 > Verificaciones propias de hoy (2026-08-27, HEAD `f65a2932`) citadas en línea.
-> Documento completo en `/Users/felipe/TEC/LEIA/street_fighter/.scratch-uiux-dashboard-leia/PLAN-final.md`
+> Este archivo ES el documento completo (copia versionada de `PLAN-final.md`, que vivia en un scratch local).
 
 ---
 

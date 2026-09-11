@@ -18,11 +18,31 @@ Sistema de memoria compartida del proyecto, versionado en git. Convención:
 - [06-pendientes.md](06-pendientes.md) — cola de trabajo abierta.
 - [07-gotchas.md](07-gotchas.md) — trampas conocidas que cuestan horas.
 
-## Snapshot (2026-08-26, tarde)
+## Snapshot (2026-09-11, al cerrar la limpieza de handoff)
 
-- Rama de trabajo: `stage0-metrics-and-semantics` (sobre `sf2-sota-rl-upgrade`, ninguna mergeada a main). Suite: **480 tests**.
-- **Dos entrenamientos vivos**: PPO en la desktop (rumbo a 31M steps, curriculum lvl2→3, BizHawk) y **ES desde cero en la flota** (madre EC2 + M4 como único worker por ahora, 12 rivales lvl1, ~128s/generación).
-- Retro tiene **212 savestates verificados** (lvl1-4 completos ×12 rivales). El bug histórico del reward (perder pagaba más que ganar, 6 meses) está muerto y doble-validado.
-- Equipo: Felipe (FelipeJackFox), Diego (Perea094, diegop00dx@gmail.com), Santiago (SantiagoSaldanaS, sssubias@gmail.com). Los 3 owners de la org GitHub LEIA-qro = admins de tailnet y W&B.
-
-- **08-cola-manana.md** — LA COLA VIVA post noche-de-los-tres-algoritmos (sustituye a 06 en lo operativo): fix numpy del actor, inferencia de savestates lvl5-8 por poke de 0xFE45, fleet-agent, vigilancia de la run del curriculum, experimentos en cola.
+- **EL DOCUMENTO DE ENTRADA ES `HANDOFF.md` EN LA RAIZ.** Esta memoria es el detalle;
+  el handoff es el mapa. El README de la raiz es de la era BizHawk/SB3 y lo dice.
+- **Rama: `main`.** Hasta el 2026-09-11 la verdad vivia en `stage0-metrics-and-semantics`
+  (128 commits de ventaja) y `main` todavia cargaba el bug de reward de 6 meses: quien
+  clonara se llevaba la version rota. Ya se integro. Suite: **629 tests**.
+- **El juego esta resuelto.** Campeon: `benchmarks/apex_milestones/apex_v3291_media990.pt`
+  (Ape-X DQN, 72 acciones con macros). ~99% de rounds de apertura sobre los 8 tiers y
+  **~90% de peleas COMPLETAS al mejor de 3 en lvl8** (n=360 x2 semillas, el banco
+  replica). Muros: BALROG ~50% (sin proyectil, embestida pura), GUILE/EHONDA 65-77%.
+- **El campeon YA ESTA EN GIT.** No lo estaba: v3291, v1212, v781 y v511 vivian solo en
+  la Mac de Felipe. Los alias moviles del selector (escalera_best, curriculum_best,
+  best_desync) NO se versionan -- son byte a byte identicos a hitos que si estan.
+- **Nada corriendo.** La run 1 del curriculum se cerro a proposito el 2026-08-28. El
+  learner esta tumbado, los actores parados, y la madre (EC2) lleva ociosa desde el
+  2026-08-27: **verificar si sigue encendida y cobrando** (HANDOFF.md seccion 7).
+- **UI: la consola React se CANCELO** (Felipe, 2026-09-11). Lo que se mantiene es el
+  dashboard Gradio `src/scripts/web_dashboard.py` (11 arreglos el mismo dia) y
+  `tools/leia_hub.py` con `web/consola.html` como pantalla. Lo borrado vive en el tag
+  `consola-react-cancelada`. Los planes de reconstruccion llevan aviso de CANCELADO.
+- Equipo: Felipe (FelipeJackFox), Diego (Perea094, diegop00dx@gmail.com), Santiago
+  (SantiagoSaldanaS, sssubias@gmail.com). Los 3 owners de la org GitHub LEIA-qro =
+  admins de tailnet y W&B.
+- **La cola viva es `08-cola-manana.md`** (sustituye a 06 en lo operativo). Lo grande:
+  el curriculum por MESH para la run 2, acelerar el learner (replay ratio real 1.10
+  contra un tope de 8 -- vale mas que sumar maquinas), el fix numpy del actor, y los
+  sentidos que faltan (stun, Y de proyectiles, fase del move rival).

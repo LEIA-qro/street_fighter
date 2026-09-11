@@ -5,7 +5,7 @@
     "nadie ni en un /tmp. Regla dura A7 del plan: este archivo NUNCA alimenta",
     "un valor que se muestre como medicion -- solo dice que se ESPERA. Lo que",
     "esta pasando de verdad lo mide el hub contra /status del learner.",
-    "Plan: .scratch-uiux-reconstruccion/41-PLAN-sistema.md seccion 3.2",
+    "Plan: doc/reconstruccion/41-PLAN-sistema.md seccion 3.2 (documento HISTORICO: la reconstruccion se cancelo el 2026-09-11; el plano de control sigue vigente).",
     "runs es una LISTA: el dia que haya dos entrenamientos a la vez, o uno nuevo, la consola no tiene que reescribirse. La marcada `activa` es la que el hub vigila."
   ],
   "schema": "leia-fleet/v1",

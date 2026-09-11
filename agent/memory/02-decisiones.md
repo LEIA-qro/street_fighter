@@ -9,3 +9,21 @@
 - 2026-08-26 **lr para PPO largo**: 3e-4 desatora (Run B); a 16M+ steps enfriar a 1.5e-4 constante (KL subía con clip al tope). --no_anneal_lr siempre (anneal a cero mata la cola del run).
 - 2026-08-26 **Curriculum threshold 75%** se respetó (promocionó legítimo a lvl2 en ~10M steps). Plan B si estanca: bajarlo a 65%.
 - Convenciones duras: git identity FelipeJackFox/felipaupz@gmail.com SIEMPRE; commits con Co-Authored-By Claude; AGENT_GAMMA única literal de descuento (guard AST); obs float32; modelos guardados deben seguir cargando (cambios de obs/action = env nuevo, nunca in-place).
+
+## [2026-09-11] Limpieza de handoff — decisiones de Felipe
+
+- **La consola React se CANCELA, no se pausa.** `consola-app/` (React 19 + shadcn) y su
+  bundle `web/app/` salen del arbol. La UI que el proyecto mantiene es el dashboard
+  Gradio `src/scripts/web_dashboard.py`. Motivo: el proyecto queda en manos de otro
+  compañero y un frontend a medias es una decision que hay que volver a tomar, no un
+  activo. Recuperable: tag `consola-react-cancelada`.
+  Lo que NO era interfaz se queda: `tools/leia_hub.py` (los ojos de la flota) con
+  `web/consola.html` de pantalla, sin build ni node_modules.
+- **`main` pasa a ser la verdad.** `stage0-metrics-and-semantics` se integra. Antes de
+  esto, clonar el repo te daba una version con el bug de reward de 6 meses.
+- **El campeon entra a git.** v3291/v1212/v781/v511 con sus actas. Los alias moviles del
+  selector no (son duplicados exactos, verificado por sha256).
+- **No se podan las pestañas muertas del dashboard** (League, Exploiter, PBT, Optuna).
+  Es una decision de producto, no un arreglo, y `refresh_dropdowns` acopla 10 dropdowns
+  posicionalmente en 5 enlaces: quitar uno rompe el mapeo en silencio. Queda listada en
+  HANDOFF.md seccion 10 con el analisis ya hecho en `agent/dashboard/que-no-reconstruir.md`.
