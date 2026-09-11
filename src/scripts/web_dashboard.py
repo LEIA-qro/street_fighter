@@ -5,6 +5,7 @@ import threading
 import sys
 import re
 import importlib
+import importlib.util
 import glob
 import webbrowser
 import time
@@ -38,45 +39,11 @@ class GlobalState:
 
 state = GlobalState()
 
-DASHBOARD_BUILD_ID = "v1592-unified-r8"
-
-# Una pestaña Gradio abierta conserva el schema de componentes aunque el
-# proceso de Python se reinicie. Si el app_id cambia, navegar con una query
-# nueva fuerza a descargar el frontend correspondiente al backend vigente.
-_DASHBOARD_RELOAD_HEAD = r'''<script>
-(() => {
-  const cfg = window.gradio_config || {};
-  let loadedAppId = cfg.app_id;
-  const root = (cfg.root || window.location.origin).replace(/\/$/, "");
-  const prefix = cfg.api_prefix || "/gradio_api";
-  const endpoint = `${root}${prefix}/app_id`;
-  document.documentElement.dataset.leiaWatcherApp = String(loadedAppId || "pending");
-  console.info(`[LEIA] reload watcher active for app ${loadedAppId || "pending"}`);
-  const timer = window.setInterval(async () => {
-    try {
-      const response = await fetch(`${endpoint}?_=${Date.now()}`, {
-        cache: "no-store"
-      });
-      if (!response.ok) return;
-      const {app_id: liveAppId} = await response.json();
-      if (!loadedAppId) {
-        loadedAppId = liveAppId;
-        document.documentElement.dataset.leiaWatcherApp = String(liveAppId);
-        return;
-      }
-      if (liveAppId && liveAppId !== loadedAppId) {
-        console.info(`[LEIA] app changed ${loadedAppId} -> ${liveAppId}; reloading`);
-        window.clearInterval(timer);
-        const fresh = new URL(window.location.href);
-        fresh.searchParams.set("_app", String(liveAppId));
-        window.location.replace(fresh.toString());
-      }
-    } catch (_) {
-      // Un restart breve puede rechazar una consulta; el siguiente tick reintenta.
-    }
-  }, 3000);
-})();
-</script>'''
+# El dashboard ya no lleva watcher de recarga. Era andamio de una noche de
+# desarrollo urgente: un setInterval de 3 s contra /gradio_api/app_id mas un
+# DASHBOARD_BUILD_ID que habia que subir A MANO en cada edicion (y que se
+# quedo congelado en el nombre de un checkpoint viejo). Si cambias el backend,
+# recarga la pestana.
 
 
 def _finish_emulator_cleanup(proc=None):
@@ -120,6 +87,20 @@ def _clear_stale_stop_marker():
     except FileNotFoundError:
         pass
 
+
+# --- Vocabulario de environment: UNA definicion, no cinco dropdowns ----------
+# Cada dropdown de environment lanza un script distinto, y cada script declara
+# sus propias choices en argparse. Cuando los dos vocabularios se separan, el
+# usuario elige algo valido en la pantalla y el hijo muere en su argparse con
+# un traceback que no dice cual de los dos manda. Paso dos veces: primero con
+# v1 (aceptado por la UI, silenciosamente degradado a v2), y luego con v4
+# (ofrecido en cinco dropdowns, rechazado por cuatro de los cinco scripts).
+# code_testing/pytest/test_dashboard_contratos.py compara estas tuplas contra
+# el argparse REAL de cada script y falla si se vuelven a separar.
+TRAIN_ENV_CHOICES = ["v2", "v3", "v4"]   # src/scripts/train.py
+TUNE_ENV_CHOICES = ["v1", "v2", "v3"]    # src/scripts/tune.py
+SB3_ENV_CHOICES = ["v2", "v3"]           # matchups, liga y exploiter
+SB3_ALGO_CHOICES = ["ppo", "dqn"]        # sac lanza NotImplementedError
 
 STAND_CHECKPOINT_DIRS = (
     Path(config.PROJECT_ROOT) / "benchmarks" / "apex_milestones",
@@ -409,6 +390,8 @@ def refresh_match_apex_checkpoints(p1_current=None, p2_current=None):
     return (
         gr.update(choices=choices, value=p1_selected),
         gr.update(choices=choices, value=p2_selected),
+        get_stand_checkpoint_status(p1_selected),
+        get_stand_checkpoint_status(p2_selected),
     )
 
 def get_all_state_files():
@@ -647,7 +630,24 @@ def force_kill_process():
         pid_str = str(proc.pid)
         try:
             print(f"[Dashboard] Force killing process tree for PID {proc.pid}...")
-            subprocess.run(f"taskkill /F /T /PID {proc.pid}", shell=True, capture_output=True)
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                               capture_output=True)
+            else:
+                # taskkill no existe fuera de Windows: el boton se veia igual y
+                # no mataba nada en la Mac ni en los actores Linux. Aqui se mata
+                # el GRUPO de procesos (los hijos nacen con start_new_session).
+                try:
+                    grupo = os.getpgid(proc.pid)
+                    # stream_logs lanza con start_new_session=True, asi que el
+                    # hijo lidera su propio grupo. La guarda es por si alguien
+                    # cambia eso: matar el grupo PROPIO mataria al dashboard.
+                    if grupo != os.getpgid(0):
+                        os.killpg(grupo, signal.SIGKILL)
+                    else:
+                        proc.kill()
+                except (ProcessLookupError, PermissionError, OSError):
+                    proc.kill()
         except Exception as e:
             print(f"[Dashboard] Error force-killing PID {proc.pid}: {e}")
     # Trigger global process sniper; mantiene bloqueado Launch hasta terminar.
@@ -687,6 +687,14 @@ def update_config_var(key, value):
 # --- Dashboard Tab Handlers ---
 
 def run_tuning(algo, env, study_name, load_zip, load_pkl, phase, timesteps, trials, device):
+    # El selector de environment es compartido con Training, que SI entrena v4
+    # (train.py:22). tune.py:16 no: elegir v4 y darle a tunear moria en el
+    # argparse del hijo, con un traceback que no dice cual de los dos manda.
+    if env not in TUNE_ENV_CHOICES:
+        yield (f"Optuna todavia no soporta el environment '{env}'. "
+               f"tune.py acepta v1, v2 o v3; v4 es el contrato del Ape-X y su "
+               f"pista se tunea a mano (agent/memory/02-decisiones.md).")
+        return
     # Store in models/tuning/{env}/{algo}/
     tuning_dir = os.path.join(config.PROJECT_ROOT, "models", "tuning", env, algo)
     os.makedirs(tuning_dir, exist_ok=True)
@@ -709,19 +717,26 @@ def get_best_tuning_params(algo, env, study_name):
     db_path = os.path.abspath(os.path.join(tuning_dir, "study.db")).replace("\\", "/")
     json_path = os.path.abspath(os.path.join(tuning_dir, f"best_params_{study_name}.json")).replace("\\", "/")
     
-    script = f"""import optuna, json
+    # El nombre del estudio lo escribe el usuario en un textbox. Interpolarlo
+    # dentro del fuente que luego se EJECUTA convertia ese textbox en una
+    # consola de Python. Ahora los tres valores viajan por argv y el script es
+    # una constante.
+    script = """import optuna, json, sys
+study_name, db_path, json_path = sys.argv[1:4]
 try:
-    study = optuna.load_study(study_name='{study_name}', storage='sqlite:///{db_path}')
-    print(f'Best Trial: {{study.best_trial.number}}')
-    print(f'Value: {{study.best_value}}')
-    print(f'Params: {{study.best_params}}')
-    with open('{json_path}', 'w') as f:
+    study = optuna.load_study(study_name=study_name, storage='sqlite:///' + db_path)
+    print(f'Best Trial: {study.best_trial.number}')
+    print(f'Value: {study.best_value}')
+    print(f'Params: {study.best_params}')
+    with open(json_path, 'w') as f:
         json.dump(study.best_params, f, indent=4)
 except Exception as e:
-    print(f'Error: {{e}}')"""
-    
+    print(f'Error: {e}')"""
+
     try:
-        result = subprocess.check_output([VENV_PYTHON, "-c", script], text=True, stderr=subprocess.STDOUT)
+        result = subprocess.check_output(
+            [VENV_PYTHON, "-c", script, str(study_name), db_path, json_path],
+            text=True, stderr=subprocess.STDOUT)
         if os.path.exists(json_path):
             return result, json_path
         return result, None
@@ -746,21 +761,32 @@ def run_training(algo, env, model_name, load_zip, load_pkl, phase, timesteps, lr
         yield log
 
 def launch_tb():
+    """Arranca TensorBoard en ESTA maquina y devuelve la URL.
+
+    Antes hacia Popen(shell=True) con las rutas interpoladas en una cadena de
+    shell, y ademas webbrowser.open(): con el dashboard servido en red, eso
+    abria una ventana en la computadora del SERVIDOR, no en la de quien hizo
+    clic. Ahora: lista de argumentos (sin shell) y la URL se devuelve para que
+    el navegador correcto la abra.
+    """
     pbt_log_dir = os.path.join(config.get_directory()["tuning"], "pbt")
-    # Use logdir_spec to monitor multiple directories
-    log_spec = f'logs:"{config.LOG_DIR}",pbt_tuning:"{pbt_log_dir}"'
-    cmd = f'"{VENV_PYTHON}" -m tensorboard.main --logdir_spec {log_spec} --port 6006'
-    subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log_spec = f"logs:{config.LOG_DIR},pbt_tuning:{pbt_log_dir}"
+    cmd = [VENV_PYTHON, "-m", "tensorboard.main",
+           "--logdir_spec", log_spec, "--port", "6006"]
+    try:
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        return f"No se pudo arrancar TensorBoard: {exc}"
     time.sleep(2)
-    webbrowser.open("http://localhost:6006")
-    return "TensorBoard launched at http://localhost:6006"
+    return ("TensorBoard corriendo en la maquina del dashboard: "
+            "http://localhost:6006 (abrelo tu; el servidor ya no abre "
+            "ventanas por ti)")
 
 APEX_P2_ALGO_TO_TYPE = {
     "Human Player": "human",
     "CPU (Built-in AI)": "cpu",
     "apex": "model",
     "ppo": "sb3",
-    "sac": "sb3",
     "dqn": "sb3",
 }
 
@@ -810,7 +836,7 @@ def run_matchup(p1_algo, p1_env, p1_zip, p1_pkl, p1_device,
             "Para modelo vs modelo selecciona Ape-X también como P2.")
         return
 
-    ai_algos = ["ppo", "dqn"]
+    ai_algos = list(SB3_ALGO_CHOICES)
     p1_is_ai = p1_algo in ai_algos
     p2_is_ai = p2_algo in ai_algos
 
@@ -890,10 +916,12 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
             _p2_path, p2_relative, _p2_meta = _resolve_stand_checkpoint(
                 p2_checkpoint)
         if opponent_type == "sb3":
-            if p2_algo not in ("ppo", "dqn"):
-                raise ValueError("el rival SB3 debe ser PPO, SAC o DQN")
-            if p2_env not in ("v2", "v3"):
-                raise ValueError("el environment del rival SB3 debe ser v2 o v3")
+            if p2_algo not in SB3_ALGO_CHOICES:
+                raise ValueError("el rival SB3 debe ser PPO o DQN")
+            if p2_env not in SB3_ENV_CHOICES:
+                raise ValueError(
+                    "el rival SB3 corre en v2 o v3 (stand_leia.py:551). Para un "
+                    "rival con obs v4 elige Ape-X, no un modelo SB3")
             for label, selected in (("modelo .zip", p2_zip),
                                     ("normalización .pkl", p2_pkl)):
                 if not selected or selected == "None":
@@ -937,6 +965,17 @@ def run_stand(checkpoint, opponent_type, opponent, cpu_level,
         cmd += ["--infinite-match"]
     for log in stream_logs(cmd):
         yield log
+
+
+def read_agent_state_label():
+    """Lo que dice .agent_state AHORA. Nadie mas debe inventar este texto."""
+    state_file = os.path.join(config.PROJECT_ROOT, ".agent_state")
+    try:
+        with open(state_file, "r") as f:
+            current = f.read().strip() or "PAUSE"
+    except OSError:
+        return "Agent State: **PAUSED** (sin sesion)"
+    return f"Agent State: **{current}**"
 
 
 def toggle_agent_state():
@@ -1012,6 +1051,17 @@ def handle_model_upload(file_obj, algo, env):
         import json
         file_path = file_obj.name if hasattr(file_obj, "name") else file_obj
         filename = os.path.basename(file_path)
+        # algo viene del mismo dropdown que ofrece "Human Player", "CPU
+        # (Built-in AI)" y "apex": usarlo de nombre de carpeta creaba
+        # models/production/v2/Human Player/ (con espacio) al primer clic.
+        if algo not in SB3_ALGO_CHOICES:
+            return (f"Esta zona de subida es para modelos SB3 (.zip/.pkl). "
+                    f"'{algo}' no es un algoritmo SB3; los checkpoints Ape-X "
+                    f"(.pt) se distribuyen por git en benchmarks/apex_milestones/.",
+                    gr.update(), gr.update())
+        if env not in SB3_ENV_CHOICES:
+            return (f"Environment SB3 no valido: '{env}'.",
+                    gr.update(), gr.update())
         target_dir = os.path.join(config.PROJECT_ROOT, "models", "production", env, algo)
         os.makedirs(target_dir, exist_ok=True)
         
@@ -1046,6 +1096,17 @@ def handle_model_upload(file_obj, algo, env):
         return f"**Error:** {e}", gr.update(), gr.update()
 
 def run_pbt(algo, env, model_name, load_zip, load_pkl, phase, total_steps, exploit_steps, population, max_concurrent, resume, envs_per_worker):
+    # train_pbt.py -> agents.pbt.pbt_orchestrator -> ray[tune], que esta
+    # DELIBERADAMENTE fuera de requirements.txt (agent/handoff.md:100). Sin
+    # esta guarda, el boton entregaba un ImportError crudo que parecia un bug
+    # del proyecto en vez de una dependencia ausente a proposito.
+    if importlib.util.find_spec("ray") is None:
+        yield ("PBT necesita ray[tune], que no esta instalado en este venv "
+               "(esta excluido de requirements.txt a proposito). Instalalo con "
+               "`.venv/bin/pip install 'ray[tune]'` si de verdad vas a correr "
+               "PBT; si no, la pista viva del proyecto es Ape-X "
+               "(tools/RUN_LARGA_DQN.md).")
+        return
     cmd = [VENV_PYTHON, os.path.join(config.SRC_DIR, "scripts", "train_pbt.py"), 
            "--algo", algo, "--env", env, "--model_name", model_name,
            "--steps", str(total_steps), "--population", str(population),
@@ -1717,9 +1778,9 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             gr.Markdown("### Global Settings")
             with gr.Row():
                 with gr.Column(scale=1):
-                    algo_sel = gr.Dropdown(label="Algorithm", choices=["ppo", "dqn"], value="ppo")
+                    algo_sel = gr.Dropdown(label="Algorithm", choices=SB3_ALGO_CHOICES, value="ppo")
                 with gr.Column(scale=1):
-                    env_sel = gr.Dropdown(label="Environment", choices=["v2", "v3", "v4"], value="v2")
+                    env_sel = gr.Dropdown(label="Environment", choices=TRAIN_ENV_CHOICES, value="v2")
                 with gr.Column(scale=1):
                     tb_main_btn = gr.Button("📈 Launch TensorBoard", variant="secondary")
             
@@ -1832,7 +1893,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             with gr.Row():
                                 league_model_name = gr.Textbox(label="League Model Name", value="league")
                                 league_steps = gr.Number(label="Total Timesteps", value=5000000, precision=0)
-                                league_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3", "v4"], value="v2")
+                                # train_league.py:156 declara choices=["v2","v3"]: v4 aqui reventaba en el hijo.
+                                league_env = gr.Dropdown(label="Environment Version", choices=SB3_ENV_CHOICES, value="v2")
                                 league_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 
                             all_states = get_all_state_files()
@@ -1870,7 +1932,8 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                                 exploiter_steps = gr.Number(label="Timesteps", value=1000000, precision=0)
                                 
                             with gr.Row():
-                                exploiter_env = gr.Dropdown(label="Environment Version", choices=["v2", "v3", "v4"], value="v2")
+                                # train_exploiter.py:156 tambien es {v2,v3}.
+                                exploiter_env = gr.Dropdown(label="Environment Version", choices=SB3_ENV_CHOICES, value="v2")
                                 exploiter_device = gr.Dropdown(label="Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                                 exploiter_matchup_mode = gr.Dropdown(
                                     label="Matchup Mode", 
@@ -1916,13 +1979,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         p1_algo = gr.Dropdown(
                             label="P1 Algorithm",
                             choices=[
-                                "ppo", "dqn",
+                                *SB3_ALGO_CHOICES,
                                 ("Ape-X QR-DQN (.pt)", "apex"),
                                 "Human Player",
                             ],
                             value="ppo",
                         )
-                        p1_env = gr.Dropdown(label="P1 Environment", choices=["v2", "v3", "v4"], value="v2")
+                        p1_env = gr.Dropdown(label="P1 Environment", choices=SB3_ENV_CHOICES, value="v2")
                     p1_device = gr.Dropdown(label="P1 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p1_model_group:
@@ -1935,6 +1998,17 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             value=stand_default_init,
                             visible=False,
                         )
+                        # get_stand_checkpoint_status existia desde la noche
+                        # del stand y no estaba enlazada a NADA: la escalera
+                        # L1-L8, el WR y la version de pesos se recitaban a
+                        # mano en RUN_STAND_LEIA.md porque la pantalla dejo de
+                        # mostrarlos. Es lo unico demostrable del proyecto.
+                        p1_apex_status = gr.Markdown(
+                            get_stand_checkpoint_status(stand_default_init)
+                            if stand_default_init else
+                            "Sin checkpoints Ape-X en benchmarks/apex_milestones/.",
+                            visible=False,
+                        )
                         with gr.Row():
                             p1_zip_upload = gr.File(label="Upload P1 Model (.zip)", file_types=[".zip"])
                             p1_pkl_upload = gr.File(label="Upload P1 Normalization (.pkl)", file_types=[".pkl"])
@@ -1944,13 +2018,13 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                         p2_algo = gr.Dropdown(
                             label="P2 Algorithm",
                             choices=[
-                                "ppo", "dqn",
+                                *SB3_ALGO_CHOICES,
                                 ("Ape-X QR-DQN (.pt)", "apex"),
                                 "Human Player", "CPU (Built-in AI)",
                             ],
                             value="ppo",
                         )
-                        p2_env = gr.Dropdown(label="P2 Environment", choices=["v2", "v3", "v4"], value="v2")
+                        p2_env = gr.Dropdown(label="P2 Environment", choices=SB3_ENV_CHOICES, value="v2")
                     p2_device = gr.Dropdown(label="P2 Compute Device", choices=["auto", "cpu", "cuda"], value="auto")
                     
                     with gr.Column(visible=True) as p2_model_group:
@@ -1961,6 +2035,17 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                             label="P2 Ape-X checkpoint (.pt)",
                             choices=stand_checkpoints_init,
                             value=stand_default_init,
+                            visible=False,
+                        )
+                        # get_stand_checkpoint_status existia desde la noche
+                        # del stand y no estaba enlazada a NADA: la escalera
+                        # L1-L8, el WR y la version de pesos se recitaban a
+                        # mano en RUN_STAND_LEIA.md porque la pantalla dejo de
+                        # mostrarlos. Es lo unico demostrable del proyecto.
+                        p2_apex_status = gr.Markdown(
+                            get_stand_checkpoint_status(stand_default_init)
+                            if stand_default_init else
+                            "Sin checkpoints Ape-X en benchmarks/apex_milestones/.",
                             visible=False,
                         )
                         with gr.Row():
@@ -2016,6 +2101,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                     gr.update(visible=is_sb3),
                     gr.update(visible=is_sb3),
                     gr.update(visible=is_apex),
+                    gr.update(visible=is_apex),
                 )
 
             p1_algo.change(
@@ -2024,6 +2110,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 outputs=[
                     p1_model_group, p1_zip, p1_pkl,
                     p1_zip_upload, p1_pkl_upload, p1_apex_checkpoint,
+                    p1_apex_status,
                 ],
             )
             p2_algo.change(
@@ -2032,6 +2119,7 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
                 outputs=[
                     p2_model_group, p2_zip, p2_pkl,
                     p2_zip_upload, p2_pkl_upload, p2_apex_checkpoint,
+                    p2_apex_status,
                 ],
             )
 
@@ -2089,9 +2177,15 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             )
 
             def update_infinite_match_status(is_infinite):
-                if is_infinite:
-                    return "Agent State: **PLAYING** (Auto)"
-                return "Agent State: **PAUSED** (Default)"
+                # Antes afirmaba "PLAYING (Auto)" con solo marcar la casilla,
+                # sin que existiera proceso ni archivo: el indicador contaba
+                # una historia y .agent_state contaba otra. Ahora lee el disco,
+                # que es la unica fuente de verdad (stand_leia.py la consulta
+                # para reanudar), y la casilla solo anade lo que hara AL
+                # lanzar.
+                nota = (" · al lanzar, auto-rematch encendido" if is_infinite
+                        else "")
+                return f"{read_agent_state_label()}{nota}"
 
             infinite_match_checkbox.change(update_infinite_match_status, inputs=[infinite_match_checkbox], outputs=[agent_state_status])
 
@@ -2119,7 +2213,17 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
             refresh_apex_btn.click(
                 refresh_match_apex_checkpoints,
                 inputs=[p1_apex_checkpoint, p2_apex_checkpoint],
-                outputs=[p1_apex_checkpoint, p2_apex_checkpoint],
+                outputs=[p1_apex_checkpoint, p2_apex_checkpoint,
+                         p1_apex_status, p2_apex_status],
+            )
+
+            p1_apex_checkpoint.change(
+                get_stand_checkpoint_status,
+                inputs=[p1_apex_checkpoint], outputs=[p1_apex_status],
+            )
+            p2_apex_checkpoint.change(
+                get_stand_checkpoint_status,
+                inputs=[p2_apex_checkpoint], outputs=[p2_apex_status],
             )
 
         # --- TAB 2.5: TELEMETRY ---
@@ -2310,19 +2414,45 @@ with gr.Blocks(title="Street Fighter II RL Dashboard") as demo:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Street Fighter II RL Gradio Web Control Center")
-    parser.add_argument("--host", "--server_name", dest="server_name", type=str, default="0.0.0.0", help="Server host address (default: 0.0.0.0)")
+    # El default era 0.0.0.0 SIN autenticacion: esta pantalla mata procesos de
+    # entrenamiento, reescribe src/core/config.py y sube archivos al repo, y
+    # quedaba expuesta a toda la red del lugar donde se abriera. El default
+    # ahora es local; exponerla es una decision explicita y --auth existe para
+    # cuando se tome.
+    parser.add_argument("--host", "--server_name", dest="server_name", type=str, default="127.0.0.1",
+                        help="Direccion de escucha (default: 127.0.0.1, solo esta maquina). "
+                             "Usa 0.0.0.0 para exponerla en la red -- de preferencia con --auth.")
     parser.add_argument("--port", "--server_port", dest="server_port", type=int, default=7860, help="Server port number (default: 7860)")
     parser.add_argument("--share", action="store_true", help="Generate public shareable Gradio link")
+    parser.add_argument("--auth", type=str, default=None, metavar="USUARIO:CLAVE",
+                        help="Exige usuario y clave para entrar. Obligatorio en la practica "
+                             "si pones --host 0.0.0.0 o --share.")
     args = parser.parse_args()
 
-    print(f"[Dashboard] build {DASHBOARD_BUILD_ID}", flush=True)
+    auth = None
+    if args.auth:
+        if ":" not in args.auth:
+            parser.error("--auth se escribe USUARIO:CLAVE")
+        usuario, _, clave = args.auth.partition(":")
+        if not usuario or not clave:
+            parser.error("--auth necesita usuario Y clave, ambos no vacios")
+        auth = (usuario, clave)
+
+    expuesto = args.share or args.server_name not in ("127.0.0.1", "localhost")
+    if expuesto and auth is None:
+        print("[Dashboard] AVISO: escuchando en "
+              f"{args.server_name}{' + share publico' if args.share else ''} SIN "
+              "autenticacion. Cualquiera que alcance este puerto puede detener "
+              "entrenamientos y editar la configuracion. Usa --auth USUARIO:CLAVE.",
+              flush=True)
+
     demo.queue().launch(
         server_name=args.server_name, 
         server_port=args.server_port, 
         share=args.share,
+        auth=auth,
         theme=gr.themes.Soft(primary_hue="blue"), 
         css="#terminal-train textarea, #terminal-league textarea, #terminal-match textarea { font-family: monospace; }",
-        head=_DASHBOARD_RELOAD_HEAD,
     )
 
 if __name__ == "__main__":

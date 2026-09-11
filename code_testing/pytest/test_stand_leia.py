@@ -418,8 +418,21 @@ def test_n_actions_is_72():
 
 
 def test_default_checkpoint_tracks_frozen_benchmarked_champion():
+    """El default es el campeon CONGELADO de la run 1, no el de media jornada.
+
+    Este test se actualizo el 2026-09-11: apuntaba a apex_v1592_benchmarked.pt
+    (2026-08-27) y ahi se quedo cuando la run cerro con un campeon mejor, asi
+    que el dashboard y el CLI arrancaban un modelo peor del que ya existia.
+    Fijar el nombre es deliberado: un cambio de campeon debe ser una decision
+    con acta, no un default que se mueve solo.
+    """
     assert Path(DEFAULT_CHECKPOINT).as_posix().endswith(
-        "benchmarks/apex_milestones/apex_v1592_benchmarked.pt")
+        "benchmarks/apex_milestones/apex_v3291_media990.pt")
+    sidecar = Path(__file__).resolve().parents[2] / (DEFAULT_CHECKPOINT + ".json")
+    assert sidecar.is_file(), "el campeon viaja con su acta al lado"
+    metrics = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert metrics["weights_version"] == 3291
+    assert metrics["wr_media"] == 0.99
 
 
 def test_match_session_log_flushes_rounds_and_summary(tmp_path):

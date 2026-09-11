@@ -15,7 +15,7 @@ desktop, o una laptop para exhibición). Piezas internas:
 1. El rig BizHawk del proyecto funcionando (el mismo de `test_ai_vs_ai_v2` /
    entrenamientos: BizHawk 2.8, ROM en `roms/`, venv de Windows con torch).
 2. `git pull` trae Lua, driver, dashboard y el checkpoint congelado
-   `benchmarks\apex_milestones\apex_v1592_benchmarked.pt`, junto con su
+   `benchmarks\apex_milestones\apex_v3291_media990.pt`, junto con su
    sidecar de resultados. No hace falta copiar el modelo por separado.
 3. **El control del retador como Player 2**: BizHawk → Config → Controllers
    → Genesis 3-button/6-button → asignar el pad USB al **puerto 2** y
@@ -39,12 +39,22 @@ Desde la raíz del repo, en PowerShell:
 
 Si se acaba de reemplazar `web_dashboard.py`, cerrar primero cualquier pestaña
 vieja de `localhost:7860`: un frontend Gradio ya abierto conserva los IDs de
-los componentes anteriores aunque el backend haya reiniciado. Abrir una carga
-fresca y versionada:
+los componentes anteriores aunque el backend haya reiniciado. Recargar la
+pestaña a fondo (Ctrl+Shift+R) basta:
 
 ```powershell
-Start-Process "http://127.0.0.1:7860/?build=v1592-unified-r8"
+Start-Process "http://127.0.0.1:7860/"
 ```
+
+El dashboard escucha en `127.0.0.1` (solo esta maquina). Para que alguien mas
+lo abra desde la red del evento hace falta decirlo, y con clave:
+
+```powershell
+.venv\Scripts\python.exe src\scripts\web_dashboard.py --host 0.0.0.0 --auth leia:LA-CLAVE-DEL-DIA
+```
+
+Sin `--auth`, cualquiera que alcance ese puerto puede detener un entrenamiento
+y editar la configuracion del repo desde un telefono.
 
 Entrar a **🎮 Model Testing & Matchups**. Ape-X ya vive en los mismos
 selectores P1/P2 del probador clásico; no hay una sección duplicada abajo:
@@ -82,7 +92,7 @@ Para diagnosticar sin Gradio se puede llamar al driver interno directamente:
 ```
 
 Sin `--ckpt`, usa
-`benchmarks\apex_milestones\apex_v1592_benchmarked.pt`.
+`benchmarks\apex_milestones\apex_v3291_media990.pt`.
 CPU nivel 6:
 
 ```powershell
@@ -92,7 +102,7 @@ CPU nivel 6:
 Modelo vs modelo:
 
 ```powershell
-.venv\Scripts\python.exe src\scripts\stand_leia.py --opponent-type model --opponent RYU --p2-ckpt benchmarks\apex_milestones\apex_v1592_benchmarked.pt
+.venv\Scripts\python.exe src\scripts\stand_leia.py --opponent-type model --opponent RYU --p2-ckpt benchmarks\apex_milestones\apex_v3291_media990.pt
 ```
 
 También admite `--opponent KEN`, `--ckpt <ruta>` y `--rematch-delay 4.0`; se
@@ -122,10 +132,13 @@ termina con **Ctrl+C**.
   Get-ChildItem .\logs\model_testing\apex_viewer\*.jsonl |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1
   ```
-- **La IA juega en serio** (v1592: 363/384, 94.5% en la escalera completa;
-  lvl1-3: 100/100/100%). Para
+- **La IA juega en serio** (v3291: 99.0% de media en la escalera completa;
+  L1-L6 al 100%, L7 97.9%, L8 93.8%, y ~90% de peleas COMPLETAS al mejor de 3
+  en lvl8). El dashboard ya no obliga a recitar estos numeros: la tarjeta bajo
+  el selector de checkpoint los muestra, leidos del sidecar del modelo. Para
   visitantes casuales usa un checkpoint anterior que también declare
-  `macros=true` y 72 acciones. Los `apex_grads_*.pt` viejos de 63 acciones
+  `macros=true` y 72 acciones -- `apex_v1212_escalera854.pt` (85.4%) es el
+  escalon justo debajo. Los `apex_grads_*.pt` viejos de 63 acciones
   **no son compatibles** con este viewer.
 - Payload de 13 campos / error "¿Lua viejo?": BizHawk cargó
   `match_test_env_client.lua` — el driver ya apunta al Lua nuevo; `git pull`

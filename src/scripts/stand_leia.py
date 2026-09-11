@@ -80,11 +80,19 @@ OPPONENTS = ("RYU", "EHONDA", "BLANKA", "GUILE", "KEN", "CHUNLI",
 
 HUMAN_PASSTHROUGH = ".........."   # 10 puntos: el Lua no toca ese pad
 
-# Campeon congelado despues de completar el benchmark de la escalera 1-8.
+# Campeon congelado de la run 1 del curriculum, cerrada el 2026-08-28.
 # Se usa un nombre versionado para que una run activa no cambie silenciosamente
 # el modelo que recibe otra maquina mediante git pull.
+#
+# v3291: 99.0% de media sobre los 8 tiers (n=48/nivel) y ~90% de PELEAS
+# COMPLETAS al mejor de 3 en lvl8, con dos bancos independientes de n=360.
+# Escalera: 100/100/100/100/100/100/97.9/93.8. Acta en agent/memory/05-runs.md.
+#
+# Estuvo apuntando a apex_v1592_benchmarked.pt (el campeon de MEDIA jornada del
+# 2026-08-27) durante las dos semanas siguientes al cierre de la run: el
+# dashboard y el CLI arrancaban un modelo peor que el que el proyecto ya tenia.
 DEFAULT_CHECKPOINT = os.path.join(
-    "benchmarks", "apex_milestones", "apex_v1592_benchmarked.pt")
+    "benchmarks", "apex_milestones", "apex_v3291_media990.pt")
 
 
 def checkpoint_provenance(checkpoint_path: str) -> dict:
@@ -546,7 +554,7 @@ def main():
                     help="checkpoint Ape-X de Player 2 en modo model")
     ap.add_argument("--p2-device", default=None,
                     help="device de P2; por defecto usa el mismo que P1")
-    ap.add_argument("--p2-algo", choices=("ppo", "sac", "dqn"),
+    ap.add_argument("--p2-algo", choices=("ppo", "dqn"),
                     help="algoritmo del modelo clásico de P2")
     ap.add_argument("--p2-env", choices=("v2", "v3"), default="v2",
                     help="versión del environment usada por el modelo P2")

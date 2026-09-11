@@ -684,8 +684,9 @@ class TestTelemetryDashboard(unittest.TestCase):
         p2_apex = by_label("P2 Ape-X checkpoint (.pt)")
         self.assertFalse(p1_apex["props"]["visible"])
         self.assertFalse(p2_apex["props"]["visible"])
-        self.assertTrue(str(p1_apex["props"]["value"]).endswith(
-            "apex_v1592_benchmarked.pt"))
+        for lado in (p1_apex, p2_apex):
+            self.assertTrue(str(lado["props"]["value"]).endswith(
+                "apex_v3291_media990.pt"))
         self.assertFalse(by_label(
             "P2 Character (Ape-X matches)")["props"]["visible"])
         self.assertFalse(any(
