@@ -27,3 +27,13 @@
   Es una decision de producto, no un arreglo, y `refresh_dropdowns` acopla 10 dropdowns
   posicionalmente en 5 enlaces: quitar uno rompe el mapeo en silencio. Queda listada en
   HANDOFF.md seccion 10 con el analisis ya hecho en `agent/dashboard/que-no-reconstruir.md`.
+
+- 2026-09-11 **Tirar la infra de AWS** (decisión de Felipe). Las tres runs de ES estaban
+  cerradas desde el 26 de agosto y la madre llevaba 16 días encendida sin trabajo. Se
+  destruyeron los seis recursos que manejaba terraform; `infra/` se conserva ENTERO a
+  propósito, "por si se vuelve a necesitar". Antes de destruir se rescató de S3 lo no
+  reproducible (últimas generaciones de las runs 1 y 2, que solo vivían ahí) y se
+  documentó en `benchmarks/LEEME-runs-ES.md`. W&B y Tailscale NO se tocaron: son el
+  registro científico y la malla del equipo, no infraestructura de cómputo.
+  Lo aprendido: el tfstate vive solo en una Mac, y la cuenta AWS es compartida con otros
+  proyectos — al limpiar, filtrar siempre por el tag `Project = leia-sf2-es`.

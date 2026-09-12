@@ -132,7 +132,7 @@ Necesitas el ROM en `roms/` con sha1 `a5aad1d108046d9388e33247610dafb4c6516e0b`
 | `fleet/` | `fleet.json` = el censo de qué DEBERÍA estar corriendo. `history/` = lo que pasó. |
 | `agent/memory/` | **La memoria del proyecto. Ocho archivos densos. Léelos.** |
 | `code_testing/pytest/` | 630 tests. Cada bug histórico tiene su regresión. |
-| `infra/` | Terraform de la "madre" (EC2 coordinador del ES). |
+| `infra/` | Terraform de la "madre" (EC2 coordinador del ES). **La pila está DESTRUIDA desde el 2026-09-11**; esto es la receta para volver a levantarla. |
 | `doc/reconstruccion/`, `agent/dashboard/` | Análisis de la interfaz. **Planes CANCELADOS**, conservados como radiografía. Ver §6. |
 
 **`agent/memory/INDEX.md` es el mapa vivo.** `agent/handoff.md` (69k) y
@@ -230,24 +230,45 @@ Métricas en **Weights & Biases**, equipo `leia-qro-rl`, dos proyectos que no se
 `leia-sf2-dqn` (pista Ape-X) y `leia-sf2-es` (pista evolución). Solo la madre necesita
 el API key.
 
-**⚠️ Lo primero que alguien tiene que verificar: la "madre".** Es una EC2 `t3.small`
-en `us-east-1`, cuenta AWS de educación (perfil `awsedu`, `800407728644`), creada con
-el terraform de `infra/`. Es el coordinador del ES y **lleva ociosa desde el
-2026-08-27**, esperando una run 4 que nunca se lanzó. No pude comprobar si sigue
-encendida (el token de SSO estaba vencido). Si ya no se va a correr ES, **está cobrando
-por nada**:
+**La "madre" ya no existe.** Era una EC2 `t3.small` en `us-east-1`, cuenta AWS de
+educación, coordinadora de la pista ES. Llevaba **dieciséis días encendida sin trabajo**
+desde que se cerró la run 3, así que el 2026-09-11 se destruyó la pila completa: la
+instancia, el bucket de checkpoints, el rol y la política de IAM, el perfil de instancia
+y el security group. Seis recursos, cero sobrantes, verificado después. **No queda nada
+de este proyecto corriendo en AWS y no está costando nada.**
+
+Antes de destruir se bajó de S3 lo que no era reproducible: los `.npz` de las últimas
+generaciones de las runs 1 y 2 solo existían ahí, porque el coordinador siguió guardando
+unas generaciones después de que el equipo diera las runs por cerradas. Están en el repo
+y `benchmarks/LEEME-runs-ES.md` explica qué queda de cada run. Las curvas generación a
+generación siguen en W&B, que no se tocó.
+
+**Para volver a levantarla:** `infra/` conserva el terraform entero y su README es
+correcto de principio a fin. Necesitas un auth key nuevo de Tailscale (el anterior era
+de un solo uso) y borrar el nodo `madre` viejo de la consola de Tailscale.
 
 ```bash
 aws sso login --sso-session focaltec
-AWS_PROFILE=awsedu aws ec2 describe-instances --region us-east-1 \
-  --filters "Name=tag:Project,Values=leia-sf2-es" \
-  --query "Reservations[].Instances[].[InstanceId,State.Name,LaunchTime]" --output text
-# Para tirarla sin rastro: cd infra && terraform destroy
-# (después, borrar a mano el nodo "madre" en la consola de Tailscale)
+AWS_PROFILE=awsedu tofu -chdir=infra apply     # en la Mac de Felipe está OpenTofu
 ```
 
-Todo lo de operación — cómo entrar a la madre, cómo lanzar un run fresco, dónde viven
-los secretos, qué máquina falta dar de alta — está en `agent/memory/04-infra.md`.
+⚠️ **El estado de Terraform vive solo en la Mac de Felipe** (`infra/terraform.tfstate`,
+gitignoreado porque lleva secretos en claro). Si se pierde, Terraform no sabe qué
+destruir y hay que limpiar a mano filtrando por el tag `Project = leia-sf2-es`. Si esto
+se vuelve a levantar para más de una persona, el estado debería ir a un backend remoto.
+
+⚠️ **Queda un pendiente manual que yo no puedo hacer:** borrar el nodo `madre` de la
+consola de Tailscale (`leia-qro.org.github`). La máquina ya no existe, pero el nodo sigue
+listado hasta que alguien lo quite a mano.
+
+⚠️ **La cuenta de AWS es compartida con otros proyectos** — orchestrator de Focaltec,
+clawd-relay, peñafiel, y una instancia `kaeser-private` en us-west-2. Nada de eso se
+tocó, y nada de eso es de LEIA. Si alguna vez limpias AWS de este proyecto, filtra por el
+tag `Project = leia-sf2-es` y por nada más.
+
+Lo demás de operación — Tailscale, W&B, dónde viven los secretos, qué máquina falta dar
+de alta — está en `agent/memory/04-infra.md`, con las partes de AWS marcadas como
+históricas.
 
 ---
 
@@ -323,7 +344,8 @@ y commiteado; le falta una corrida real con BizHawk, ~5 minutos con el runbook.
 
 ## 10. Decisiones que esperan a un humano
 
-1. **La madre (EC2).** ¿Se va a correr la run 4 del ES, o se destruye? Ver §7.
+1. ~~**La madre (EC2).** ¿Se va a correr la run 4 del ES, o se destruye?~~ —
+   **RESUELTO 2026-09-11: destruida.** Ver §7.
 2. **Las pestañas muertas del dashboard.** Cuatro de las cinco pestañas no tienen uso
    documentado: League y Exploiter nunca se ejecutaron desde ahí (`models/production/league/`
    está vacío), PBT necesita `ray` (excluido de requirements a propósito), Optuna no
@@ -339,9 +361,9 @@ y commiteado; le falta una corrida real con BizHawk, ~5 minutos con el runbook.
    cablea de verdad (como parámetro del lanzamiento, no reescribiendo el fuente), o se
    borra. Lo dejo señalado, no decidido.
 4. **`core/elo.py` está cableado a nada.** Su único importador es su propio test.
-5. **El README de la raíz** describe el proyecto de la era BizHawk/SB3. Sigue siendo
-   cierto para ese backend, pero no es el retrato del proyecto. Le puse un encabezado
-   que apunta aquí; reescribirlo entero es trabajo pendiente.
+5. ~~**El README de la raíz** describe el proyecto de la era BizHawk/SB3.~~ —
+   **RESUELTO 2026-09-11: reescrito entero.** Ahora cubre los dos backends, los dos
+   algoritmos, el bug de seis meses, el mapa del repo y las reglas de la casa.
 
 ---
 

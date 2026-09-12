@@ -32,9 +32,13 @@ Sistema de memoria compartida del proyecto, versionado en git. Convención:
 - **El campeon YA ESTA EN GIT.** No lo estaba: v3291, v1212, v781 y v511 vivian solo en
   la Mac de Felipe. Los alias moviles del selector (escalera_best, curriculum_best,
   best_desync) NO se versionan -- son byte a byte identicos a hitos que si estan.
-- **Nada corriendo.** La run 1 del curriculum se cerro a proposito el 2026-08-28. El
-  learner esta tumbado, los actores parados, y la madre (EC2) lleva ociosa desde el
-  2026-08-27: **verificar si sigue encendida y cobrando** (HANDOFF.md seccion 7).
+- **Nada corriendo, y nada costando.** La run 1 del curriculum se cerro a proposito el
+  2026-08-28; el learner esta tumbado y los actores parados. **La infra de AWS se
+  DESTRUYO el 2026-09-11** (la madre llevaba 16 dias encendida sin trabajo): instancia,
+  bucket, IAM y security group, seis recursos, cero sobrantes. El terraform de `infra/`
+  se conserva para volver a levantarla. Lo de S3 que no era reproducible se rescato al
+  repo: `benchmarks/LEEME-runs-ES.md`. Tailscale y W&B siguen vivos; queda por borrar a
+  mano el nodo `madre` de la consola de Tailscale.
 - **UI: la consola React se CANCELO** (Felipe, 2026-09-11). Lo que se mantiene es el
   dashboard Gradio `src/scripts/web_dashboard.py` (11 arreglos el mismo dia) y
   `tools/leia_hub.py` con `web/consola.html` como pantalla. Lo borrado vive en el tag

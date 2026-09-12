@@ -184,8 +184,11 @@ subiendo) hasta que la escalera se aplane.**
   desktop hospede el learner (un entrenamiento por máquina).
 - **ES run 4**: `--policy v4onehot_macro --sigma-final 0.012
   --sigma-decay-gens 600` + perturbaciones de run 3, cuando haya slot de
-  máquina. La madre (EC2) está VIVA pero ociosa esperándola (unit con flags de
-  run 3; cambiar prefijo S3 a es-run4-macro).
+  máquina. **[2026-09-11] La madre ya NO está esperando: se destruyó junto con
+  toda la infra de AWS** (16 días encendida sin trabajo). Correr esta run ahora
+  empieza por `tofu -chdir=infra apply` con un auth key nuevo de Tailscale —
+  `infra/README.md` tiene la receta. Ojo al relanzar: prefijo S3 nuevo
+  (`es-run4-macro`) y wandb-id nuevo, como siempre.
 - ~~**Humano vs IA en BizHawk**~~ — **CONSTRUIDO (2026-08-27 tarde, modo
   STAND para promocionar LEIA)**: `lua/v2.0/stand_env_client.lua` (payload
   de 25 vars crudas de data.json) + `src/scripts/stand_leia.py` (obs v4

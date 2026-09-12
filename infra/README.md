@@ -1,5 +1,33 @@
 # Infra de 'la madre' — coordinador ES en AWS
 
+> ## 🔌 DESMONTADA — 2026-09-11
+>
+> **No hay nada levantado en AWS. Este directorio es la receta para volver a
+> levantarlo, no la descripción de algo que existe.**
+>
+> El 2026-09-11 se destruyó la pila completa (`tofu destroy`): la instancia, el
+> bucket de checkpoints, el rol y la política de IAM, el perfil de instancia y el
+> security group. Seis recursos, cero sobrantes. Motivo: las tres runs de ES
+> estaban cerradas desde el 26 de agosto y el coordinador llevaba **dieciséis días
+> encendido sin trabajo**.
+>
+> Antes de destruir se rescató de S3 lo que no era reproducible y entró al repo
+> (ver `benchmarks/LEEME-runs-ES.md`). Las curvas generación a generación siguen en
+> Weights & Biases, que no se tocó.
+>
+> **Para volver a levantarla:** este README sigue siendo correcto de principio a
+> fin. Necesitas un auth key nuevo de Tailscale (§2) — el anterior era de un solo
+> uso y ya se consumió — y borrar el nodo `madre` viejo de la consola de Tailscale
+> si todavía aparece. El `terraform.tfstate` local quedó vacío, así que un `apply`
+> crea todo desde cero con nombres nuevos.
+>
+> Y una advertencia que la primera instalación no tuvo: **el estado de Terraform
+> vive solo en la Mac de Felipe** (`infra/terraform.tfstate`, gitignoreado porque
+> contiene secretos en claro). Si se pierde, Terraform no sabe qué destruir y hay
+> que limpiar a mano por el tag `Project = leia-sf2-es`. Si esto se vuelve a
+> levantar para más de una persona, el estado debería ir a un backend remoto.
+
+
 'La madre' es la VPS que coordina el entrenamiento por Evolution Strategies: reparte
 seeds a los workers (nuestras maquinas), agrega los fitness que regresan, actualiza la
 politica y sube checkpoints a S3. Los workers viven en las laptops/desktop del equipo y
@@ -170,16 +198,17 @@ la cuenta queda exactamente como antes; verificalo si quieres con el filtro
 
 ---
 
-## Despliegue actual (2026-08-25)
+## Despliegue histórico (2026-08-25 → 2026-09-11, DESTRUIDO)
 
-Primera madre levantada. Datos para referencia:
+La única madre que existió. Se deja como referencia de qué se creó y con qué
+nombres; **ninguno de estos identificadores existe ya**.
 
 | Dato | Valor |
 |---|---|
 | Cuenta | `800407728644` (Education, perfil `awsedu`) |
 | Región | **us-east-1** (la cuenta no tiene VPC default en us-west-2) |
-| Instancia | `i-03484b27772437719` (t3.small) |
-| Bucket de checkpoints | `leia-sf2-es-ckpt-d4a2b8dc99bbd0b480e7520f5e` |
+| Instancia | `i-03484b27772437719`, reemplazada luego por `i-0a7fb66111036bba6` (t3.small) — **terminada** |
+| Bucket de checkpoints | `leia-sf2-es-ckpt-d4a2b8dc99bbd0b480e7520f5e` — **borrado** (1,949 objetos, 222 MB) |
 | Tailnet | `leia-qro.org.github` (propiedad de la ORG, no de una persona) |
 | Hostname en la malla | `madre` |
 
@@ -196,10 +225,10 @@ sobreviven solo si se subieron a S3 — y el bucket también se borra, así que
 bajen lo que importe antes):
 
 ```bash
-AWS_PROFILE=awsedu terraform -chdir=infra destroy
+AWS_PROFILE=awsedu tofu -chdir=infra destroy   # en esta Mac está OpenTofu, no Terraform
 ```
 
-**Pendientes de esta instalación:**
+**Lecciones de esa instalación, para la próxima:**
 - El auth key generado fue *single-use*: si la instancia se recrea, hay que
   generar otro (marcando **Reusable**) y re-aplicar.
 - `wandb_api_key` quedó vacío: el coordinador corre con W&B en modo offline.

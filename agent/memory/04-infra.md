@@ -1,5 +1,24 @@
 # Infraestructura — cómo operar (2026-08-26)
 
+> **[2026-09-11] LA INFRA DE AWS YA NO EXISTE.** Se destruyó la pila completa de la
+> madre (instancia, bucket de checkpoints, rol/política/perfil de IAM y security group):
+> seis recursos, cero sobrantes, verificado. Llevaba dieciséis días encendida sin trabajo
+> desde que cerró la run 3 del ES. Lo que había en S3 y no era reproducible se rescató al
+> repo — ver `benchmarks/LEEME-runs-ES.md`.
+>
+> Todo lo que dice esta sección sobre "la madre" queda como **historia**: sigue siendo la
+> descripción correcta de lo que hubo y de cómo se opera si se vuelve a levantar
+> (`infra/README.md` tiene la receta completa). Lo que NO se tocó y sigue vivo: Tailscale
+> y Weights & Biases.
+>
+> Pendiente manual: borrar el nodo `madre` de la consola de Tailscale.
+>
+> Nota nueva, aprendida al destruir: el `terraform.tfstate` vive SOLO en la Mac de
+> Felipe. Si se pierde, hay que limpiar AWS a mano por el tag `Project = leia-sf2-es`.
+> Y la cuenta está compartida con otros proyectos (orchestrator, clawd-relay, peñafiel,
+> `kaeser-private`): filtrar SIEMPRE por ese tag.
+
+
 ## La madre (coordinador ES)
 - EC2 t3.small us-east-1, cuenta AWS **educación** (perfil `awsedu`, 800407728644 — NUNCA la de producción). Creada con terraform (infra/), TODO etiquetado Project=leia-sf2-es. `terraform destroy` la tira sin rastro (bucket force_destroy; borrar el nodo "madre" del console de Tailscale a mano después).
 - Acceso: `tailscale ssh ubuntu@madre` (SG sin ingress; todo por Tailscale). Repo en /opt/leia (owned root → usar sudo para git).
